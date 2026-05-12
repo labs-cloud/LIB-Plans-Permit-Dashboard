@@ -1,0 +1,71 @@
+export const CLICKUP = {
+  WORKSPACE_ID: process.env.CLICKUP_WORKSPACE_ID || '9017603275',
+  ACTIVE_PROJECTS_SPACE_ID: process.env.CLICKUP_ACTIVE_PROJECTS_SPACE_ID || '90173230172',
+  PLANS_LIST_NAME: '03. Plans',
+  PERMITS_LIST_NAME: '04. Permits',
+  PROJECT_OVERVIEW_LIST_NAME: '00. Project Overview',
+  BASE_URL: process.env.NEXT_PUBLIC_CLICKUP_BASE_URL || 'https://app.clickup.com',
+} as const;
+
+export type CoordinatorId = 'faigy' | 'malky' | 'unassigned';
+
+export interface CoordinatorMeta {
+  id: CoordinatorId;
+  name: string;
+  email: string;
+  initials: string;
+  color: string;
+  bg: string;
+  bgActive: string;
+  textDark: string;
+}
+
+export const COORDINATORS: CoordinatorMeta[] = [
+  {
+    id: 'faigy',
+    name: 'Faigy Follman',
+    email: 'faigy@leaditbuilders.com',
+    initials: 'FF',
+    color: '#534AB7',
+    bg: '#EEEDFE',
+    bgActive: '#CECBF6',
+    textDark: '#26215C',
+  },
+  {
+    id: 'malky',
+    name: 'Malky Kahan',
+    email: 'mkahan@leaditbuilders.com',
+    initials: 'MK',
+    color: '#0F6E56',
+    bg: '#E1F5EE',
+    bgActive: '#9FE1CB',
+    textDark: '#04342C',
+  },
+];
+
+export const UNASSIGNED: CoordinatorMeta = {
+  id: 'unassigned',
+  name: 'Unassigned',
+  email: '',
+  initials: '?',
+  color: '#5F5E5A',
+  bg: '#F1EFE8',
+  bgActive: '#D3D1C7',
+  textDark: '#2C2C2A',
+};
+
+export const COORD_BY_ID: Record<CoordinatorId, CoordinatorMeta> = {
+  faigy: COORDINATORS[0],
+  malky: COORDINATORS[1],
+  unassigned: UNASSIGNED,
+};
+
+export const PHASES = [
+  { id: 'pre' as const, label: 'Pre-construction', bg: '#EEEDFE', text: '#26215C', sub: '#534AB7', subline: 'filings in flight' },
+  { id: 'con' as const, label: 'Construction', bg: '#E1F5EE', text: '#04342C', sub: '#0F6E56', subline: 'permits active' },
+  { id: 'post' as const, label: 'Post-construction', bg: '#F1EFE8', text: '#2C2C2A', sub: '#5F5E5A', subline: 'closeout pending' },
+];
+
+export type PhaseId = 'pre' | 'con' | 'post';
+
+export const CACHE_TTL_SECONDS = 60;
