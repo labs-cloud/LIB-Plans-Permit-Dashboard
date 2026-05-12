@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Plans & Permits — Unified Dashboard · Mockup v4</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.47.0/tabler-icons.min.css">
+<style>
+  :root {
+    --color-background-primary: #ffffff;
+    --color-background-secondary: #f7f6f3;
+    --color-background-tertiary: #ebeae5;
+    --color-text-primary: #1a1a1a;
+    --color-text-secondary: #6b6b6b;
+    --color-text-tertiary: #9a9a9a;
+    --color-text-info: #185fa5;
+    --color-border-tertiary: rgba(0,0,0,0.08);
+    --color-border-secondary: rgba(0,0,0,0.15);
+    --border-radius-md: 8px;
+    --border-radius-lg: 12px;
+    --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro", "Inter", "Segoe UI", sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --color-background-primary: #1a1a1a;
+      --color-background-secondary: #232323;
+      --color-background-tertiary: #2c2c2a;
+      --color-text-primary: #eaeaea;
+      --color-text-secondary: #a0a0a0;
+      --color-text-tertiary: #6b6b6b;
+      --color-text-info: #85b7eb;
+      --color-border-tertiary: rgba(255,255,255,0.1);
+      --color-border-secondary: rgba(255,255,255,0.18);
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 2rem; font-family: var(--font-sans); background: var(--color-background-tertiary); color: var(--color-text-primary); font-size: 14px; line-height: 1.5; }
+  .container { max-width: 1200px; margin: 0 auto; background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); padding: 1.5rem; }
+  input[type="search"], select { height: 32px; padding: 0 10px; border: 0.5px solid var(--color-border-secondary); border-radius: var(--border-radius-md); background: var(--color-background-primary); color: var(--color-text-primary); font-family: inherit; }
+  .pill { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 999px; font-size: 11px; }
+  .pill strong { font-weight: 500; }
+  .dot { display: inline-block; width: 16px; height: 16px; border-radius: 3px; }
+  .card { background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); padding: 14px 16px; }
+  .section-title { font-size: 13px; font-weight: 500; margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
+  .tab { padding: 8px 16px; font-size: 13px; border-radius: var(--border-radius-md); cursor: pointer; border: 0.5px solid transparent; transition: all 0.15s; user-select: none; }
+  .tab.active { background: var(--color-background-primary); border-color: var(--color-border-secondary); font-weight: 500; }
+  .tab:not(.active) { color: var(--color-text-secondary); }
+  .tab:not(.active):hover { background: var(--color-background-tertiary); }
+  .view { display: none; }
+  .view.active { display: block; }
+  .sort-chip { padding: 5px 12px; border-radius: var(--border-radius-md); background: var(--color-background-secondary); font-size: 12px; color: var(--color-text-secondary); cursor: pointer; user-select: none; }
+  .sort-chip.active { background: var(--color-background-primary); border: 0.5px solid var(--color-border-secondary); color: var(--color-text-primary); font-weight: 500; }
+  .matrix-row { display: grid; grid-template-columns: 0.35fr 1.5fr repeat(8, 0.65fr) 0.9fr; gap: 6px; padding: 8px 8px; font-size: 12px; align-items: center; border-top: 0.5px solid var(--color-border-tertiary); }
+  .matrix-row:hover { background: var(--color-background-secondary); cursor: pointer; }
+  .scrollable { max-height: 480px; overflow-y: auto; padding: 10px; background: var(--color-background-secondary); border-radius: var(--border-radius-lg); display: flex; flex-direction: column; gap: 8px; }
+  .avatar { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; font-size: 10px; font-weight: 500; flex-shrink: 0; }
+  .avatar-faigy { background: #EEEDFE; color: #26215C; }
+  .avatar-malky { background: #E1F5EE; color: #04342C; }
+  .avatar-unassigned { background: #F1EFE8; color: #5F5E5A; }
+  .coord-filter { background: #EEEDFE !important; color: #26215C !important; font-weight: 500; border-color: #AFA9EC !important; }
+  .empty-state { padding: 2rem; text-align: center; color: var(--color-text-tertiary); font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- LOGO HEADER BAR (using real LIB brand logo) -->
+  <div style="display: flex; align-items: center; gap: 16px; padding: 14px 20px; background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); margin-bottom: 1.25rem; border-top: 3px solid #F47832;">
+    <div style="flex-shrink: 0; display: flex; align-items: center;">
+      <img src="lib_brand/lead_it_builders_logo.png" alt="Lead It Builders" style="height: 48px; width: auto; object-fit: contain;" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
+      <!-- SVG fallback if image fails to load -->
+      <div style="display: none; align-items: center; gap: 10px;">
+        <svg width="48" height="48" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" aria-label="LIB">
+          <polygon points="24,4 42,14 42,34 24,44 6,34 6,14" fill="#000000"/>
+          <rect x="22" y="8" width="4" height="20" fill="#F47832"/>
+        </svg>
+        <span style="font-weight: 700; font-size: 14px; letter-spacing: 0.5px;">LEAD IT BUILDERS</span>
+      </div>
+    </div>
+    <div style="flex: 1; min-width: 0;">
+      <div style="font-size: 18px; font-weight: 500; letter-spacing: 0.2px;">Plans &amp; Permits Dashboard</div>
+      <div style="font-size: 12px; color: var(--color-text-secondary); margin-top: 2px;"><span id="status-line">43 active projects · live from ClickUp · synced 2 min ago</span></div>
+    </div>
+    <div style="display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--color-text-secondary); white-space: nowrap; padding: 5px 12px; background: #EAF3DE; border-radius: 999px;">
+      <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #639922;"></span>
+      <span style="color: #173404; font-weight: 500;">Live</span>
+    </div>
+  </div>
+
+  <!-- FILTER BAR -->
+  <div style="display: flex; gap: 8px; margin-bottom: 1.25rem; flex-wrap: wrap; align-items: center;">
+    <input type="search" id="search" placeholder="Search projects…" style="flex: 1; min-width: 160px; max-width: 220px; font-size: 13px;" />
+    <select id="filter-coord" class="coord-filter" style="font-size: 13px;">
+      <option value="all">👤 All coordinators</option>
+      <option value="faigy">Faigy Follman</option>
+      <option value="malky">Malky Kahan</option>
+      <option value="unassigned">Unassigned</option>
+    </select>
+    <select id="filter-phase" style="font-size: 13px;"><option value="all">All phases</option><option value="pre">Pre-construction</option><option value="con">Construction</option><option value="post">Post-construction</option></select>
+    <div style="display: flex; gap: 4px; padding: 4px; background: var(--color-background-secondary); border-radius: var(--border-radius-md); margin-left: auto;">
+      <div class="tab active" data-view="overview"><i class="ti ti-grid-dots" style="font-size: 14px; vertical-align: -2px; margin-right: 4px;"></i>Overview</div>
+      <div class="tab" data-view="detailed"><i class="ti ti-list-details" style="font-size: 14px; vertical-align: -2px; margin-right: 4px;"></i>Detailed</div>
+    </div>
+  </div>
+
+  <!-- COORDINATOR ROSTER STRIP -->
+  <div class="card" style="margin-bottom: 1.25rem;">
+    <div class="section-title" style="margin-bottom: 10px;"><i class="ti ti-users" style="font-size: 16px;"></i> Project Coordinators</div>
+    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px;" id="coord-roster"></div>
+  </div>
+
+  <!-- KPI STRIP -->
+  <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 1.25rem;" id="kpi-strip"></div>
+
+  <!-- OVERVIEW VIEW -->
+  <div class="view active" id="view-overview">
+
+    <div style="display: grid; grid-template-columns: 1.3fr 1fr; gap: 14px; margin-bottom: 1.25rem;">
+      <div class="card">
+        <div class="section-title"><i class="ti ti-flag" style="font-size: 16px; color: #A32D2D;"></i> What's sticking</div>
+        <div id="sticking-list" style="display: flex; flex-direction: column; gap: 6px;"></div>
+      </div>
+      <div class="card">
+        <div class="section-title"><i class="ti ti-layers-intersect" style="font-size: 16px; color: #534AB7;"></i> Active by phase</div>
+        <div style="display: flex; flex-direction: column; gap: 10px;" id="phase-summary"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div style="display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 12px;">
+        <div class="section-title" style="margin: 0;"><i class="ti ti-grid-dots" style="font-size: 16px;"></i> Portfolio matrix</div>
+        <div style="font-size: 11px; color: var(--color-text-tertiary);" id="matrix-count">Click any row to drill in</div>
+      </div>
+      <div style="display: flex; gap: 14px; align-items: center; font-size: 11px; color: var(--color-text-secondary); margin-bottom: 10px; flex-wrap: wrap;">
+        <span style="display: inline-flex; align-items: center; gap: 5px;"><span class="dot" style="background: #C0DD97;"></span>Approved</span>
+        <span style="display: inline-flex; align-items: center; gap: 5px;"><span class="dot" style="background: #B5D4F4;"></span>Filed</span>
+        <span style="display: inline-flex; align-items: center; gap: 5px;"><span class="dot" style="background: #FAC775;"></span>Waiting on</span>
+        <span style="display: inline-flex; align-items: center; gap: 5px;"><span class="dot" style="background: #D3D1C7;"></span>To file</span>
+        <span style="display: inline-flex; align-items: center; gap: 5px;"><span class="dot" style="background: #F1EFE8; border: 0.5px solid #D3D1C7;"></span>To submit</span>
+        <span style="display: inline-flex; align-items: center; gap: 5px;"><span class="dot" style="background: var(--color-background-secondary); border: 0.5px dashed var(--color-border-secondary);"></span>None</span>
+      </div>
+      <div style="display: grid; grid-template-columns: 0.35fr 1.5fr repeat(8, 0.65fr) 0.9fr; gap: 6px; padding: 6px 8px; font-size: 10px; color: var(--color-text-tertiary); border-bottom: 0.5px solid var(--color-border-tertiary);">
+        <div>Owner</div><div>Project</div><div style="text-align: center;">Arch</div><div style="text-align: center;">ST</div><div style="text-align: center;">FO</div><div style="text-align: center;">SOE</div><div style="text-align: center;">FA</div><div style="text-align: center;">SP</div><div style="text-align: center;">PL</div><div style="text-align: center;">Mech</div><div style="text-align: right;">Permits</div>
+      </div>
+      <div id="matrix-rows"></div>
+    </div>
+
+  </div>
+
+  <!-- DETAILED VIEW -->
+  <div class="view" id="view-detailed">
+    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px; flex-wrap: wrap;">
+      <span style="font-size: 12px; color: var(--color-text-secondary);">Sort by</span>
+      <span class="sort-chip active" data-sort="urgency"><i class="ti ti-alert-circle" style="font-size: 13px; vertical-align: -2px; color: #A32D2D;"></i> Urgency</span>
+      <span class="sort-chip" data-sort="coord"><i class="ti ti-user" style="font-size: 13px; vertical-align: -2px;"></i> Coordinator</span>
+      <span class="sort-chip" data-sort="phase">Phase</span>
+      <span class="sort-chip" data-sort="name">Project A→Z</span>
+      <span class="sort-chip" data-sort="activity">Last activity</span>
+    </div>
+    <div class="scrollable" id="project-rows"></div>
+
+    <div style="margin-top: 1.5rem; padding-top: 1.25rem; border-top: 0.5px solid var(--color-border-secondary);">
+      <div style="display: flex; align-items: baseline; justify-content: space-between;">
+        <div>
+          <div style="font-size: 18px; font-weight: 500; display: flex; align-items: center; gap: 6px;"><i class="ti ti-license" style="font-size: 20px;"></i> Permits dashboard</div>
+          <div style="font-size: 12px; color: var(--color-text-secondary); margin-top: 2px;">Active permits · expiration tracking · agency breakdown</div>
+        </div>
+        <div style="font-size: 12px; color: var(--color-text-info);">View all permits →</div>
+      </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 1rem 0;">
+      <div style="background: #EAF3DE; border-radius: var(--border-radius-md); padding: 12px 14px;"><div style="font-size: 11px; color: #173404;">Active permits</div><div style="font-size: 24px; font-weight: 500; color: #173404;">147</div><div style="font-size: 11px; color: #3B6D11;">across 38 projects</div></div>
+      <div style="background: #FAEEDA; border-radius: var(--border-radius-md); padding: 12px 14px;"><div style="font-size: 11px; color: #412402;">Expiring · 30d</div><div style="font-size: 24px; font-weight: 500; color: #412402;">6</div><div style="font-size: 11px; color: #854F0B;">on 4 projects</div></div>
+      <div style="background: #FCEBEB; border-radius: var(--border-radius-md); padding: 12px 14px;"><div style="font-size: 11px; color: #501313;">Expired</div><div style="font-size: 24px; font-weight: 500; color: #501313;">2</div><div style="font-size: 11px; color: #791F1F;">stop-work risk</div></div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 1.3fr 1fr; gap: 14px; margin-bottom: 1rem;">
+      <div class="card">
+        <div class="section-title">Expiration timeline · next 90 days</div>
+        <div style="display: flex; gap: 8px; align-items: end; height: 110px;">
+          <div style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px;"><div style="font-size: 12px; font-weight: 500;">2</div><div style="width: 100%; height: 32px; background: #F09595; border-radius: 4px 4px 0 0;"></div><div style="font-size: 10px; color: var(--color-text-secondary);">Overdue</div></div>
+          <div style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px;"><div style="font-size: 12px; font-weight: 500;">3</div><div style="width: 100%; height: 50px; background: #EF9F27; border-radius: 4px 4px 0 0;"></div><div style="font-size: 10px; color: var(--color-text-secondary);">0–7d</div></div>
+          <div style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px;"><div style="font-size: 12px; font-weight: 500;">3</div><div style="width: 100%; height: 50px; background: #FAC775; border-radius: 4px 4px 0 0;"></div><div style="font-size: 10px; color: var(--color-text-secondary);">8–30d</div></div>
+          <div style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px;"><div style="font-size: 12px; font-weight: 500;">11</div><div style="width: 100%; height: 86px; background: #B5D4F4; border-radius: 4px 4px 0 0;"></div><div style="font-size: 10px; color: var(--color-text-secondary);">31–60d</div></div>
+          <div style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px;"><div style="font-size: 12px; font-weight: 500;">14</div><div style="width: 100%; height: 104px; background: #85B7EB; border-radius: 4px 4px 0 0;"></div><div style="font-size: 10px; color: var(--color-text-secondary);">61–90d</div></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="section-title">By agency</div>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <div style="display: flex; align-items: center; gap: 8px;"><span style="display:inline-block; width: 10px; height: 10px; border-radius: 2px; background: #534AB7;"></span><div style="flex: 1; font-size: 12px;">DOB</div><div style="font-size: 12px; font-weight: 500;">98</div></div>
+          <div style="display: flex; align-items: center; gap: 8px;"><span style="display:inline-block; width: 10px; height: 10px; border-radius: 2px; background: #5F5E5A;"></span><div style="flex: 1; font-size: 12px;">DOT</div><div style="font-size: 12px; font-weight: 500;">26</div></div>
+          <div style="display: flex; align-items: center; gap: 8px;"><span style="display:inline-block; width: 10px; height: 10px; border-radius: 2px; background: #A32D2D;"></span><div style="flex: 1; font-size: 12px;">FDNY</div><div style="font-size: 12px; font-weight: 500;">17</div></div>
+          <div style="display: flex; align-items: center; gap: 8px;"><span style="display:inline-block; width: 10px; height: 10px; border-radius: 2px; background: #1D9E75;"></span><div style="flex: 1; font-size: 12px;">DEP</div><div style="font-size: 12px; font-weight: 500;">4</div></div>
+          <div style="display: flex; align-items: center; gap: 8px;"><span style="display:inline-block; width: 10px; height: 10px; border-radius: 2px; background: #185fa5;"></span><div style="flex: 1; font-size: 12px;">FEMA</div><div style="font-size: 12px; font-weight: 500;">2</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="margin-top: 1.5rem; font-size: 11px; color: var(--color-text-tertiary); text-align: center;">Mockup v4 · coordinator filter + avatars · click Overview/Detailed to switch · coordinator dropdown filters both views</div>
+
+</div>
+
+<script>
+  const STATUSES = { AP: '#C0DD97', FI: '#B5D4F4', WO: '#FAC775', TF: '#D3D1C7', TS: '#F1EFE8' };
+  const STATUS_LABEL = { AP: 'Approved', FI: 'Filed', WO: 'Waiting on', TF: 'To file', TS: 'To submit' };
+  const STATUS_TEXT = { AP: '#173404', FI: '#042C53', WO: '#412402', TF: '#2C2C2A', TS: '#5F5E5A' };
+  const COORDS = {
+    faigy: { name: 'Faigy Follman', initials: 'FF', cls: 'avatar-faigy', color: '#534AB7' },
+    malky: { name: 'Malky Kahan', initials: 'MK', cls: 'avatar-malky', color: '#0F6E56' },
+    unassigned: { name: 'Unassigned', initials: '?', cls: 'avatar-unassigned', color: '#5F5E5A' }
+  };
+
+  // Projects with coordinator assignments
+  const projects = [
+    { name: '1973 Crotona', meta: '8 stories', phase: 'pre', phaseLabel: 'Pre-construction', coord: 'faigy', urgency: 1, alert: { color: '#791F1F', text: '4 objections · 12d' }, plans: ['WO','WO','WO','AP','WO','AP','AP','AP'], permits: '— none', permitColor: '#5F5E5A' },
+    { name: '940–942 Woodycrest', meta: '14 stories', phase: 'con', phaseLabel: 'Construction', coord: 'malky', urgency: 2, alert: { color: '#791F1F', text: 'Hoist permit expired today' }, plans: ['AP','AP','AP','AP','FI','AP','AP','AP'], permits: '● 1 expired', permitColor: '#791F1F' },
+    { name: '800 Brady Ave', meta: '9 stories', phase: 'pre', phaseLabel: 'Pre-construction', coord: 'faigy', urgency: 3, alert: { color: '#854F0B', text: '8 in flight · pending GC' }, plans: ['FI','WO','WO','AP','FI','FI','FI','WO'], permits: '● 1 active', permitColor: '#5F5E5A' },
+    { name: '1305 Rockaway', meta: '5 stories', phase: 'con', phaseLabel: 'Construction', coord: 'malky', urgency: 4, alert: { color: '#BA7517', text: 'FO permit expires in 3d' }, plans: ['AP','AP','AP','AP','FI','AP','AP','AP'], permits: '● 2 expiring', permitColor: '#BA7517' },
+    { name: '2916 Atlantic', meta: '11 stories', phase: 'pre', phaseLabel: 'Pre-construction', coord: 'faigy', urgency: 5, alert: { color: '#854F0B', text: 'ST waiting on borings' }, plans: ['FI','WO','FI','TF','FI','AP','AP','AP'], permits: '— none', permitColor: '#5F5E5A' },
+    { name: '1385 Sutter', meta: '9 stories', phase: 'pre', phaseLabel: 'Pre-construction', coord: 'faigy', urgency: 6, alert: { color: '#854F0B', text: '3 objections open' }, plans: ['WO','AP','WO','WO','FI','AP','AP','AP'], permits: '— none', permitColor: '#5F5E5A' },
+    { name: '1931–1935 Bedford', meta: '9 stories', phase: 'con', phaseLabel: 'Construction', coord: 'malky', urgency: 8, alert: { color: '#173404', text: '8 permits active' }, plans: ['AP','AP','AP','AP','FI','AP','AP','AP'], permits: '● 8 active', permitColor: '#173404' },
+    { name: '2098 Creston', meta: '8 stories', phase: 'con', phaseLabel: 'Construction', coord: 'faigy', urgency: 9, alert: { color: '#173404', text: '4 permits active' }, plans: ['AP','AP','AP','AP','FI','FI','AP','FI'], permits: '● 4 active', permitColor: '#173404' },
+    { name: '35 East 169', meta: '8 stories', phase: 'con', phaseLabel: 'Construction', coord: 'malky', urgency: 10, alert: { color: '#173404', text: '6 permits active' }, plans: ['AP','AP','AP','AP','AP','AP','AP','AP'], permits: '● 6 active', permitColor: '#173404' },
+    { name: '23–27 MT Hope', meta: '15 stories', phase: 'con', phaseLabel: 'Construction', coord: 'faigy', urgency: 11, alert: { color: '#173404', text: '7 permits active' }, plans: ['AP','AP','AP','AP','AP','AP','AP','WO'], permits: '● 7 active', permitColor: '#173404' },
+    { name: '1143 Hoe', meta: '7 stories', phase: 'con', phaseLabel: 'Construction', coord: 'malky', urgency: 12, alert: { color: '#173404', text: '9 permits active' }, plans: ['AP','AP','AP','AP','AP','AP','AP','AP'], permits: '● 9 active', permitColor: '#173404' },
+    { name: '3743 White Plains', meta: '9 stories', phase: 'con', phaseLabel: 'Construction', coord: 'faigy', urgency: 13, alert: { color: '#173404', text: '5 permits active' }, plans: ['AP','AP','AP','AP','FI','AP','AP','AP'], permits: '● 5 active', permitColor: '#173404' },
+    { name: '631–633 Bergen', meta: '5 stories', phase: 'pre', phaseLabel: 'Pre-construction', coord: 'malky', urgency: 14, alert: { color: '#854F0B', text: 'FA + SP awaiting drawings' }, plans: ['FI','TS','TS','TS','TS','TS','TS','TS'], permits: '● 2 active', permitColor: '#173404' },
+    { name: '50 Marvin', meta: 'TBD', phase: 'pre', phaseLabel: 'Pre-construction', coord: 'unassigned', urgency: 15, alert: { color: '#5F5E5A', text: 'Newly launched · needs coordinator' }, plans: ['TS','TS','TS','TS','TS','TS','TS','TS'], permits: '— none', permitColor: '#5F5E5A' },
+  ];
+
+  let currentSort = 'urgency';
+  let currentCoord = 'all';
+  let currentPhase = 'all';
+  let currentSearch = '';
+
+  function filteredProjects() {
+    return projects.filter(p => {
+      if (currentCoord !== 'all' && p.coord !== currentCoord) return false;
+      if (currentPhase !== 'all' && p.phase !== currentPhase) return false;
+      if (currentSearch && !p.name.toLowerCase().includes(currentSearch.toLowerCase())) return false;
+      return true;
+    });
+  }
+
+  function sortedProjects(list, key) {
+    let s = [...list];
+    if (key === 'urgency') s.sort((a,b) => a.urgency - b.urgency);
+    else if (key === 'name') s.sort((a,b) => a.name.localeCompare(b.name));
+    else if (key === 'phase') s.sort((a,b) => (a.phase + a.name).localeCompare(b.phase + b.name));
+    else if (key === 'coord') s.sort((a,b) => (a.coord + ' ' + a.urgency).localeCompare(b.coord + ' ' + b.urgency));
+    return s;
+  }
+
+  // ─── KPI strip (always shared) ───
+  document.getElementById('kpi-strip').innerHTML = `
+    <div style="background: var(--color-background-secondary); border-radius: var(--border-radius-md); padding: 14px 16px;"><div style="font-size: 11px; color: var(--color-text-secondary);">Filings in flight</div><div style="font-size: 26px; font-weight: 500;">87</div><svg viewBox="0 0 60 16" style="width: 100%; height: 16px; margin-top: 4px;"><polyline points="0,12 10,10 20,11 30,7 40,8 50,5 60,4" fill="none" stroke="#185fa5" stroke-width="1.5"/></svg></div>
+    <div style="background: var(--color-background-secondary); border-radius: var(--border-radius-md); padding: 14px 16px;"><div style="font-size: 11px; color: var(--color-text-secondary);">Approved · 7d</div><div style="font-size: 26px; font-weight: 500; color: #173404;">11</div><svg viewBox="0 0 60 16" style="width: 100%; height: 16px; margin-top: 4px;"><polyline points="0,12 10,11 20,9 30,10 40,7 50,5 60,3" fill="none" stroke="#3B6D11" stroke-width="1.5"/></svg></div>
+    <div style="background: var(--color-background-secondary); border-radius: var(--border-radius-md); padding: 14px 16px;"><div style="font-size: 11px; color: var(--color-text-secondary);">Waiting on</div><div style="font-size: 26px; font-weight: 500; color: #854F0B;">14</div><svg viewBox="0 0 60 16" style="width: 100%; height: 16px; margin-top: 4px;"><polyline points="0,4 10,5 20,8 30,7 40,9 50,10 60,8" fill="none" stroke="#BA7517" stroke-width="1.5"/></svg></div>
+    <div style="background: var(--color-background-secondary); border-radius: var(--border-radius-md); padding: 14px 16px;"><div style="font-size: 11px; color: var(--color-text-secondary);">Expiring · 30d</div><div style="font-size: 26px; font-weight: 500; color: #854F0B;">6</div><svg viewBox="0 0 60 16" style="width: 100%; height: 16px; margin-top: 4px;"><polyline points="0,9 10,8 20,7 30,6 40,5 50,4 60,3" fill="none" stroke="#BA7517" stroke-width="1.5"/></svg></div>
+    <div style="background: var(--color-background-secondary); border-radius: var(--border-radius-md); padding: 14px 16px;"><div style="font-size: 11px; color: var(--color-text-secondary);">Expired · stop work</div><div style="font-size: 26px; font-weight: 500; color: #791F1F;">2</div><svg viewBox="0 0 60 16" style="width: 100%; height: 16px; margin-top: 4px;"><polyline points="0,13 10,13 20,12 30,11 40,10 50,9 60,9" fill="none" stroke="#A32D2D" stroke-width="1.5"/></svg></div>
+  `;
+
+  // ─── Coordinator roster ───
+  function renderRoster() {
+    const faigyCount = projects.filter(p => p.coord === 'faigy').length;
+    const malkyCount = projects.filter(p => p.coord === 'malky').length;
+    const unassignedCount = projects.filter(p => p.coord === 'unassigned').length;
+    document.getElementById('coord-roster').innerHTML = `
+      <div style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: ${currentCoord==='faigy'?'#CECBF6':'#EEEDFE'}; border-radius: var(--border-radius-md); cursor: pointer;" onclick="setCoord('faigy')">
+        <span class="avatar avatar-faigy" style="width: 36px; height: 36px; font-size: 13px;">FF</span>
+        <div style="flex: 1;"><div style="font-size: 13px; font-weight: 500; color: #26215C;">Faigy Follman</div><div style="font-size: 11px; color: #534AB7;">${faigyCount} projects · 48 plans in flight · 4 objections</div></div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: ${currentCoord==='malky'?'#9FE1CB':'#E1F5EE'}; border-radius: var(--border-radius-md); cursor: pointer;" onclick="setCoord('malky')">
+        <span class="avatar avatar-malky" style="width: 36px; height: 36px; font-size: 13px;">MK</span>
+        <div style="flex: 1;"><div style="font-size: 13px; font-weight: 500; color: #04342C;">Malky Kahan</div><div style="font-size: 11px; color: #0F6E56;">${malkyCount} projects · 39 plans in flight · 6 objections</div></div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: ${currentCoord==='unassigned'?'#D3D1C7':'var(--color-background-secondary)'}; border-radius: var(--border-radius-md); cursor: pointer;" onclick="setCoord('unassigned')">
+        <span class="avatar avatar-unassigned" style="width: 36px; height: 36px; font-size: 13px;">?</span>
+        <div style="flex: 1;"><div style="font-size: 13px; font-weight: 500;">Unassigned</div><div style="font-size: 11px; color: var(--color-text-secondary);">${unassignedCount} project${unassignedCount===1?'':'s'} · needs assignment</div></div>
+      </div>
+    `;
+  }
+  window.setCoord = (c) => {
+    currentCoord = currentCoord === c ? 'all' : c;
+    document.getElementById('filter-coord').value = currentCoord;
+    rerenderAll();
+  };
+
+  // ─── Sticking list ───
+  function renderSticking() {
+    const list = filteredProjects().filter(p => p.alert.color !== '#173404').slice(0, 5);
+    document.getElementById('sticking-list').innerHTML = list.length === 0 ? '<div class="empty-state" style="padding: 1rem;">All clear for this filter</div>' : list.map(p => {
+      const bg = p.alert.color === '#791F1F' ? '#FCEBEB' : '#FAEEDA';
+      return `<div style="display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: ${bg}; border-radius: var(--border-radius-md);">
+        <span class="avatar ${COORDS[p.coord].cls}" style="width: 20px; height: 20px; font-size: 9px;">${COORDS[p.coord].initials}</span>
+        <div style="flex: 1; font-size: 12px; color: ${p.alert.color};"><strong>${p.name}</strong> · ${p.alert.text}</div>
+      </div>`;
+    }).join('');
+  }
+
+  // ─── Phase summary ───
+  function renderPhases() {
+    const list = filteredProjects();
+    const pre = list.filter(p => p.phase === 'pre').length;
+    const con = list.filter(p => p.phase === 'con').length;
+    const post = list.filter(p => p.phase === 'post').length;
+    document.getElementById('phase-summary').innerHTML = `
+      <div style="padding: 10px 12px; background: #EEEDFE; border-radius: var(--border-radius-md);"><div style="display: flex; justify-content: space-between; align-items: baseline;"><strong style="font-size: 12px; color: #26215C;">Pre-construction</strong><span style="font-size: 16px; font-weight: 500; color: #26215C;">${pre}</span></div><div style="font-size: 11px; color: #534AB7; margin-top: 4px;">filings in flight</div></div>
+      <div style="padding: 10px 12px; background: #E1F5EE; border-radius: var(--border-radius-md);"><div style="display: flex; justify-content: space-between; align-items: baseline;"><strong style="font-size: 12px; color: #04342C;">Construction</strong><span style="font-size: 16px; font-weight: 500; color: #04342C;">${con}</span></div><div style="font-size: 11px; color: #0F6E56; margin-top: 4px;">permits active</div></div>
+      <div style="padding: 10px 12px; background: #F1EFE8; border-radius: var(--border-radius-md);"><div style="display: flex; justify-content: space-between; align-items: baseline;"><strong style="font-size: 12px; color: #2C2C2A;">Post-construction</strong><span style="font-size: 16px; font-weight: 500; color: #2C2C2A;">${post}</span></div><div style="font-size: 11px; color: #5F5E5A; margin-top: 4px;">closeout pending</div></div>
+    `;
+  }
+
+  // ─── Matrix rows ───
+  function renderMatrix() {
+    const list = sortedProjects(filteredProjects(), currentSort);
+    document.getElementById('matrix-count').innerHTML = `Showing ${list.length} of ${projects.length}${currentCoord!=='all'?' · '+COORDS[currentCoord].name:''}`;
+    document.getElementById('matrix-rows').innerHTML = list.length === 0 ? '<div class="empty-state">No projects match these filters</div>' : list.map(p => {
+      const cells = p.plans.map(s => {
+        const bg = STATUSES[s] || 'transparent';
+        const border = s === 'TS' ? '0.5px solid #D3D1C7' : 'none';
+        return `<div style="text-align: center;"><span class="dot" style="background: ${bg}; border: ${border};"></span></div>`;
+      }).join('');
+      return `<div class="matrix-row"><div><span class="avatar ${COORDS[p.coord].cls}">${COORDS[p.coord].initials}</span></div><div>${p.name}</div>${cells}<div style="text-align: right; font-size: 11px; color: ${p.permitColor};">${p.permits}</div></div>`;
+    }).join('');
+  }
+
+  // ─── Detailed rows ───
+  function renderDetailed() {
+    const list = sortedProjects(filteredProjects(), currentSort);
+    document.getElementById('project-rows').innerHTML = list.length === 0 ? '<div class="empty-state">No projects match these filters</div>' : list.map(p => {
+      const pills = p.plans.map((s, i) => {
+        const labels = ['Arch','ST','FO','SOE','FA','SP','PL','Mech'];
+        return `<span class="pill" style="background: ${STATUSES[s]}; color: ${STATUS_TEXT[s]};"><strong>${labels[i]}</strong> ${STATUS_LABEL[s]}</span>`;
+      }).join('');
+      return `<div class="card" style="padding: 12px 14px;">
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+          <span class="avatar ${COORDS[p.coord].cls}">${COORDS[p.coord].initials}</span>
+          <div style="flex: 1;"><strong style="font-size: 14px;">${p.name}</strong> <span style="font-size: 11px; color: var(--color-text-secondary);">· ${p.meta} · ${p.phaseLabel} · </span><span style="font-size: 11px; color: ${COORDS[p.coord].color};">${COORDS[p.coord].name}</span></div>
+          <div style="font-size: 11px; color: ${p.alert.color};">${p.alert.text}</div>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 5px;">${pills}</div>
+      </div>`;
+    }).join('');
+  }
+
+  function updateStatus() {
+    const count = filteredProjects().length;
+    let extra = [];
+    if (currentCoord !== 'all') extra.push(COORDS[currentCoord].name);
+    if (currentPhase !== 'all') extra.push(currentPhase);
+    document.getElementById('status-line').innerHTML = `${count} project${count===1?'':'s'} shown${extra.length?' · filtered by '+extra.join(', '):''} · live from ClickUp`;
+  }
+
+  function rerenderAll() {
+    renderRoster();
+    renderSticking();
+    renderPhases();
+    renderMatrix();
+    renderDetailed();
+    updateStatus();
+  }
+  rerenderAll();
+
+  // ─── Event bindings ───
+  document.querySelectorAll('.tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      const view = tab.dataset.view;
+      document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+      document.getElementById('view-' + view).classList.add('active');
+    });
+  });
+  document.querySelectorAll('.sort-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      document.querySelectorAll('.sort-chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      currentSort = chip.dataset.sort;
+      renderMatrix();
+      renderDetailed();
+    });
+  });
+  document.getElementById('filter-coord').addEventListener('change', e => { currentCoord = e.target.value; rerenderAll(); });
+  document.getElementById('filter-phase').addEventListener('change', e => { currentPhase = e.target.value; rerenderAll(); });
+  document.getElementById('search').addEventListener('input', e => { currentSearch = e.target.value; rerenderAll(); });
+</script>
+</body>
+</html>
