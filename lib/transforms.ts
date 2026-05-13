@@ -1,7 +1,7 @@
 import { CLICKUP, PHASES } from './constants';
 import type { PhaseId } from './constants';
-import { planStatusKey, permitStatusKey, PLAN_STATUS_ORDER } from './status-map';
-import { planTypeToColumn } from './plan-type-map';
+import { planStatusKey, permitStatusKey } from './status-map';
+import { buildMatrix, planTypeToColumn } from './plan-type-map';
 import { deriveCoordinator } from './coordinator';
 import type {
   ClickUpCustomFieldValue,
@@ -14,13 +14,7 @@ import {
   getListsInFolder,
   getTasksInList,
 } from './clickup';
-import type {
-  Plan,
-  Permit,
-  Project,
-  StatusKey,
-  MatrixColumn,
-} from './types';
+import type { Permit, Plan, Project } from './types';
 
 const DAY = 24 * 60 * 60 * 1000;
 const EXPIRING_SOON_DAYS = 30;
@@ -175,20 +169,6 @@ function transformPermit(task: ClickUpTask, now: number): Permit {
     dateUpdated: parseMs(task.date_updated) ?? now,
     daysToExpiration,
   };
-}
-
-function buildMatrix(plans: Plan[]): Partial<Record<MatrixColumn, StatusKey>> {
-  const m: Partial<Record<MatrixColumn, StatusKey>> = {};
-  for (const p of plans) {
-    if (!p.matrixColumn || !p.status) continue;
-    const prev = m[p.matrixColumn];
-    if (!prev || PLAN_STATUS_ORDER.indexOf(p.status) < PLAN_STATUS_ORDER.indexOf(prev)) {
-      // Prefer the more advanced (Approved > Filed > Waiting on > To file > To submit) status
-      // when multiple plans share a column. Approved trumps Filed, etc.
-      m[p.matrixColumn] = p.status;
-    }
-  }
-  return m;
 }
 
 function summarisePermits(permits: Permit[]) {

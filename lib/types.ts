@@ -110,6 +110,7 @@ export interface PermitsPanelData {
 export interface DashboardPayload {
   projects: Project[];
   matrixColumns: string[];
+  setTypes: string[];
   kpis: KpiStripData;
   sticking: StickingItem[];
   permits: PermitsPanelData;
