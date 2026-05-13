@@ -14,7 +14,7 @@ export interface Plan {
   rawStatus: string;
   planType: string | null;
   matrixColumn: MatrixColumn | null;
-  setType: string | null;
+  assetType: string | null;
   filingPhase: string | null;
   filingDate: number | null;
   expirationDate: number | null;
@@ -110,7 +110,7 @@ export interface PermitsPanelData {
 export interface DashboardPayload {
   projects: Project[];
   matrixColumns: string[];
-  setTypes: string[];
+  assetTypes: string[];
   kpis: KpiStripData;
   sticking: StickingItem[];
   permits: PermitsPanelData;

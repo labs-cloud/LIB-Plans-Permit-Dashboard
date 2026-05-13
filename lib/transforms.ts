@@ -103,7 +103,9 @@ function phaseFromLabel(label: string | null): PhaseId | null {
 
 function transformPlan(task: ClickUpTask): Plan {
   const planType = readDropdownName(findField(task, (n) => n === 'plan type'));
-  const setType = readDropdownName(findField(task, (n) => n === 'set type'));
+  const assetType = readDropdownName(
+    findField(task, (n) => n === 'asset type' || n === 'set type'),
+  );
   const filingPhase = readDropdownName(findField(task, (n) => n === 'filing phase'));
   const filingDate = readDate(findField(task, (n) => n === 'filing date'));
   const expirationDate = readDate(findField(task, (n) => n === 'expiration date'));
@@ -123,7 +125,7 @@ function transformPlan(task: ClickUpTask): Plan {
     rawStatus,
     planType,
     matrixColumn: planTypeToColumn(planType ?? task.name),
-    setType,
+    assetType,
     filingPhase,
     filingDate,
     expirationDate,

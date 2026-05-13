@@ -28,7 +28,7 @@ const fetcher = async (url: string): Promise<DashboardPayload> => {
 const EMPTY_PAYLOAD: DashboardPayload = {
   projects: [],
   matrixColumns: [],
-  setTypes: [],
+  assetTypes: [],
   kpis: { filingsInFlight: 0, approved7d: 0, waitingOn: 0, expiring30d: 0, expired: 0 },
   sticking: [],
   permits: {
@@ -91,7 +91,7 @@ export function Dashboard({ initial, initialError }: Props) {
   const phase = readParam(searchParams, 'phase', PHASE_KEYS, 'all');
   const sort = readParam(searchParams, 'sort', SORT_KEYS, 'urgency');
   const search = searchParams.get('q') ?? '';
-  const setTypeRaw = searchParams.get('setType') ?? 'all';
+  const assetTypeRaw = searchParams.get('assetType') ?? 'all';
   const [searchInput, setSearchInput] = useState(search);
   useEffect(() => setSearchInput(search), [search]);
 
@@ -104,10 +104,10 @@ export function Dashboard({ initial, initialError }: Props) {
 
   const payload = data ?? initial ?? EMPTY_PAYLOAD;
 
-  // Validate Set Type filter against options the server actually returned —
+  // Validate Asset Type filter against options the server actually returned —
   // falls back to 'all' if the URL holds a stale value.
-  const setType =
-    setTypeRaw !== 'all' && payload.setTypes.includes(setTypeRaw) ? setTypeRaw : 'all';
+  const assetType =
+    assetTypeRaw !== 'all' && payload.assetTypes.includes(assetTypeRaw) ? assetTypeRaw : 'all';
 
   const setParam = useCallback(
     (updates: Record<string, string | null>) => {
@@ -125,7 +125,7 @@ export function Dashboard({ initial, initialError }: Props) {
   const setView = (v: ViewMode) => setParam({ view: v === 'overview' ? null : v });
   const setCoord = (c: CoordinatorId | 'all') => setParam({ coord: c === 'all' ? null : c });
   const setPhase = (p: PhaseId | 'all') => setParam({ phase: p === 'all' ? null : p });
-  const setSetType = (s: string | 'all') => setParam({ setType: s === 'all' ? null : s });
+  const setAssetType = (s: string | 'all') => setParam({ assetType: s === 'all' ? null : s });
   const setSort = (s: SortKey) => setParam({ sort: s === 'urgency' ? null : s });
 
   // Debounced commit of search to URL.
@@ -149,23 +149,23 @@ export function Dashboard({ initial, initialError }: Props) {
     });
   }, [payload.projects, coord, phase, search]);
 
-  // Stage 2: plan-level Set Type filter — replaces each project's plan list
+  // Stage 2: plan-level Asset Type filter — replaces each project's plan list
   // and re-derives the matrix so the matrix dots reflect only matching plans.
   const filtered = useMemo(() => {
-    if (setType === 'all') return projectFiltered;
+    if (assetType === 'all') return projectFiltered;
     return projectFiltered.map((project) => {
-      const plans = project.plans.filter((plan) => plan.setType === setType);
+      const plans = project.plans.filter((plan) => plan.assetType === assetType);
       return { ...project, plans, matrix: buildMatrix(plans) };
     });
-  }, [projectFiltered, setType]);
+  }, [projectFiltered, assetType]);
 
-  // Matrix columns reflect ALL active filters — when filtering by Set Type
+  // Matrix columns reflect ALL active filters — when filtering by Asset Type
   // we don't want empty plan-type columns crowding the matrix.
   const matrixColumns = useMemo(() => computeMatrixColumns(filtered), [filtered]);
 
   const sorted = useMemo(() => sortProjects(filtered, sort), [filtered, sort]);
 
-  const filtersActive = coord !== 'all' || phase !== 'all' || setType !== 'all' || !!search;
+  const filtersActive = coord !== 'all' || phase !== 'all' || assetType !== 'all' || !!search;
 
   const filteredKpis: KpiStripData = useMemo(
     () => (filtersActive ? computeKpis(filtered) : payload.kpis),
@@ -183,7 +183,7 @@ export function Dashboard({ initial, initialError }: Props) {
   const filterTagBits: string[] = [];
   if (coord !== 'all') filterTagBits.push(COORD_BY_ID[coord].name);
   if (phase !== 'all') filterTagBits.push(PHASES.find((p) => p.id === phase)?.label ?? phase);
-  if (setType !== 'all') filterTagBits.push(setType);
+  if (assetType !== 'all') filterTagBits.push(assetType);
   if (search) filterTagBits.push(`“${search}”`);
   const filterTag = filterTagBits.length ? filterTagBits.join(' · ') : null;
 
@@ -211,13 +211,13 @@ export function Dashboard({ initial, initialError }: Props) {
         search={searchInput}
         coord={coord}
         phase={phase}
-        setType={setType}
-        setTypeOptions={payload.setTypes}
+        assetType={assetType}
+        assetTypeOptions={payload.assetTypes}
         view={view}
         onSearchChange={setSearchInput}
         onCoordChange={setCoord}
         onPhaseChange={setPhase}
-        onSetTypeChange={setSetType}
+        onAssetTypeChange={setAssetType}
         onViewChange={setView}
       />
 

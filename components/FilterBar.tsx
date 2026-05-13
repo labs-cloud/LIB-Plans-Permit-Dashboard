@@ -8,13 +8,13 @@ interface Props {
   search: string;
   coord: CoordinatorId | 'all';
   phase: PhaseId | 'all';
-  setType: string | 'all';
-  setTypeOptions: string[];
+  assetType: string | 'all';
+  assetTypeOptions: string[];
   view: ViewMode;
   onSearchChange: (s: string) => void;
   onCoordChange: (c: CoordinatorId | 'all') => void;
   onPhaseChange: (p: PhaseId | 'all') => void;
-  onSetTypeChange: (s: string | 'all') => void;
+  onAssetTypeChange: (s: string | 'all') => void;
   onViewChange: (v: ViewMode) => void;
 }
 
@@ -22,13 +22,13 @@ export function FilterBar({
   search,
   coord,
   phase,
-  setType,
-  setTypeOptions,
+  assetType,
+  assetTypeOptions,
   view,
   onSearchChange,
   onCoordChange,
   onPhaseChange,
-  onSetTypeChange,
+  onAssetTypeChange,
   onViewChange,
 }: Props) {
   return (
@@ -75,19 +75,19 @@ export function FilterBar({
         <option value="post">Post-construction</option>
       </select>
       <select
-        value={setType}
-        onChange={(e) => onSetTypeChange(e.target.value)}
-        title="Filter plans by Set Type"
+        value={assetType}
+        onChange={(e) => onAssetTypeChange(e.target.value)}
+        title="Filter plans by Asset Type"
         style={{
           fontSize: 13,
-          background: setType !== 'all' ? '#FEF1E5' : undefined,
-          color: setType !== 'all' ? '#7A3A11' : undefined,
-          fontWeight: setType !== 'all' ? 500 : undefined,
-          borderColor: setType !== 'all' ? '#F4A973' : undefined,
+          background: assetType !== 'all' ? '#FEF1E5' : undefined,
+          color: assetType !== 'all' ? '#7A3A11' : undefined,
+          fontWeight: assetType !== 'all' ? 500 : undefined,
+          borderColor: assetType !== 'all' ? '#F4A973' : undefined,
         }}
       >
-        <option value="all">All set types</option>
-        {setTypeOptions.map((opt) => (
+        <option value="all">All asset types</option>
+        {assetTypeOptions.map((opt) => (
           <option key={opt} value={opt}>
             {opt}
           </option>
