@@ -52,7 +52,11 @@ export function ProjectCard({ project }: Props) {
               target="_blank"
               rel="noopener"
               className="pill"
-              style={{ background: style.bg, color: style.fg }}
+              style={{
+                background: style.bg,
+                color: style.fg,
+                border: `1px solid ${style.border}`,
+              }}
             >
               <strong>{col}</strong> {style.label}
             </a>
@@ -70,7 +74,11 @@ export function ProjectCard({ project }: Props) {
                 target="_blank"
                 rel="noopener"
                 className="pill"
-                style={{ background: style.bg, color: style.fg }}
+                style={{
+                  background: style.bg,
+                  color: style.fg,
+                  border: `1px solid ${style.border}`,
+                }}
                 title={plan.planType ?? plan.name}
               >
                 <strong>{plan.planType ?? plan.name}</strong> {style.label}
@@ -83,7 +91,11 @@ export function ProjectCard({ project }: Props) {
             target="_blank"
             rel="noopener"
             className="pill"
-            style={{ background: '#F1EFE8', color: project.permitsSummary.color }}
+            style={{
+              background: '#F1EFE8',
+              color: project.permitsSummary.color,
+              border: `1px solid ${project.permitsSummary.color}`,
+            }}
           >
             <strong>Permits</strong> {project.permitsSummary.label.replace('● ', '')}
           </a>

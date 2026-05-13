@@ -10,13 +10,13 @@ interface Props {
   filterTag?: string | null;
 }
 
-const LEGEND: { label: string; color: string; border?: string }[] = [
-  { label: 'Approved', color: '#C0DD97' },
-  { label: 'Filed', color: '#B5D4F4' },
-  { label: 'Waiting on', color: '#FAC775' },
-  { label: 'To file', color: '#D3D1C7' },
-  { label: 'To submit', color: '#F1EFE8', border: '0.5px solid #D3D1C7' },
-  { label: 'None', color: 'var(--color-background-secondary)', border: '0.5px dashed var(--color-border-secondary)' },
+const LEGEND: { label: string; color: string; border: string }[] = [
+  { label: 'Approved', color: '#C0DD97', border: '1px solid #7FAE52' },
+  { label: 'Filed', color: '#B5D4F4', border: '1px solid #5F94CC' },
+  { label: 'Waiting on', color: '#FAC775', border: '1px solid #D89724' },
+  { label: 'To file', color: '#D3D1C7', border: '1px solid #A8A595' },
+  { label: 'To submit', color: '#F1EFE8', border: '1px solid #C7C3B5' },
+  { label: 'None', color: 'var(--color-background-secondary)', border: '1px dashed var(--color-border-secondary)' },
 ];
 
 function findPlanForColumn(project: Project, column: MatrixColumn) {

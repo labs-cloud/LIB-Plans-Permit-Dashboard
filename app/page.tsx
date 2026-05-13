@@ -16,7 +16,7 @@ export default async function Page() {
   }
 
   return (
-    <main style={{ maxWidth: 1200, margin: '0 auto' }}>
+    <main style={{ maxWidth: 1600, width: '100%', margin: '0 auto' }}>
       <Suspense fallback={<DashboardSkeleton />}>
         <Dashboard initial={initial} initialError={error} />
       </Suspense>
