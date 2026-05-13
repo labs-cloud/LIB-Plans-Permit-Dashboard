@@ -44,12 +44,13 @@ export function LogoHeader({ shownCount, totalCount, syncedAt, filterLine, warni
     >
       <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center' }}>
         {!imgError ? (
-          // Crop the full logo PNG (2550×3300, icon occupies ~x:396-726, y:165-602)
-          // down to just the hex + orange-stripe mark, sized large for visibility.
+          // Crop the full logo PNG (2550×3300) down to a generous window around
+          // the hex + orange-stripe mark with breathing room on all sides.
+          // Crop window: x 10–32%, y 3–20%  → square container 88×88.
           <div
             style={{
-              width: 60,
-              height: 78,
+              width: 88,
+              height: 88,
               overflow: 'hidden',
               position: 'relative',
               flexShrink: 0,
@@ -64,10 +65,10 @@ export function LogoHeader({ shownCount, totalCount, syncedAt, filterLine, warni
               onError={() => setImgError(true)}
               style={{
                 position: 'absolute',
-                width: 465,
+                width: 400,
                 height: 'auto',
-                left: -72,
-                top: -30,
+                left: -40,
+                top: -16,
                 maxWidth: 'none',
                 userSelect: 'none',
               }}
@@ -75,12 +76,12 @@ export function LogoHeader({ shownCount, totalCount, syncedAt, filterLine, warni
             />
           </div>
         ) : (
-          <svg width="60" height="78" viewBox="0 0 60 78" aria-label="LIB">
+          <svg width="88" height="88" viewBox="0 0 88 88" aria-label="LIB">
             <polygon
-              points="30,4 54,18 54,46 30,60 6,46 6,18"
+              points="44,12 70,26 70,62 44,76 18,62 18,26"
               fill="#000000"
             />
-            <rect x="27" y="10" width="6" height="26" fill="#F47832" />
+            <rect x="40" y="18" width="8" height="34" fill="#F47832" />
           </svg>
         )}
       </div>
