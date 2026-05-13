@@ -30,7 +30,7 @@ export function ProjectCard({ project }: Props) {
           >
             {project.name}
           </a>
-          <ApprovedPlansCopyButton variant="pill" />
+          <ApprovedPlansCopyButton variant="button" />
           <span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>
             {project.meta ? `${project.meta} · ` : ''}
             {project.phaseLabel ? `${project.phaseLabel} · ` : ''}
