@@ -72,6 +72,9 @@ export function PortfolioMatrix({ projects, totalCount, filterTag }: Props) {
           </div>
         ))}
         <div style={{ textAlign: 'right' }}>Permits</div>
+        <div style={{ textAlign: 'center' }} title="Copy Approved Plans Link">
+          Plans
+        </div>
       </div>
 
       {projects.length === 0 ? (
@@ -83,17 +86,22 @@ export function PortfolioMatrix({ projects, totalCount, filterTag }: Props) {
               <div>
                 <CoordinatorAvatar coord={project.coord} />
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+              <div style={{ minWidth: 0 }}>
                 <a
                   href={folderUrl(project.folderId)}
                   target="_blank"
                   rel="noopener"
                   title={`Open ${project.name} in ClickUp`}
-                  style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                  style={{
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    display: 'inline-block',
+                    maxWidth: '100%',
+                  }}
                 >
                   {project.name}
                 </a>
-                <ApprovedPlansCopyButton variant="icon" />
               </div>
               {MATRIX_COLUMNS.map((col) => {
                 const plan = findPlanForColumn(project, col);
@@ -137,6 +145,9 @@ export function PortfolioMatrix({ projects, totalCount, filterTag }: Props) {
                 ) : (
                   project.permitsSummary.label
                 )}
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'center' }}>
+                <ApprovedPlansCopyButton variant="icon" />
               </div>
             </div>
           ))}

@@ -1,5 +1,4 @@
-import type { Project, MatrixColumn } from '@/lib/types';
-import { MATRIX_COLUMNS } from '@/lib/plan-type-map';
+import type { Project } from '@/lib/types';
 import { COORD_BY_ID } from '@/lib/constants';
 import { folderUrl, taskUrl, listUrl } from '@/lib/urls';
 import { PLAN_STATUS_TABLE } from '@/lib/status-map';
@@ -10,9 +9,11 @@ interface Props {
   project: Project;
 }
 
-function findPlan(project: Project, column: MatrixColumn) {
-  return project.plans.find((p) => p.matrixColumn === column) ?? null;
-}
+const UNMAPPED_STYLE = {
+  bg: '#F1EFE8',
+  fg: '#5F5E5A',
+  border: '#C7C3B5',
+};
 
 export function ProjectCard({ project }: Props) {
   const coordMeta = COORD_BY_ID[project.coord];
@@ -21,7 +22,16 @@ export function ProjectCard({ project }: Props) {
     <div className="card" style={{ padding: '12px 14px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
         <CoordinatorAvatar coord={project.coord} />
-        <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        <div
+          style={{
+            flex: 1,
+            minWidth: 0,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            flexWrap: 'wrap',
+          }}
+        >
           <a
             href={folderUrl(project.folderId)}
             target="_blank"
@@ -43,32 +53,18 @@ export function ProjectCard({ project }: Props) {
       </div>
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-        {MATRIX_COLUMNS.map((col) => {
-          const plan = findPlan(project, col);
-          if (!plan || !plan.status) return null;
-          const style = PLAN_STATUS_TABLE[plan.status];
-          return (
-            <a
-              key={col}
-              href={taskUrl(plan.id)}
-              target="_blank"
-              rel="noopener"
-              className="pill"
-              style={{
-                background: style.bg,
-                color: style.fg,
-                border: `1px solid ${style.border}`,
-              }}
-            >
-              <strong>{col}</strong> {style.label}
-            </a>
-          );
-        })}
-        {project.plans
-          .filter((p) => !p.matrixColumn && p.status)
-          .map((plan) => {
+        {project.plans.length === 0 ? (
+          <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', fontStyle: 'italic' }}>
+            No plans in ClickUp yet
+          </div>
+        ) : (
+          project.plans.map((plan) => {
             const style = plan.status ? PLAN_STATUS_TABLE[plan.status] : null;
-            if (!style) return null;
+            const label = plan.matrixColumn ?? plan.planType ?? plan.name;
+            const statusLabel = style?.label ?? plan.rawStatus ?? '—';
+            const bg = style?.bg ?? UNMAPPED_STYLE.bg;
+            const fg = style?.fg ?? UNMAPPED_STYLE.fg;
+            const border = style?.border ?? UNMAPPED_STYLE.border;
             return (
               <a
                 key={plan.id}
@@ -76,17 +72,14 @@ export function ProjectCard({ project }: Props) {
                 target="_blank"
                 rel="noopener"
                 className="pill"
-                style={{
-                  background: style.bg,
-                  color: style.fg,
-                  border: `1px solid ${style.border}`,
-                }}
+                style={{ background: bg, color: fg, border: `1px solid ${border}` }}
                 title={plan.planType ?? plan.name}
               >
-                <strong>{plan.planType ?? plan.name}</strong> {style.label}
+                <strong>{label}</strong> {statusLabel}
               </a>
             );
-          })}
+          })
+        )}
         {project.permitsListId && project.permitsSummary.total > 0 ? (
           <a
             href={listUrl(project.permitsListId)}
