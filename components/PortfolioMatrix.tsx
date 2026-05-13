@@ -1,5 +1,6 @@
 import type { Project, MatrixColumn } from '@/lib/types';
 import { MATRIX_COLUMNS } from '@/lib/plan-type-map';
+import { APPROVED_PLANS_LINK } from '@/lib/constants';
 import { folderUrl, listUrl, taskUrl } from '@/lib/urls';
 import { CoordinatorAvatar } from './CoordinatorAvatar';
 import { StatusDot } from './StatusDot';
@@ -82,14 +83,30 @@ export function PortfolioMatrix({ projects, totalCount, filterTag }: Props) {
               <div>
                 <CoordinatorAvatar coord={project.coord} />
               </div>
-              <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
                 <a
                   href={folderUrl(project.folderId)}
                   target="_blank"
                   rel="noopener"
                   title={`Open ${project.name} in ClickUp`}
+                  style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
                 >
                   {project.name}
+                </a>
+                <a
+                  href={APPROVED_PLANS_LINK}
+                  target="_blank"
+                  rel="noopener"
+                  title="Open the Approved Plans folder in SharePoint"
+                  style={{
+                    color: '#F47832',
+                    flexShrink: 0,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <i className="ti ti-folder" style={{ fontSize: 14 }} />
                 </a>
               </div>
               {MATRIX_COLUMNS.map((col) => {

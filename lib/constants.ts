@@ -69,3 +69,8 @@ export const PHASES = [
 export type PhaseId = 'pre' | 'con' | 'post';
 
 export const CACHE_TTL_SECONDS = 60;
+
+// Shared SharePoint folder for approved plans. Linked from every project row
+// so coordinators can jump to the archive without navigating through ClickUp.
+export const APPROVED_PLANS_LINK =
+  'https://leaditbuilders.sharepoint.com/:f:/s/LeaditBuilders/IgAe5AdWtMkoRK6Gg0eHUI6CAe93fjfZ5_BTqPn-5FfTOig?e=5qIY0x';

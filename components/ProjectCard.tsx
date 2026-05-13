@@ -1,6 +1,6 @@
 import type { Project, MatrixColumn } from '@/lib/types';
 import { MATRIX_COLUMNS } from '@/lib/plan-type-map';
-import { COORD_BY_ID } from '@/lib/constants';
+import { APPROVED_PLANS_LINK, COORD_BY_ID } from '@/lib/constants';
 import { folderUrl, taskUrl, listUrl } from '@/lib/urls';
 import { PLAN_STATUS_TABLE } from '@/lib/status-map';
 import { CoordinatorAvatar } from './CoordinatorAvatar';
@@ -100,6 +100,21 @@ export function ProjectCard({ project }: Props) {
             <strong>Permits</strong> {project.permitsSummary.label.replace('● ', '')}
           </a>
         ) : null}
+        <a
+          href={APPROVED_PLANS_LINK}
+          target="_blank"
+          rel="noopener"
+          className="pill"
+          style={{
+            background: '#FEF1E5',
+            color: '#7A3A11',
+            border: '1px solid #F47832',
+          }}
+          title="Open the Approved Plans folder in SharePoint"
+        >
+          <i className="ti ti-folder" style={{ fontSize: 12, verticalAlign: -1, marginRight: 4 }} />
+          Approved Plans Link
+        </a>
       </div>
     </div>
   );
