@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { APPROVED_PLANS_LINK } from '@/lib/constants';
 
 interface Props {
-  variant?: 'pill' | 'icon';
+  variant?: 'button' | 'icon';
 }
 
 async function copyText(text: string) {
@@ -12,7 +12,7 @@ async function copyText(text: string) {
     await navigator.clipboard.writeText(text);
     return;
   } catch {
-    /* fall through to legacy path */
+    /* fall through */
   }
   // Legacy fallback for non-secure contexts (e.g. ClickUp's iframe sometimes
   // strips clipboard permissions). Hidden textarea + execCommand still works.
@@ -30,7 +30,10 @@ async function copyText(text: string) {
   }
 }
 
-export function ApprovedPlansCopyButton({ variant = 'pill' }: Props) {
+const MONO_FONT =
+  'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Roboto Mono", monospace';
+
+export function ApprovedPlansCopyButton({ variant = 'button' }: Props) {
   const [copied, setCopied] = useState(false);
 
   const handle = async (e: React.MouseEvent) => {
@@ -49,14 +52,24 @@ export function ApprovedPlansCopyButton({ variant = 'pill' }: Props) {
         title={copied ? 'Copied!' : 'Copy Approved Plans Link'}
         aria-label={copied ? 'Copied' : 'Copy Approved Plans Link'}
         style={{
-          color: copied ? '#3B6D11' : '#F47832',
-          flexShrink: 0,
+          width: 24,
+          height: 24,
+          borderRadius: 4,
+          background: copied ? '#3B6D11' : '#F47832',
+          color: '#ffffff',
           display: 'inline-flex',
           alignItems: 'center',
+          justifyContent: 'center',
           cursor: 'pointer',
+          flexShrink: 0,
+          boxShadow: '0 1px 2px rgba(0,0,0,0.15)',
+          transition: 'background 0.15s ease',
         }}
       >
-        <i className={`ti ${copied ? 'ti-check' : 'ti-copy'}`} style={{ fontSize: 14 }} />
+        <i
+          className={`ti ${copied ? 'ti-check' : 'ti-clipboard'}`}
+          style={{ fontSize: 14, lineHeight: 1 }}
+        />
       </button>
     );
   }
@@ -65,21 +78,33 @@ export function ApprovedPlansCopyButton({ variant = 'pill' }: Props) {
     <button
       type="button"
       onClick={handle}
-      className="pill"
       title={copied ? 'Copied to clipboard' : 'Copy Approved Plans Link to clipboard'}
       style={{
-        background: copied ? '#EAF3DE' : '#FEF1E5',
-        color: copied ? '#173404' : '#7A3A11',
-        border: `1px solid ${copied ? '#7FAE52' : '#F47832'}`,
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 6,
+        height: 26,
+        padding: '0 10px',
+        borderRadius: 4,
+        background: copied ? '#3B6D11' : '#F47832',
+        color: '#ffffff',
+        border: 'none',
         cursor: 'pointer',
+        fontFamily: MONO_FONT,
+        fontSize: 10.5,
+        fontWeight: 600,
+        letterSpacing: '0.06em',
+        textTransform: 'uppercase',
         whiteSpace: 'nowrap',
+        boxShadow: '0 1px 2px rgba(0,0,0,0.15)',
+        transition: 'background 0.15s ease',
       }}
     >
       <i
-        className={`ti ${copied ? 'ti-check' : 'ti-copy'}`}
-        style={{ fontSize: 12, verticalAlign: -1, marginRight: 4 }}
+        className={`ti ${copied ? 'ti-check' : 'ti-clipboard'}`}
+        style={{ fontSize: 13, lineHeight: 1 }}
       />
-      {copied ? 'Copied!' : 'Copy Approved Plans Link'}
+      {copied ? 'Copied' : 'Copy plans link'}
     </button>
   );
 }
