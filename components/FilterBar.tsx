@@ -8,10 +8,13 @@ interface Props {
   search: string;
   coord: CoordinatorId | 'all';
   phase: PhaseId | 'all';
+  setType: string | 'all';
+  setTypeOptions: string[];
   view: ViewMode;
   onSearchChange: (s: string) => void;
   onCoordChange: (c: CoordinatorId | 'all') => void;
   onPhaseChange: (p: PhaseId | 'all') => void;
+  onSetTypeChange: (s: string | 'all') => void;
   onViewChange: (v: ViewMode) => void;
 }
 
@@ -19,10 +22,13 @@ export function FilterBar({
   search,
   coord,
   phase,
+  setType,
+  setTypeOptions,
   view,
   onSearchChange,
   onCoordChange,
   onPhaseChange,
+  onSetTypeChange,
   onViewChange,
 }: Props) {
   return (
@@ -67,6 +73,25 @@ export function FilterBar({
         <option value="pre">Pre-construction</option>
         <option value="con">Construction</option>
         <option value="post">Post-construction</option>
+      </select>
+      <select
+        value={setType}
+        onChange={(e) => onSetTypeChange(e.target.value)}
+        title="Filter plans by Set Type"
+        style={{
+          fontSize: 13,
+          background: setType !== 'all' ? '#FEF1E5' : undefined,
+          color: setType !== 'all' ? '#7A3A11' : undefined,
+          fontWeight: setType !== 'all' ? 500 : undefined,
+          borderColor: setType !== 'all' ? '#F4A973' : undefined,
+        }}
+      >
+        <option value="all">All set types</option>
+        {setTypeOptions.map((opt) => (
+          <option key={opt} value={opt}>
+            {opt}
+          </option>
+        ))}
       </select>
       <div
         style={{

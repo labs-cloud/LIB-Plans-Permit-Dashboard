@@ -1,4 +1,5 @@
-import type { Project } from './types';
+import type { Plan, Project, StatusKey } from './types';
+import { PLAN_STATUS_ORDER } from './status-map';
 
 // The matrix column for a plan is just its ClickUp Plan Type name. If a plan
 // has no Plan Type set, it doesn't show up in a matrix column (it still
@@ -23,3 +24,34 @@ export function computeMatrixColumns(projects: Project[]): string[] {
     .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
     .map(([name]) => name);
 }
+
+// Distinct ClickUp "Set Type" values (Filing Set / Surveys / Miscellaneous /
+// Field Set / …) discovered across all plans, alphabetically sorted.
+export function computeSetTypes(projects: Project[]): string[] {
+  const set = new Set<string>();
+  for (const project of projects) {
+    for (const plan of project.plans) {
+      if (plan.setType) set.add(plan.setType.trim());
+    }
+  }
+  return Array.from(set)
+    .filter(Boolean)
+    .sort((a, b) => a.localeCompare(b));
+}
+
+// For a project's plan list, collapse to one status per Plan Type column,
+// preferring the more advanced status (AP > FI > WO > TF > TS) when multiple
+// plans share a column. Used by both the server (transforms.ts) and the
+// client (when re-deriving matrix data after a Set Type filter).
+export function buildMatrix(plans: Plan[]): Record<string, StatusKey> {
+  const m: Record<string, StatusKey> = {};
+  for (const p of plans) {
+    if (!p.matrixColumn || !p.status) continue;
+    const prev = m[p.matrixColumn];
+    if (!prev || PLAN_STATUS_ORDER.indexOf(p.status) < PLAN_STATUS_ORDER.indexOf(prev)) {
+      m[p.matrixColumn] = p.status;
+    }
+  }
+  return m;
+}
+
