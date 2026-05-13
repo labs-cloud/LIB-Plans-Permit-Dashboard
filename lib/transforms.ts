@@ -89,7 +89,48 @@ function findField(
   task: ClickUpTask,
   predicate: (name: string) => boolean,
 ): ClickUpCustomFieldValue | undefined {
-  return task.custom_fields?.find((f) => predicate(f.name.toLowerCase()));
+  return task.custom_fields?.find((f) => predicate(f.name.toLowerCase().trim()));
+}
+
+// Dropdown options that are known to live on the "Asset Type" field
+// (per Faigy / Malky's workflow). Used as a content-based fallback if the
+// field's name doesn't exactly match what we expect — handles ClickUp
+// rename quirks and any extra whitespace.
+const ASSET_TYPE_OPTION_VOCAB = new Set([
+  'filing set',
+  'field set',
+  'surveys',
+  'survey',
+  'miscellaneous',
+  'misc',
+]);
+
+function findAssetTypeField(task: ClickUpTask): ClickUpCustomFieldValue | undefined {
+  const fields = task.custom_fields ?? [];
+  // 1) name-based match — accept any field whose lowercase trimmed name
+  //    contains 'asset' (e.g. 'Asset Type', 'asset', 'Type of Asset') or
+  //    is exactly 'set type' / 'set'. Don't accept anything containing
+  //    'plan type' to avoid clashing with the Plan Type field.
+  for (const f of fields) {
+    const n = f.name.toLowerCase().trim();
+    if (n.includes('plan type')) continue;
+    if (n.includes('asset') || n === 'set type' || n === 'set') {
+      return f;
+    }
+  }
+  // 2) content-based match: any dropdown whose options look like the
+  //    asset-type vocabulary (Filing Set / Surveys / Miscellaneous / …).
+  //    Catches the case where the field is named something unexpected.
+  for (const f of fields) {
+    if (f.name.toLowerCase().includes('plan type')) continue;
+    const opts = f.type_config?.options ?? [];
+    if (opts.length === 0) continue;
+    const hit = opts.some(
+      (o) => o.name && ASSET_TYPE_OPTION_VOCAB.has(o.name.toLowerCase().trim()),
+    );
+    if (hit) return f;
+  }
+  return undefined;
 }
 
 function phaseFromLabel(label: string | null): PhaseId | null {
@@ -103,9 +144,7 @@ function phaseFromLabel(label: string | null): PhaseId | null {
 
 function transformPlan(task: ClickUpTask): Plan {
   const planType = readDropdownName(findField(task, (n) => n === 'plan type'));
-  const assetType = readDropdownName(
-    findField(task, (n) => n === 'asset type' || n === 'set type'),
-  );
+  const assetType = readDropdownName(findAssetTypeField(task));
   const filingPhase = readDropdownName(findField(task, (n) => n === 'filing phase'));
   const filingDate = readDate(findField(task, (n) => n === 'filing date'));
   const expirationDate = readDate(findField(task, (n) => n === 'expiration date'));
