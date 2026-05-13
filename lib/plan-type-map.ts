@@ -25,13 +25,13 @@ export function computeMatrixColumns(projects: Project[]): string[] {
     .map(([name]) => name);
 }
 
-// Distinct ClickUp "Set Type" values (Filing Set / Surveys / Miscellaneous /
+// Distinct ClickUp "Asset Type" values (Filing Set / Surveys / Miscellaneous /
 // Field Set / …) discovered across all plans, alphabetically sorted.
-export function computeSetTypes(projects: Project[]): string[] {
+export function computeAssetTypes(projects: Project[]): string[] {
   const set = new Set<string>();
   for (const project of projects) {
     for (const plan of project.plans) {
-      if (plan.setType) set.add(plan.setType.trim());
+      if (plan.assetType) set.add(plan.assetType.trim());
     }
   }
   return Array.from(set)
@@ -42,7 +42,7 @@ export function computeSetTypes(projects: Project[]): string[] {
 // For a project's plan list, collapse to one status per Plan Type column,
 // preferring the more advanced status (AP > FI > WO > TF > TS) when multiple
 // plans share a column. Used by both the server (transforms.ts) and the
-// client (when re-deriving matrix data after a Set Type filter).
+// client (when re-deriving matrix data after a Asset Type filter).
 export function buildMatrix(plans: Plan[]): Record<string, StatusKey> {
   const m: Record<string, StatusKey> = {};
   for (const p of plans) {
