@@ -26,6 +26,7 @@ const fetcher = async (url: string): Promise<DashboardPayload> => {
 
 const EMPTY_PAYLOAD: DashboardPayload = {
   projects: [],
+  matrixColumns: [],
   kpis: { filingsInFlight: 0, approved7d: 0, waitingOn: 0, expiring30d: 0, expired: 0 },
   sticking: [],
   permits: {
@@ -200,6 +201,7 @@ export function Dashboard({ initial, initialError }: Props) {
       {view === 'overview' ? (
         <OverviewView
           projects={sorted}
+          matrixColumns={payload.matrixColumns}
           totalCount={payload.projects.length}
           sticking={filteredSticking}
           activeCoord={coord}

@@ -2,7 +2,10 @@ import type { CoordinatorId, PhaseId } from './constants';
 
 export type StatusKey = 'AP' | 'FI' | 'WO' | 'TF' | 'TS';
 export type PermitStatus = 'active' | 'expiring' | 'expired';
-export type MatrixColumn = 'Arch' | 'ST' | 'FO' | 'SOE' | 'FA' | 'SP' | 'PL' | 'Mech';
+// The portfolio matrix uses the ClickUp Plan Type name as the column id
+// (e.g. "Architectural", "Sprinkler System"). Loose string keeps the model
+// honest about the fact that ClickUp owns the vocabulary.
+export type MatrixColumn = string;
 
 export interface Plan {
   id: string;
@@ -106,6 +109,7 @@ export interface PermitsPanelData {
 
 export interface DashboardPayload {
   projects: Project[];
+  matrixColumns: string[];
   kpis: KpiStripData;
   sticking: StickingItem[];
   permits: PermitsPanelData;

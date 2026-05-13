@@ -1,5 +1,4 @@
-import type { Project, MatrixColumn } from '@/lib/types';
-import { MATRIX_COLUMNS } from '@/lib/plan-type-map';
+import type { Project } from '@/lib/types';
 import { ApprovedPlansCopyButton } from './ApprovedPlansCopyButton';
 import { folderUrl, listUrl, taskUrl } from '@/lib/urls';
 import { CoordinatorAvatar } from './CoordinatorAvatar';
@@ -7,6 +6,7 @@ import { StatusDot } from './StatusDot';
 
 interface Props {
   projects: Project[];
+  matrixColumns: string[];
   totalCount: number;
   filterTag?: string | null;
 }
@@ -17,14 +17,28 @@ const LEGEND: { label: string; color: string; border: string }[] = [
   { label: 'Waiting on', color: '#FAC775', border: '1px solid #D89724' },
   { label: 'To file', color: '#D3D1C7', border: '1px solid #A8A595' },
   { label: 'To submit', color: '#F1EFE8', border: '1px solid #C7C3B5' },
-  { label: 'None', color: 'var(--color-background-secondary)', border: '1px dashed var(--color-border-secondary)' },
+  {
+    label: 'None',
+    color: 'var(--color-background-secondary)',
+    border: '1px dashed var(--color-border-secondary)',
+  },
 ];
 
-function findPlanForColumn(project: Project, column: MatrixColumn) {
-  return project.plans.find((p) => p.matrixColumn === column && p.status) ?? null;
+const COL_WIDTH = {
+  owner: 36,
+  project: 200,
+  plan: 100,
+  permits: 110,
+  copy: 40,
+};
+
+function gridTemplate(planCount: number): string {
+  return `${COL_WIDTH.owner}px ${COL_WIDTH.project}px repeat(${planCount}, ${COL_WIDTH.plan}px) ${COL_WIDTH.permits}px ${COL_WIDTH.copy}px`;
 }
 
-export function PortfolioMatrix({ projects, totalCount, filterTag }: Props) {
+export function PortfolioMatrix({ projects, matrixColumns, totalCount, filterTag }: Props) {
+  const template = gridTemplate(matrixColumns.length);
+
   return (
     <div className="card">
       <div
@@ -33,14 +47,16 @@ export function PortfolioMatrix({ projects, totalCount, filterTag }: Props) {
           alignItems: 'baseline',
           justifyContent: 'space-between',
           marginBottom: 12,
+          gap: 16,
         }}
       >
         <div className="section-title" style={{ margin: 0 }}>
           <i className="ti ti-grid-dots" style={{ fontSize: 16 }} /> Portfolio matrix
         </div>
-        <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
+        <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', textAlign: 'right' }}>
           Showing {projects.length} of {totalCount}
           {filterTag ? ` · ${filterTag}` : ''}
+          {matrixColumns.length > 8 ? ' · scroll horizontally for more plan types →' : ''}
         </div>
       </div>
 
@@ -63,96 +79,136 @@ export function PortfolioMatrix({ projects, totalCount, filterTag }: Props) {
         ))}
       </div>
 
-      <div className="matrix-header">
-        <div>Owner</div>
-        <div>Project</div>
-        {MATRIX_COLUMNS.map((c) => (
-          <div key={c} style={{ textAlign: 'center' }}>
-            {c}
-          </div>
-        ))}
-        <div style={{ textAlign: 'right' }}>Permits</div>
-        <div style={{ textAlign: 'center' }} title="Copy Approved Plans Link">
-          Plans
-        </div>
-      </div>
-
-      {projects.length === 0 ? (
-        <div className="empty-state">No projects match these filters</div>
-      ) : (
-        <div>
-          {projects.map((project) => (
-            <div key={project.folderId} className="matrix-row">
-              <div>
-                <CoordinatorAvatar coord={project.coord} />
-              </div>
-              <div style={{ minWidth: 0 }}>
-                <a
-                  href={folderUrl(project.folderId)}
-                  target="_blank"
-                  rel="noopener"
-                  title={`Open ${project.name} in ClickUp`}
-                  style={{
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                    display: 'inline-block',
-                    maxWidth: '100%',
-                  }}
-                >
-                  {project.name}
-                </a>
-              </div>
-              {MATRIX_COLUMNS.map((col) => {
-                const plan = findPlanForColumn(project, col);
-                const status = project.matrix[col] ?? null;
-                if (plan) {
-                  return (
-                    <div key={col} style={{ textAlign: 'center' }}>
-                      <a
-                        href={taskUrl(plan.id)}
-                        target="_blank"
-                        rel="noopener"
-                        title={`${col} · ${plan.rawStatus || 'no status'}`}
-                      >
-                        <StatusDot status={status} />
-                      </a>
-                    </div>
-                  );
-                }
-                return (
-                  <div key={col} style={{ textAlign: 'center' }}>
-                    <StatusDot status={null} />
-                  </div>
-                );
-              })}
+      <div
+        style={{
+          overflowX: 'auto',
+          borderRadius: 'var(--border-radius-md)',
+          border: '0.5px solid var(--color-border-tertiary)',
+        }}
+      >
+        <div style={{ minWidth: 'max-content' }}>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: template,
+              gap: 6,
+              padding: '8px 10px',
+              fontSize: 10,
+              color: 'var(--color-text-tertiary)',
+              borderBottom: '0.5px solid var(--color-border-tertiary)',
+              background: 'var(--color-background-secondary)',
+              alignItems: 'end',
+            }}
+          >
+            <div>Owner</div>
+            <div>Project</div>
+            {matrixColumns.map((col) => (
               <div
+                key={col}
                 style={{
-                  textAlign: 'right',
-                  fontSize: 11,
-                  color: project.permitsSummary.color,
+                  textAlign: 'center',
+                  whiteSpace: 'normal',
+                  lineHeight: 1.15,
+                  wordBreak: 'break-word',
+                }}
+                title={col}
+              >
+                {col}
+              </div>
+            ))}
+            <div style={{ textAlign: 'right' }}>Permits</div>
+            <div style={{ textAlign: 'center' }} title="Copy Approved Plans Link">
+              Plans
+            </div>
+          </div>
+
+          {projects.length === 0 ? (
+            <div className="empty-state">No projects match these filters</div>
+          ) : (
+            projects.map((project) => (
+              <div
+                key={project.folderId}
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: template,
+                  gap: 6,
+                  padding: '8px 10px',
+                  fontSize: 12,
+                  alignItems: 'center',
+                  borderTop: '0.5px solid var(--color-border-tertiary)',
                 }}
               >
-                {project.permitsListId && project.permitsSummary.total > 0 ? (
+                <div>
+                  <CoordinatorAvatar coord={project.coord} />
+                </div>
+                <div style={{ minWidth: 0 }}>
                   <a
-                    href={listUrl(project.permitsListId)}
+                    href={folderUrl(project.folderId)}
                     target="_blank"
                     rel="noopener"
-                    style={{ color: 'inherit' }}
+                    title={`Open ${project.name} in ClickUp`}
+                    style={{
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      display: 'inline-block',
+                      maxWidth: '100%',
+                    }}
                   >
-                    {project.permitsSummary.label}
+                    {project.name}
                   </a>
-                ) : (
-                  project.permitsSummary.label
-                )}
+                </div>
+                {matrixColumns.map((col) => {
+                  const plan = project.plans.find((p) => p.matrixColumn === col);
+                  const status = project.matrix[col] ?? null;
+                  if (plan) {
+                    return (
+                      <div key={col} style={{ textAlign: 'center' }}>
+                        <a
+                          href={taskUrl(plan.id)}
+                          target="_blank"
+                          rel="noopener"
+                          title={`${col} · ${plan.rawStatus || 'no status'}`}
+                        >
+                          <StatusDot status={status} />
+                        </a>
+                      </div>
+                    );
+                  }
+                  return (
+                    <div key={col} style={{ textAlign: 'center' }}>
+                      <StatusDot status={null} />
+                    </div>
+                  );
+                })}
+                <div
+                  style={{
+                    textAlign: 'right',
+                    fontSize: 11,
+                    color: project.permitsSummary.color,
+                  }}
+                >
+                  {project.permitsListId && project.permitsSummary.total > 0 ? (
+                    <a
+                      href={listUrl(project.permitsListId)}
+                      target="_blank"
+                      rel="noopener"
+                      style={{ color: 'inherit' }}
+                    >
+                      {project.permitsSummary.label}
+                    </a>
+                  ) : (
+                    project.permitsSummary.label
+                  )}
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'center' }}>
+                  <ApprovedPlansCopyButton variant="icon" />
+                </div>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'center' }}>
-                <ApprovedPlansCopyButton variant="icon" />
-              </div>
-            </div>
-          ))}
+            ))
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 }

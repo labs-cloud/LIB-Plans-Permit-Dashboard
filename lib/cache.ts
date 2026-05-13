@@ -1,6 +1,7 @@
 import { unstable_cache } from 'next/cache';
 import { hasClickUpToken } from './clickup';
 import { computeKpis, computePermitsPanel } from './kpis';
+import { computeMatrixColumns } from './plan-type-map';
 import { computeSticking } from './sticking';
 import { loadAllProjects } from './transforms';
 import type { DashboardPayload } from './types';
@@ -12,6 +13,7 @@ async function buildPayload(): Promise<DashboardPayload> {
   if (!hasClickUpToken()) {
     return {
       projects: [],
+      matrixColumns: [],
       kpis: { filingsInFlight: 0, approved7d: 0, waitingOn: 0, expiring30d: 0, expired: 0 },
       sticking: [],
       permits: {
@@ -35,6 +37,7 @@ async function buildPayload(): Promise<DashboardPayload> {
   const projects = await loadAllProjects();
   return {
     projects,
+    matrixColumns: computeMatrixColumns(projects),
     kpis: computeKpis(projects, now),
     sticking: computeSticking(projects, now),
     permits: computePermitsPanel(projects, now),
