@@ -9,8 +9,17 @@ interface Props {
 export function StickingList({ items }: Props) {
   return (
     <div className="card">
-      <div className="section-title">
-        <i className="ti ti-flag" style={{ fontSize: 16, color: '#A32D2D' }} /> What&apos;s sticking
+      <div className="section-title" style={{ marginBottom: 4 }}>
+        <i className="ti ti-flag" style={{ fontSize: 16, color: '#A32D2D' }} /> Needs attention
+      </div>
+      <div
+        style={{
+          fontSize: 11,
+          color: 'var(--color-text-tertiary)',
+          marginBottom: 10,
+        }}
+      >
+        Expired permits · expiring in ≤7 days · plans stuck waiting on &gt; 3 days
       </div>
       {items.length === 0 ? (
         <div className="empty-state" style={{ padding: '1rem' }}>

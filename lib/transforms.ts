@@ -279,7 +279,7 @@ async function loadProject(folder: ClickUpFolder, now: number): Promise<Project 
   const plans = planTasks.map(transformPlan);
   const permits = permitTasks.map((t) => transformPermit(t, now));
 
-  const coord = deriveCoordinator(overviewTasks);
+  const coord = deriveCoordinator([...overviewTasks, ...planTasks, ...permitTasks]);
   const overview = overviewTasks[0];
   const phaseLabel = readDropdownName(findField(overview ?? ({} as ClickUpTask), (n) => n === 'project phases' || n === 'project phase'));
   const phase = phaseFromLabel(phaseLabel);

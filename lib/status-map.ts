@@ -4,15 +4,16 @@ export interface StatusStyle {
   key: StatusKey;
   label: string;
   bg: string;
+  border: string;
   fg: string;
 }
 
 const STATUS_TABLE: Record<StatusKey, StatusStyle> = {
-  AP: { key: 'AP', label: 'Approved', bg: '#C0DD97', fg: '#173404' },
-  FI: { key: 'FI', label: 'Filed', bg: '#B5D4F4', fg: '#042C53' },
-  WO: { key: 'WO', label: 'Waiting on', bg: '#FAC775', fg: '#412402' },
-  TF: { key: 'TF', label: 'To file', bg: '#D3D1C7', fg: '#2C2C2A' },
-  TS: { key: 'TS', label: 'To submit', bg: '#F1EFE8', fg: '#5F5E5A' },
+  AP: { key: 'AP', label: 'Approved', bg: '#C0DD97', border: '#7FAE52', fg: '#0E2A02' },
+  FI: { key: 'FI', label: 'Filed', bg: '#B5D4F4', border: '#5F94CC', fg: '#042C53' },
+  WO: { key: 'WO', label: 'Waiting on', bg: '#FAC775', border: '#D89724', fg: '#412402' },
+  TF: { key: 'TF', label: 'To file', bg: '#D3D1C7', border: '#A8A595', fg: '#2C2C2A' },
+  TS: { key: 'TS', label: 'To submit', bg: '#F1EFE8', border: '#C7C3B5', fg: '#5F5E5A' },
 };
 
 const RAW_TO_KEY: Record<string, StatusKey> = {

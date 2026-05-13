@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { ThemeToggle } from './ThemeToggle';
 
 interface Props {
   shownCount: number;
@@ -71,6 +72,8 @@ export function LogoHeader({ shownCount, totalCount, syncedAt, filterLine, warni
           {subtitle}
         </div>
       </div>
+
+      <ThemeToggle />
 
       <div
         style={{

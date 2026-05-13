@@ -23,11 +23,15 @@ export function StatusDot({ status, size = 16, title }: Props) {
     );
   }
   const meta = PLAN_STATUS_TABLE[status];
-  const border = status === 'TS' ? '0.5px solid #D3D1C7' : undefined;
   return (
     <span
       className="dot"
-      style={{ width: size, height: size, background: meta.bg, border }}
+      style={{
+        width: size,
+        height: size,
+        background: meta.bg,
+        border: `1px solid ${meta.border}`,
+      }}
       title={title ?? meta.label}
     />
   );
