@@ -196,7 +196,7 @@ export function Dashboard({ initial, initialError }: Props) {
         onCoordToggle={(c) => setCoord(coord === c ? 'all' : c)}
       />
 
-      <KpiStrip data={filteredKpis} />
+      <KpiStrip data={filteredKpis} projects={filtered} />
 
       {view === 'overview' ? (
         <OverviewView
