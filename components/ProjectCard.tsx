@@ -1,8 +1,9 @@
 import type { Project, MatrixColumn } from '@/lib/types';
 import { MATRIX_COLUMNS } from '@/lib/plan-type-map';
-import { APPROVED_PLANS_LINK, COORD_BY_ID } from '@/lib/constants';
+import { COORD_BY_ID } from '@/lib/constants';
 import { folderUrl, taskUrl, listUrl } from '@/lib/urls';
 import { PLAN_STATUS_TABLE } from '@/lib/status-map';
+import { ApprovedPlansCopyButton } from './ApprovedPlansCopyButton';
 import { CoordinatorAvatar } from './CoordinatorAvatar';
 
 interface Props {
@@ -20,7 +21,7 @@ export function ProjectCard({ project }: Props) {
     <div className="card" style={{ padding: '12px 14px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
         <CoordinatorAvatar coord={project.coord} />
-        <div style={{ flex: 1 }}>
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           <a
             href={folderUrl(project.folderId)}
             target="_blank"
@@ -29,11 +30,12 @@ export function ProjectCard({ project }: Props) {
           >
             {project.name}
           </a>
+          <ApprovedPlansCopyButton variant="pill" />
           <span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>
-            {project.meta ? ` · ${project.meta}` : ''}
-            {project.phaseLabel ? ` · ${project.phaseLabel}` : ''} ·{' '}
+            {project.meta ? `${project.meta} · ` : ''}
+            {project.phaseLabel ? `${project.phaseLabel} · ` : ''}
+            <span style={{ color: coordMeta.color }}>{coordMeta.name}</span>
           </span>
-          <span style={{ fontSize: 11, color: coordMeta.color }}>{coordMeta.name}</span>
         </div>
         {project.alert ? (
           <div style={{ fontSize: 11, color: project.alert.color }}>{project.alert.text}</div>
@@ -100,21 +102,6 @@ export function ProjectCard({ project }: Props) {
             <strong>Permits</strong> {project.permitsSummary.label.replace('● ', '')}
           </a>
         ) : null}
-        <a
-          href={APPROVED_PLANS_LINK}
-          target="_blank"
-          rel="noopener"
-          className="pill"
-          style={{
-            background: '#FEF1E5',
-            color: '#7A3A11',
-            border: '1px solid #F47832',
-          }}
-          title="Open the Approved Plans folder in SharePoint"
-        >
-          <i className="ti ti-folder" style={{ fontSize: 12, verticalAlign: -1, marginRight: 4 }} />
-          Approved Plans Link
-        </a>
       </div>
     </div>
   );
