@@ -8,6 +8,7 @@ import { PhaseSummary } from './PhaseSummary';
 
 interface Props {
   projects: Project[];
+  matrixColumns: string[];
   totalCount: number;
   sticking: StickingItem[];
   activeCoord: CoordinatorId | 'all';
@@ -18,6 +19,7 @@ interface Props {
 
 export function OverviewView({
   projects,
+  matrixColumns,
   totalCount,
   sticking,
   activePhase,
@@ -41,7 +43,12 @@ export function OverviewView({
           onPhaseToggle={onPhaseToggle}
         />
       </div>
-      <PortfolioMatrix projects={projects} totalCount={totalCount} filterTag={filterTag} />
+      <PortfolioMatrix
+        projects={projects}
+        matrixColumns={matrixColumns}
+        totalCount={totalCount}
+        filterTag={filterTag}
+      />
     </div>
   );
 }

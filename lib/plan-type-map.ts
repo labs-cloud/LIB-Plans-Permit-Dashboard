@@ -1,30 +1,25 @@
-import type { MatrixColumn } from './types';
+import type { Project } from './types';
 
-const MATRIX_COLUMNS: MatrixColumn[] = ['Arch', 'ST', 'FO', 'SOE', 'FA', 'SP', 'PL', 'Mech'];
-
-// Map ClickUp "Plan Type" dropdown value → portfolio-matrix column.
-// Unmapped plan types still render in the Detailed capsule view; they just
-// don't get a dot in the matrix.
-const KEYWORD_TABLE: Array<[RegExp, MatrixColumn]> = [
-  [/^arch/i, 'Arch'],
-  [/^struct/i, 'ST'],
-  [/^foundation/i, 'FO'],
-  [/^soe\b/i, 'SOE'],
-  [/support of excavation/i, 'SOE'],
-  [/fire alarm/i, 'FA'],
-  [/sprinkler/i, 'SP'],
-  [/standpipe/i, 'SP'],
-  [/plumbing/i, 'PL'],
-  [/mechanical/i, 'Mech'],
-  [/\bhvac\b/i, 'Mech'],
-];
-
-export function planTypeToColumn(planType: string | null | undefined): MatrixColumn | null {
+// The matrix column for a plan is just its ClickUp Plan Type name. If a plan
+// has no Plan Type set, it doesn't show up in a matrix column (it still
+// renders in the Detailed view via its task name).
+export function planTypeToColumn(planType: string | null | undefined): string | null {
   if (!planType) return null;
-  for (const [re, col] of KEYWORD_TABLE) {
-    if (re.test(planType)) return col;
-  }
-  return null;
+  const trimmed = planType.trim();
+  return trimmed.length ? trimmed : null;
 }
 
-export { MATRIX_COLUMNS };
+// Build the matrix column list across every project, ordered by frequency
+// (most-used plan types first) with alphabetical tie-break.
+export function computeMatrixColumns(projects: Project[]): string[] {
+  const counts = new Map<string, number>();
+  for (const project of projects) {
+    for (const plan of project.plans) {
+      if (!plan.matrixColumn) continue;
+      counts.set(plan.matrixColumn, (counts.get(plan.matrixColumn) ?? 0) + 1);
+    }
+  }
+  return Array.from(counts.entries())
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .map(([name]) => name);
+}
