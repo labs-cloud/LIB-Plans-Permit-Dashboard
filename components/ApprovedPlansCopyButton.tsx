@@ -75,36 +75,58 @@ export function ApprovedPlansCopyButton({ variant = 'button' }: Props) {
   }
 
   return (
-    <button
-      type="button"
-      onClick={handle}
-      title={copied ? 'Copied to clipboard' : 'Copy Approved Plans Link to clipboard'}
+    <span
       style={{
         display: 'inline-flex',
-        alignItems: 'center',
-        gap: 6,
-        height: 26,
-        padding: '0 10px',
-        borderRadius: 4,
-        background: copied ? '#3B6D11' : '#F47832',
-        color: '#ffffff',
-        border: 'none',
-        cursor: 'pointer',
-        fontFamily: MONO_FONT,
-        fontSize: 10.5,
-        fontWeight: 600,
-        letterSpacing: '0.06em',
-        textTransform: 'uppercase',
-        whiteSpace: 'nowrap',
-        boxShadow: '0 1px 2px rgba(0,0,0,0.15)',
-        transition: 'background 0.15s ease',
+        flexDirection: 'column',
+        alignItems: 'stretch',
+        gap: 3,
       }}
     >
-      <i
-        className={`ti ${copied ? 'ti-check' : 'ti-clipboard'}`}
-        style={{ fontSize: 13, lineHeight: 1 }}
-      />
-      {copied ? 'Copied' : 'Copy plans link'}
-    </button>
+      <span
+        style={{
+          fontFamily: MONO_FONT,
+          fontSize: 9,
+          fontWeight: 600,
+          letterSpacing: '0.08em',
+          textTransform: 'uppercase',
+          color: copied ? '#3B6D11' : 'var(--color-text-tertiary)',
+          lineHeight: 1,
+        }}
+      >
+        {copied ? 'Copied to clipboard' : 'Copy to clipboard'}
+      </span>
+      <button
+        type="button"
+        onClick={handle}
+        title={copied ? 'Copied to clipboard' : 'Copy Approved Plans Link to clipboard'}
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 6,
+          height: 26,
+          padding: '0 10px',
+          borderRadius: 4,
+          background: copied ? '#3B6D11' : '#F47832',
+          color: '#ffffff',
+          border: 'none',
+          cursor: 'pointer',
+          fontFamily: MONO_FONT,
+          fontSize: 10.5,
+          fontWeight: 600,
+          letterSpacing: '0.06em',
+          textTransform: 'uppercase',
+          whiteSpace: 'nowrap',
+          boxShadow: '0 1px 2px rgba(0,0,0,0.15)',
+          transition: 'background 0.15s ease',
+        }}
+      >
+        <i
+          className={`ti ${copied ? 'ti-check' : 'ti-clipboard'}`}
+          style={{ fontSize: 13, lineHeight: 1 }}
+        />
+        Approved Plans Link
+      </button>
+    </span>
   );
 }
