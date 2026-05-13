@@ -44,23 +44,44 @@ export function LogoHeader({ shownCount, totalCount, syncedAt, filterLine, warni
     >
       <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center' }}>
         {!imgError ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src="/lib_brand/lead_it_builders_logo.png"
-            alt="Lead It Builders"
-            style={{ height: 48, width: 'auto', objectFit: 'contain' }}
-            onError={() => setImgError(true)}
-          />
-        ) : (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <svg width="48" height="48" viewBox="0 0 48 48" aria-label="LIB">
-              <polygon points="24,4 42,14 42,34 24,44 6,34 6,14" fill="#000000" />
-              <rect x="22" y="8" width="4" height="20" fill="#F47832" />
-            </svg>
-            <span style={{ fontWeight: 700, fontSize: 14, letterSpacing: 0.5 }}>
-              LEAD IT BUILDERS
-            </span>
+          // Crop the full logo PNG (2550×3300, icon occupies ~x:396-726, y:165-602)
+          // down to just the hex + orange-stripe mark, sized large for visibility.
+          <div
+            style={{
+              width: 60,
+              height: 78,
+              overflow: 'hidden',
+              position: 'relative',
+              flexShrink: 0,
+            }}
+            aria-label="Lead It Builders"
+            role="img"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/lib_brand/lead_it_builders_logo.png"
+              alt="Lead It Builders"
+              onError={() => setImgError(true)}
+              style={{
+                position: 'absolute',
+                width: 465,
+                height: 'auto',
+                left: -72,
+                top: -30,
+                maxWidth: 'none',
+                userSelect: 'none',
+              }}
+              draggable={false}
+            />
           </div>
+        ) : (
+          <svg width="60" height="78" viewBox="0 0 60 78" aria-label="LIB">
+            <polygon
+              points="30,4 54,18 54,46 30,60 6,46 6,18"
+              fill="#000000"
+            />
+            <rect x="27" y="10" width="6" height="26" fill="#F47832" />
+          </svg>
         )}
       </div>
 
