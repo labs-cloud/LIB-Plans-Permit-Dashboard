@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { SyncButton } from './SyncButton';
 import { ThemeToggle } from './ThemeToggle';
 
 interface Props {
@@ -95,6 +96,7 @@ export function LogoHeader({ shownCount, totalCount, syncedAt, filterLine, warni
         </div>
       </div>
 
+      <SyncButton />
       <ThemeToggle />
 
       <div

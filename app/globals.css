@@ -146,7 +146,7 @@ select {
 
 .matrix-row {
   display: grid;
-  grid-template-columns: 0.35fr 1.5fr repeat(8, 0.65fr) 0.9fr;
+  grid-template-columns: 0.35fr 1.5fr repeat(8, 0.65fr) 0.9fr 0.4fr;
   gap: 6px;
   padding: 8px 8px;
   font-size: 12px;
@@ -161,7 +161,7 @@ select {
 
 .matrix-header {
   display: grid;
-  grid-template-columns: 0.35fr 1.5fr repeat(8, 0.65fr) 0.9fr;
+  grid-template-columns: 0.35fr 1.5fr repeat(8, 0.65fr) 0.9fr 0.4fr;
   gap: 6px;
   padding: 6px 8px;
   font-size: 10px;
@@ -232,6 +232,15 @@ select {
   }
   100% {
     background-position: -200% 0;
+  }
+}
+
+@keyframes lib-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
   }
 }
 
