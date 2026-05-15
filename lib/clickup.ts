@@ -100,12 +100,23 @@ export async function getListsInFolder(folderId: string): Promise<ClickUpList[]>
   return data.lists.filter((l) => !l.archived);
 }
 
+// Fetches a single task by ID. Use this when the list-task endpoint omits
+// values for a custom field (a known ClickUp quirk) — /task/{id} always
+// returns the full custom_fields with their values.
+export async function getTask(taskId: string): Promise<ClickUpTask> {
+  return clickupFetch<ClickUpTask>(`/task/${encodeURIComponent(taskId)}`);
+}
+
 export async function getTasksInList(listId: string): Promise<ClickUpTask[]> {
   const out: ClickUpTask[] = [];
   let page = 0;
   while (true) {
+    // include_closed=false: skip archived
+    // subtasks=false: every Plan is a discrete task; including subtasks via
+    //   the list endpoint has been observed to drop custom-field VALUES
+    //   (e.g. Asset Type comes back with value: null even when set in UI).
     const data = await clickupFetch<{ tasks: ClickUpTask[]; last_page?: boolean }>(
-      `/list/${listId}/task?subtasks=true&include_closed=false&page=${page}`,
+      `/list/${listId}/task?subtasks=false&include_closed=false&page=${page}`,
     );
     out.push(...data.tasks);
     if (!data.tasks.length || data.last_page || data.tasks.length < 100) break;
