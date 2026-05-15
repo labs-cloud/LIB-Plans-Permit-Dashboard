@@ -25,8 +25,25 @@ export function computeMatrixColumns(projects: Project[]): string[] {
     .map(([name]) => name);
 }
 
-// Distinct ClickUp "Asset Type" values (Filing Set / Surveys / Miscellaneous /
-// Field Set / …) discovered across all plans, alphabetically sorted.
+// Distinct ClickUp "Asset Type" values (Filing Set / Field Set / Shop Drawing
+// / Misc / …) discovered across all plans. Ordered the way ClickUp lists them
+// — Filing Set first, then Field Set, Shop Drawing, Misc — with anything new
+// appended alphabetically at the end.
+const ASSET_TYPE_CANONICAL_ORDER = [
+  'filing set',
+  'field set',
+  'shop drawing',
+  'shop drawings',
+  'misc',
+  'miscellaneous',
+];
+
+function canonicalRank(name: string): number {
+  const lower = name.toLowerCase().trim();
+  const i = ASSET_TYPE_CANONICAL_ORDER.indexOf(lower);
+  return i === -1 ? Number.MAX_SAFE_INTEGER : i;
+}
+
 export function computeAssetTypes(projects: Project[]): string[] {
   const set = new Set<string>();
   for (const project of projects) {
@@ -36,7 +53,12 @@ export function computeAssetTypes(projects: Project[]): string[] {
   }
   return Array.from(set)
     .filter(Boolean)
-    .sort((a, b) => a.localeCompare(b));
+    .sort((a, b) => {
+      const ra = canonicalRank(a);
+      const rb = canonicalRank(b);
+      if (ra !== rb) return ra - rb;
+      return a.localeCompare(b);
+    });
 }
 
 // For a project's plan list, collapse to one status per Plan Type column,

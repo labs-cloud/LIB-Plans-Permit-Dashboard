@@ -92,17 +92,17 @@ function findField(
   return task.custom_fields?.find((f) => predicate(f.name.toLowerCase().trim()));
 }
 
-// Dropdown options that are known to live on the "Asset Type" field
-// (per Faigy / Malky's workflow). Used as a content-based fallback if the
-// field's name doesn't exactly match what we expect — handles ClickUp
-// rename quirks and any extra whitespace.
+// Dropdown options that live on the "Asset Type" field
+// (per the Plan tasks: Filing Set / Field Set / Shop Drawing / Misc).
+// Used as a content-based fallback if the field's name doesn't exactly
+// match what we expect — handles ClickUp rename quirks or whitespace.
 const ASSET_TYPE_OPTION_VOCAB = new Set([
   'filing set',
   'field set',
-  'surveys',
-  'survey',
-  'miscellaneous',
+  'shop drawing',
+  'shop drawings',
   'misc',
+  'miscellaneous',
 ]);
 
 function findAssetTypeField(task: ClickUpTask): ClickUpCustomFieldValue | undefined {
