@@ -42,6 +42,7 @@ export function PortfolioMatrix({ projects, matrixColumns, totalCount, filterTag
   return (
     <div className="card">
       <div
+        className="matrix-title-row"
         style={{
           display: 'flex',
           alignItems: 'baseline',
@@ -80,6 +81,7 @@ export function PortfolioMatrix({ projects, matrixColumns, totalCount, filterTag
       </div>
 
       <div
+        className="matrix-scroll"
         style={{
           overflowX: 'auto',
           borderRadius: 'var(--border-radius-md)',

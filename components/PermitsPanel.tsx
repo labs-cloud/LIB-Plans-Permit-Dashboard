@@ -44,7 +44,7 @@ export function PermitsPanel({ data }: Props) {
           borderTop: '0.5px solid var(--color-border-secondary)',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+        <div className="permits-header" style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
           <div>
             <div
               style={{
@@ -73,6 +73,7 @@ export function PermitsPanel({ data }: Props) {
       </div>
 
       <div
+        className="permits-kpi-grid"
         style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(3, 1fr)',
@@ -120,6 +121,7 @@ export function PermitsPanel({ data }: Props) {
       </div>
 
       <div
+        className="permits-detail-grid"
         style={{
           display: 'grid',
           gridTemplateColumns: '1.3fr 1fr',

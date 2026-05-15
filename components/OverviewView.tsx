@@ -29,6 +29,7 @@ export function OverviewView({
   return (
     <div>
       <div
+        className="overview-grid"
         style={{
           display: 'grid',
           gridTemplateColumns: '1.3fr 1fr',

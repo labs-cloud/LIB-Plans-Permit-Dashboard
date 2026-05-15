@@ -356,6 +356,7 @@ export function KpiStrip({ data, projects }: Props) {
   return (
     <>
       <div
+        className="kpi-grid"
         style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(5, 1fr)',

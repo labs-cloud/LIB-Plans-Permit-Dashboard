@@ -77,7 +77,7 @@ export function CoordinatorRoster({ projects, activeCoord, onCoordToggle }: Prop
       <div className="section-title">
         <i className="ti ti-users" style={{ fontSize: 16 }} /> Project Coordinators
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+      <div className="coordinator-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
         {cards.map((card) => {
           const count = countProjects(projects, card.id);
           const isActive = activeCoord === card.id;

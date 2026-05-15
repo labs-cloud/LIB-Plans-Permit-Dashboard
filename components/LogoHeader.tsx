@@ -31,6 +31,7 @@ export function LogoHeader({ shownCount, totalCount, syncedAt, filterLine, warni
 
   return (
     <div
+      className="dashboard-header"
       style={{
         display: 'flex',
         alignItems: 'center',
@@ -43,12 +44,13 @@ export function LogoHeader({ shownCount, totalCount, syncedAt, filterLine, warni
         borderTop: '3px solid #F47832',
       }}
     >
-      <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center' }}>
+      <div className="dashboard-header-logo" style={{ flexShrink: 0, display: 'flex', alignItems: 'center' }}>
         {!imgError ? (
           // Crop the full logo PNG (2550×3300) down to a generous window around
           // the hex + orange-stripe mark with breathing room on all sides.
           // Crop window: x ~8–35%, y ~0–23% of the source.
           <div
+            className="dashboard-logo-crop"
             style={{
               width: 96,
               height: 104,
@@ -61,6 +63,7 @@ export function LogoHeader({ shownCount, totalCount, syncedAt, filterLine, warni
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
+              className="dashboard-logo-img"
               src="/lib_brand/lead_it_builders_logo.png"
               alt="Lead It Builders"
               onError={() => setImgError(true)}
@@ -88,7 +91,7 @@ export function LogoHeader({ shownCount, totalCount, syncedAt, filterLine, warni
       </div>
 
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 18, fontWeight: 500, letterSpacing: 0.2 }}>
+        <div className="dashboard-title" style={{ fontSize: 18, fontWeight: 500, letterSpacing: 0.2 }}>
           Plans &amp; Permits Dashboard
         </div>
         <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 2 }}>
@@ -96,10 +99,13 @@ export function LogoHeader({ shownCount, totalCount, syncedAt, filterLine, warni
         </div>
       </div>
 
-      <SyncButton />
-      <ThemeToggle />
+      <div className="dashboard-header-actions">
+        <SyncButton />
+        <ThemeToggle />
+      </div>
 
       <div
+        className="live-pill"
         style={{
           display: 'flex',
           alignItems: 'center',

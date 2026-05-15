@@ -192,11 +192,11 @@ export function Dashboard({ initial, initialError }: Props) {
 
   return (
     <div
+      className="dashboard-shell"
       style={{
         background: 'var(--color-background-primary)',
         border: '0.5px solid var(--color-border-tertiary)',
         borderRadius: 'var(--border-radius-lg)',
-        padding: '1.5rem',
       }}
     >
       <LogoHeader

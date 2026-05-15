@@ -1,9 +1,14 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
   title: 'Plans & Permits Dashboard · Lead It Builders',
   description: 'Read-only portfolio dashboard mirroring Lead It Builders Plans & Permits state from ClickUp.',
+};
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
 };
 
 const THEME_INIT = `(function(){try{var t=localStorage.getItem('libTheme');if(t==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}})();`;

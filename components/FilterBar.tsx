@@ -33,6 +33,7 @@ export function FilterBar({
 }: Props) {
   return (
     <div
+      className="filter-bar"
       style={{
         display: 'flex',
         gap: 8,
@@ -42,6 +43,7 @@ export function FilterBar({
       }}
     >
       <input
+        className="filter-search"
         type="search"
         placeholder="Search projects…"
         value={search}
@@ -49,6 +51,7 @@ export function FilterBar({
         style={{ flex: 1, minWidth: 160, maxWidth: 220, fontSize: 13 }}
       />
       <select
+        className="filter-select"
         value={coord}
         onChange={(e) => onCoordChange(e.target.value as CoordinatorId | 'all')}
         style={{
@@ -65,6 +68,7 @@ export function FilterBar({
         <option value="unassigned">Unassigned</option>
       </select>
       <select
+        className="filter-select"
         value={phase}
         onChange={(e) => onPhaseChange(e.target.value as PhaseId | 'all')}
         style={{ fontSize: 13 }}
@@ -75,6 +79,7 @@ export function FilterBar({
         <option value="post">Post-construction</option>
       </select>
       <select
+        className="filter-select"
         value={assetType}
         onChange={(e) => onAssetTypeChange(e.target.value)}
         title="Filter plans by Asset Type"
@@ -94,6 +99,7 @@ export function FilterBar({
         ))}
       </select>
       <div
+        className="view-toggle"
         style={{
           display: 'flex',
           gap: 4,
