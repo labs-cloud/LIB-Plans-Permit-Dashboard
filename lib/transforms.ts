@@ -107,22 +107,27 @@ const ASSET_TYPE_OPTION_VOCAB = new Set([
 
 function findAssetTypeField(task: ClickUpTask): ClickUpCustomFieldValue | undefined {
   const fields = task.custom_fields ?? [];
-  // 1) name-based match — accept any field whose lowercase trimmed name
-  //    contains 'asset' (e.g. 'Asset Type', 'asset', 'Type of Asset') or
-  //    is exactly 'set type' / 'set'. Don't accept anything containing
-  //    'plan type' to avoid clashing with the Plan Type field.
+  // 1) Strong match: any field whose lowercase trimmed name CONTAINS 'asset'
+  //    (e.g. 'Asset Type', 'asset', 'Type of Asset'). Run across ALL fields
+  //    first so we don't accidentally pick up the legacy 'Set Type' field
+  //    that shipped alongside Asset Type on some workspaces and may be
+  //    unset on every task.
   for (const f of fields) {
     const n = f.name.toLowerCase().trim();
     if (n.includes('plan type')) continue;
-    if (n.includes('asset') || n === 'set type' || n === 'set') {
-      return f;
-    }
+    if (n.includes('asset')) return f;
   }
-  // 2) content-based match: any dropdown whose options look like the
-  //    asset-type vocabulary (Filing Set / Surveys / Miscellaneous / …).
-  //    Catches the case where the field is named something unexpected.
+  // 2) Legacy 'Set Type' field — only consult if no Asset Type field exists.
   for (const f of fields) {
-    if (f.name.toLowerCase().includes('plan type')) continue;
+    const n = f.name.toLowerCase().trim();
+    if (n === 'set type' || n === 'set') return f;
+  }
+  // 3) Content-based fallback: any dropdown whose options look like the
+  //    asset-type vocabulary. Skip anything named 'plan type' or 'set
+  //    type' (already handled above with proper priority).
+  for (const f of fields) {
+    const lower = f.name.toLowerCase().trim();
+    if (lower.includes('plan type') || lower === 'set type' || lower === 'set') continue;
     const opts = f.type_config?.options ?? [];
     if (opts.length === 0) continue;
     const hit = opts.some(
