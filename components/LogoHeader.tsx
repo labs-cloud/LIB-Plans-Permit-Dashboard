@@ -92,7 +92,7 @@ export function LogoHeader({ shownCount, totalCount, syncedAt, filterLine, warni
 
       <div style={{ flex: 1, minWidth: 0 }}>
         <div className="dashboard-title" style={{ fontSize: 18, fontWeight: 500, letterSpacing: 0.2 }}>
-          Plans &amp; Permits Dashboard
+          Plans Dashboard
         </div>
         <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 2 }}>
           {subtitle}

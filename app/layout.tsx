@@ -2,8 +2,8 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Plans & Permits Dashboard · Lead It Builders',
-  description: 'Read-only portfolio dashboard mirroring Lead It Builders Plans & Permits state from ClickUp.',
+  title: 'Plans Dashboard · Lead It Builders',
+  description: 'Read-only portfolio dashboard mirroring Lead It Builders Plans state from ClickUp.',
 };
 
 export const viewport: Viewport = {
