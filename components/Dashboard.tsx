@@ -8,7 +8,7 @@ import type { CoordinatorId, PhaseId } from '@/lib/constants';
 import { COORD_BY_ID, PHASES } from '@/lib/constants';
 import type { DashboardPayload, KpiStripData, PermitsPanelData, Project, StickingItem } from '@/lib/types';
 import { computeKpis, computePermitsPanel } from '@/lib/kpis';
-import { buildMatrix, computeMatrixColumns } from '@/lib/plan-type-map';
+import { buildMatrix } from '@/lib/plan-type-map';
 import { computeSticking } from '@/lib/sticking';
 
 import { LogoHeader } from './LogoHeader';
@@ -159,10 +159,6 @@ export function Dashboard({ initial, initialError }: Props) {
     });
   }, [projectFiltered, assetType]);
 
-  // Matrix columns reflect ALL active filters — when filtering by Asset Type
-  // we don't want empty plan-type columns crowding the matrix.
-  const matrixColumns = useMemo(() => computeMatrixColumns(filtered), [filtered]);
-
   const sorted = useMemo(() => sortProjects(filtered, sort), [filtered, sort]);
 
   const filtersActive = coord !== 'all' || phase !== 'all' || assetType !== 'all' || !!search;
@@ -221,24 +217,29 @@ export function Dashboard({ initial, initialError }: Props) {
         onViewChange={setView}
       />
 
-      <CoordinatorRoster
-        projects={payload.projects}
-        activeCoord={coord}
-        onCoordToggle={(c) => setCoord(coord === c ? 'all' : c)}
-      />
-
-      <KpiStrip data={filteredKpis} projects={filtered} />
+      {view === 'detailed' && (
+        <>
+          <CoordinatorRoster
+            projects={payload.projects}
+            activeCoord={coord}
+            onCoordToggle={(c) => setCoord(coord === c ? 'all' : c)}
+          />
+          <KpiStrip data={filteredKpis} projects={filtered} />
+        </>
+      )}
 
       {view === 'overview' ? (
         <OverviewView
           projects={sorted}
-          matrixColumns={matrixColumns}
           totalCount={payload.projects.length}
           sticking={filteredSticking}
+          kpis={filteredKpis}
+          permits={filteredPermits}
           activeCoord={coord}
           activePhase={phase}
+          onCoordToggle={(c) => setCoord(coord === c ? 'all' : c)}
           onPhaseToggle={(p) => setPhase(phase === p ? 'all' : p)}
-          filterTag={filterTag}
+          onSwitchToDetailed={() => setView('detailed')}
         />
       ) : (
         <DetailedView

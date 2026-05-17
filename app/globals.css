@@ -15,6 +15,39 @@
   --border-radius-md: 8px;
   --border-radius-lg: 12px;
   --font-sans: -apple-system, BlinkMacSystemFont, 'SF Pro', 'Inter', 'Segoe UI', sans-serif;
+
+  /* brand */
+  --lib-black: #000000;
+  --lib-softblack: #231F20;
+  --lib-orange: #F47832;
+
+  /* status palette */
+  --st-ap-bg: #C0DD97; --st-ap-fg: #173404; --st-ap-bar: #7AAE3B;
+  --st-fi-bg: #B5D4F4; --st-fi-fg: #042C53; --st-fi-bar: #5A9BD4;
+  --st-wo-bg: #FAC775; --st-wo-fg: #412402; --st-wo-bar: #D69128;
+  --st-tf-bg: #D3D1C7; --st-tf-fg: #2C2C2A; --st-tf-bar: #8B8B83;
+  --st-ts-bg: #F1EFE8; --st-ts-fg: #5F5E5A; --st-ts-bar: #D0CCBE;
+
+  /* coordinator palette */
+  --c-faigy: #534AB7;       --c-faigy-bg: #EEEDFE;   --c-faigy-dark: #26215C;
+  --c-malky: #0F6E56;       --c-malky-bg: #E1F5EE;   --c-malky-dark: #04342C;
+  --c-unassigned: #5F5E5A;  --c-unassigned-bg: #F1EFE8;
+
+  /* semantic alert tones */
+  --warn-bg: #FAEEDA; --warn-fg: #412402; --warn-strong: #BA7517;
+  --danger-bg: #FCEBEB; --danger-fg: #501313; --danger-strong: #A32D2D;
+  --good-bg: #EAF3DE; --good-fg: #173404; --good-strong: #3B6D11;
+  --info-bg: #E6F1FB; --info-fg: #042C53; --info-strong: #185fa5;
+}
+
+html[data-theme='dark'] {
+  --st-ts-bg: #2A2825; --st-ts-fg: #C5C2B8;
+  --st-tf-bg: #3A3833;
+
+  --warn-bg: #3B2C12; --warn-fg: #F3C97E; --warn-strong: #F0A638;
+  --danger-bg: #3A1818; --danger-fg: #F2B0B0; --danger-strong: #E26565;
+  --good-bg: #1C2E14; --good-fg: #B4DA88; --good-strong: #9CCC65;
+  --info-bg: #18283A; --info-fg: #B0CFEF; --info-strong: #6FA7DF;
 }
 
 html[data-theme='dark'] {
@@ -85,6 +118,7 @@ body {
 
 @media (max-width: 860px) {
   .overview-grid,
+  .overview-two-up,
   .permits-detail-grid {
     grid-template-columns: 1fr !important;
   }
@@ -96,6 +130,21 @@ body {
 
   .kpi-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .hero-mosaic {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .hero-mosaic .hero-feature {
+    grid-row: auto !important;
+    grid-column: 1 / -1 !important;
+  }
+}
+
+@media (max-width: 520px) {
+  .hero-mosaic {
+    grid-template-columns: 1fr !important;
   }
 }
 
