@@ -68,7 +68,13 @@ export function DetailedView({ projects, permits, sort, onSortChange }: Props) {
           <i className="ti ti-arrow-up-right" style={{ fontSize: 14, opacity: 0.7 }} />
         </a>
       </div>
-      <div className="scrollable">
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 12,
+        }}
+      >
         {projects.length === 0 ? (
           <div className="empty-state">No projects match these filters</div>
         ) : (
