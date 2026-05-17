@@ -18,6 +18,7 @@ import { CoordinatorRoster } from './CoordinatorRoster';
 import { OverviewView } from './OverviewView';
 import { DetailedView } from './DetailedView';
 import type { SortKey } from './SortChips';
+import type { ChipStyle, DetailedLayout } from './ViewSettings';
 
 const fetcher = async (url: string): Promise<DashboardPayload> => {
   const res = await fetch(url);
@@ -66,6 +67,8 @@ const SORT_KEYS: readonly SortKey[] = ['urgency', 'coord', 'phase', 'name', 'act
 const COORD_KEYS: readonly (CoordinatorId | 'all')[] = ['all', 'faigy', 'malky', 'unassigned'] as const;
 const PHASE_KEYS: readonly (PhaseId | 'all')[] = ['all', 'pre', 'con', 'post'] as const;
 const VIEW_KEYS: readonly ViewMode[] = ['overview', 'detailed'] as const;
+const LAYOUT_KEYS: readonly DetailedLayout[] = ['A', 'B', 'C', 'D'] as const;
+const CHIP_KEYS: readonly ChipStyle[] = ['solid', 'dot', 'stripe'] as const;
 
 function sortProjects(list: Project[], key: SortKey): Project[] {
   const arr = [...list];
@@ -90,6 +93,8 @@ export function Dashboard({ initial, initialError }: Props) {
   const coord = readParam(searchParams, 'coord', COORD_KEYS, 'all');
   const phase = readParam(searchParams, 'phase', PHASE_KEYS, 'all');
   const sort = readParam(searchParams, 'sort', SORT_KEYS, 'urgency');
+  const layout = readParam(searchParams, 'layout', LAYOUT_KEYS, 'A');
+  const chipStyle = readParam(searchParams, 'chip', CHIP_KEYS, 'solid');
   const search = searchParams.get('q') ?? '';
   const assetTypeRaw = searchParams.get('assetType') ?? 'all';
   const [searchInput, setSearchInput] = useState(search);
@@ -127,6 +132,8 @@ export function Dashboard({ initial, initialError }: Props) {
   const setPhase = (p: PhaseId | 'all') => setParam({ phase: p === 'all' ? null : p });
   const setAssetType = (s: string | 'all') => setParam({ assetType: s === 'all' ? null : s });
   const setSort = (s: SortKey) => setParam({ sort: s === 'urgency' ? null : s });
+  const setLayout = (l: DetailedLayout) => setParam({ layout: l === 'A' ? null : l });
+  const setChipStyle = (c: ChipStyle) => setParam({ chip: c === 'solid' ? null : c });
 
   // Debounced commit of search to URL.
   useEffect(() => {
@@ -247,6 +254,10 @@ export function Dashboard({ initial, initialError }: Props) {
           permits={filteredPermits}
           sort={sort}
           onSortChange={setSort}
+          layout={layout}
+          chipStyle={chipStyle}
+          onLayoutChange={setLayout}
+          onChipStyleChange={setChipStyle}
         />
       )}
 
