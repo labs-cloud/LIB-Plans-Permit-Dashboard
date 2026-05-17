@@ -1,55 +1,71 @@
 'use client';
 
 import type { CoordinatorId, PhaseId } from '@/lib/constants';
-import type { Project, StickingItem } from '@/lib/types';
-import { PortfolioMatrix } from './PortfolioMatrix';
-import { StickingList } from './StickingList';
+import type {
+  KpiStripData,
+  PermitsPanelData,
+  Project,
+  StickingItem,
+} from '@/lib/types';
+import { CoordinatorWorkload } from './CoordinatorWorkload';
+import { HeroMosaic } from './HeroMosaic';
 import { PhaseSummary } from './PhaseSummary';
+import { PortfolioGlance } from './PortfolioGlance';
 
 interface Props {
   projects: Project[];
-  matrixColumns: string[];
   totalCount: number;
   sticking: StickingItem[];
+  kpis: KpiStripData;
+  permits: PermitsPanelData;
   activeCoord: CoordinatorId | 'all';
   activePhase: PhaseId | 'all';
+  onCoordToggle: (c: CoordinatorId) => void;
   onPhaseToggle: (p: PhaseId) => void;
-  filterTag: string | null;
+  onSwitchToDetailed: () => void;
 }
 
 export function OverviewView({
   projects,
-  matrixColumns,
   totalCount,
   sticking,
+  kpis,
+  permits,
+  activeCoord,
   activePhase,
+  onCoordToggle,
   onPhaseToggle,
-  filterTag,
+  onSwitchToDetailed,
 }: Props) {
   return (
     <div>
+      <HeroMosaic kpis={kpis} sticking={sticking} permits={permits} />
+
+      <CoordinatorWorkload
+        projects={projects}
+        activeCoord={activeCoord}
+        onCoordToggle={onCoordToggle}
+      />
+
       <div
-        className="overview-grid"
+        className="overview-two-up"
         style={{
           display: 'grid',
-          gridTemplateColumns: '1.3fr 1fr',
+          gridTemplateColumns: '1fr 1fr',
           gap: 14,
-          marginBottom: '1.25rem',
         }}
       >
-        <StickingList items={sticking} />
         <PhaseSummary
           projects={projects}
           activePhase={activePhase}
           onPhaseToggle={onPhaseToggle}
         />
+        <PortfolioGlance
+          projects={projects}
+          totalCount={totalCount}
+          onSwitchToDetailed={onSwitchToDetailed}
+        />
       </div>
-      <PortfolioMatrix
-        projects={projects}
-        matrixColumns={matrixColumns}
-        totalCount={totalCount}
-        filterTag={filterTag}
-      />
     </div>
   );
 }

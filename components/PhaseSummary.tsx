@@ -17,10 +17,33 @@ export function PhaseSummary({ projects, activePhase, onPhaseToggle }: Props) {
   }
 
   return (
-    <div className="card">
-      <div className="section-title">
-        <i className="ti ti-layers-intersect" style={{ fontSize: 16, color: '#534AB7' }} /> Active by phase
+    <div className="card" style={{ padding: '20px 22px' }}>
+      <div
+        className="section-title"
+        style={{
+          marginBottom: 14,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+        }}
+      >
+        <i
+          className="ti ti-layers-intersect"
+          style={{ fontSize: 16, color: 'var(--c-faigy)' }}
+        />{' '}
+        Active by phase
+        <span
+          style={{
+            marginLeft: 'auto',
+            fontSize: 11,
+            color: 'var(--color-text-tertiary)',
+            fontWeight: 400,
+          }}
+        >
+          click to filter
+        </span>
       </div>
+
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {PHASES.map((phase) => {
           const isActive = activePhase === phase.id;
@@ -30,29 +53,37 @@ export function PhaseSummary({ projects, activePhase, onPhaseToggle }: Props) {
               type="button"
               onClick={() => onPhaseToggle(phase.id)}
               style={{
-                padding: '10px 12px',
+                padding: '16px 18px',
                 background: phase.bg,
+                color: phase.text,
                 borderRadius: 'var(--border-radius-md)',
+                cursor: 'pointer',
+                display: 'grid',
+                gridTemplateColumns: '1fr auto',
+                alignItems: 'center',
+                gap: 12,
+                width: '100%',
                 textAlign: 'left',
                 outline: isActive ? `2px solid ${phase.text}` : 'none',
                 outlineOffset: isActive ? '-2px' : 0,
-                width: '100%',
-                cursor: 'pointer',
               }}
             >
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 500 }}>{phase.label}</div>
+                <div style={{ fontSize: 11, opacity: 0.75, marginTop: 2 }}>
+                  {phase.subline}
+                </div>
+              </div>
               <div
                 style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'baseline',
+                  fontSize: 30,
+                  fontWeight: 500,
+                  letterSpacing: '-0.02em',
+                  fontVariantNumeric: 'tabular-nums',
                 }}
               >
-                <strong style={{ fontSize: 12, color: phase.text }}>{phase.label}</strong>
-                <span style={{ fontSize: 16, fontWeight: 500, color: phase.text }}>
-                  {counts[phase.id]}
-                </span>
+                {counts[phase.id]}
               </div>
-              <div style={{ fontSize: 11, color: phase.sub, marginTop: 4 }}>{phase.subline}</div>
             </button>
           );
         })}
