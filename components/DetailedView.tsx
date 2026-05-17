@@ -2,17 +2,36 @@
 
 import type { PermitsPanelData, Project } from '@/lib/types';
 import { permitsSearchUrl } from '@/lib/urls';
+import { CompactRow } from './CompactRow';
 import { ProjectCard } from './ProjectCard';
 import { SortChips, type SortKey } from './SortChips';
+import {
+  ViewSettings,
+  type ChipStyle,
+  type DetailedLayout,
+} from './ViewSettings';
 
 interface Props {
   projects: Project[];
   permits: PermitsPanelData;
   sort: SortKey;
   onSortChange: (s: SortKey) => void;
+  layout: DetailedLayout;
+  chipStyle: ChipStyle;
+  onLayoutChange: (l: DetailedLayout) => void;
+  onChipStyleChange: (c: ChipStyle) => void;
 }
 
-export function DetailedView({ projects, permits, sort, onSortChange }: Props) {
+export function DetailedView({
+  projects,
+  permits,
+  sort,
+  onSortChange,
+  layout,
+  chipStyle,
+  onLayoutChange,
+  onChipStyleChange,
+}: Props) {
   const permitsHref = permitsSearchUrl(permits.allPermitsListIds);
   const permitsCount = permits.active + permits.expiring30d + permits.expired;
 
@@ -30,6 +49,12 @@ export function DetailedView({ projects, permits, sort, onSortChange }: Props) {
         <div style={{ flex: 1, minWidth: 0 }}>
           <SortChips sort={sort} onSortChange={onSortChange} />
         </div>
+        <ViewSettings
+          layout={layout}
+          chipStyle={chipStyle}
+          onLayoutChange={onLayoutChange}
+          onChipStyleChange={onChipStyleChange}
+        />
         <a
           href={permitsHref}
           target="_blank"
@@ -77,8 +102,23 @@ export function DetailedView({ projects, permits, sort, onSortChange }: Props) {
       >
         {projects.length === 0 ? (
           <div className="empty-state">No projects match these filters</div>
+        ) : layout === 'D' ? (
+          projects.map((project) => (
+            <CompactRow
+              key={project.folderId}
+              project={project}
+              chipStyle={chipStyle}
+            />
+          ))
         ) : (
-          projects.map((project) => <ProjectCard key={project.folderId} project={project} />)
+          projects.map((project) => (
+            <ProjectCard
+              key={project.folderId}
+              project={project}
+              layout={layout}
+              chipStyle={chipStyle}
+            />
+          ))
         )}
       </div>
     </div>

@@ -1,54 +1,24 @@
 import type { Plan, Project, StatusKey } from '@/lib/types';
 import { COORD_BY_ID } from '@/lib/constants';
-import { folderUrl, listUrl, taskUrl } from '@/lib/urls';
+import { folderUrl, listUrl } from '@/lib/urls';
 import { ApprovedPlansCopyButton } from './ApprovedPlansCopyButton';
 import { CoordinatorAvatar } from './CoordinatorAvatar';
+import { FilingChip, PermitsChip } from './FilingChip';
+import type { ChipStyle, DetailedLayout } from './ViewSettings';
 
 interface Props {
   project: Project;
+  layout: DetailedLayout;
+  chipStyle: ChipStyle;
 }
 
-// Solid-chip palette per the A2 design: tinted background + matching ink.
-const CHIP_STYLE: Record<StatusKey, { bg: string; fg: string; statusLabel: string }> = {
-  AP: { bg: 'var(--st-ap-bg)', fg: 'var(--st-ap-fg)', statusLabel: 'Approved' },
-  FI: { bg: 'var(--st-fi-bg)', fg: 'var(--st-fi-fg)', statusLabel: 'submitted' },
-  WO: { bg: 'var(--st-wo-bg)', fg: 'var(--st-wo-fg)', statusLabel: 'Waiting on' },
-  TF: { bg: 'var(--st-tf-bg)', fg: 'var(--st-tf-fg)', statusLabel: 'To file' },
-  TS: { bg: 'var(--st-ts-bg)', fg: 'var(--st-ts-fg)', statusLabel: 'To submit' },
+const TRIAGE_RANK: Record<StatusKey, number> = {
+  WO: 0,
+  FI: 1,
+  TF: 2,
+  TS: 3,
+  AP: 4,
 };
-
-const UNMAPPED_CHIP = {
-  bg: 'var(--color-background-secondary)',
-  fg: 'var(--color-text-secondary)',
-};
-
-// Expand the ClickUp short codes ("SP - Sprinkler") into the full word.
-const FULL_NAME: Record<string, string> = {
-  'SP - Sprinkler': 'Sprinkler',
-  'MH - Mechanical': 'Mechanical',
-  'CC - Cross Connection': 'Cross Connection',
-  'SD - Standpipe': 'Standpipe',
-  'EN - Energy': 'Energy',
-  'ED - Electrical': 'Electrical',
-  'PL - Plumbing': 'Plumbing',
-  SOE: 'Support of Excavation',
-  BPP: 'Builders Pavement',
-  'Arch Survey': 'Architectural Survey',
-  'ID Drawings': 'Identification Drawings',
-  'EES Plan': 'Energy Efficiency Standards',
-};
-
-function displayName(raw: string): string {
-  if (FULL_NAME[raw]) return FULL_NAME[raw];
-  // Generic "XX - Name" → "Name" fallback.
-  const match = /^[A-Z]{2,4}\s+-\s+(.*)$/.exec(raw);
-  return match ? match[1] : raw;
-}
-
-function planLabel(plan: Plan): string {
-  const raw = plan.planType ?? plan.matrixColumn ?? plan.name;
-  return displayName(raw);
-}
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -65,13 +35,60 @@ function waitingMeta(project: Project): { count: number; maxDays: number } {
   return { count, maxDays };
 }
 
-export function ProjectCard({ project }: Props) {
+function sortedPlans(plans: Plan[]): Plan[] {
+  return [...plans].sort((a, b) => {
+    const aRank = a.status ? TRIAGE_RANK[a.status] : 5;
+    const bRank = b.status ? TRIAGE_RANK[b.status] : 5;
+    return aRank - bRank;
+  });
+}
+
+interface Lane {
+  id: 'urgent' | 'flight' | 'queue' | 'done';
+  label: string;
+  accent: string;
+  match: (p: Plan) => boolean;
+}
+
+const LANES: Lane[] = [
+  {
+    id: 'urgent',
+    label: 'Needs attention',
+    accent: 'var(--warn-strong)',
+    match: (p) => p.status === 'WO',
+  },
+  {
+    id: 'flight',
+    label: 'In flight with agency',
+    accent: 'var(--info-strong)',
+    match: (p) => p.status === 'FI',
+  },
+  {
+    id: 'queue',
+    label: 'Drafting · to submit',
+    accent: 'var(--color-text-tertiary)',
+    match: (p) => p.status === 'TF' || p.status === 'TS',
+  },
+  {
+    id: 'done',
+    label: 'Approved',
+    accent: 'var(--good-strong)',
+    match: (p) => p.status === 'AP',
+  },
+];
+
+export function ProjectCard({ project, layout, chipStyle }: Props) {
   const coordMeta = COORD_BY_ID[project.coord];
   const { count: waitingCount, maxDays: waitingDays } = waitingMeta(project);
   const waitingActive = waitingCount > 0;
   const metaBits: string[] = [];
   if (project.meta) metaBits.push(project.meta);
   if (project.phaseLabel) metaBits.push(project.phaseLabel);
+
+  const permitsHref =
+    project.permitsListId && project.permitsSummary.total > 0
+      ? listUrl(project.permitsListId)
+      : null;
 
   return (
     <div
@@ -137,99 +154,124 @@ export function ProjectCard({ project }: Props) {
         </span>
       </div>
 
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-        {project.plans.length === 0 ? (
+      {project.plans.length === 0 ? (
+        <div
+          style={{
+            fontSize: 11,
+            color: 'var(--color-text-tertiary)',
+            fontStyle: 'italic',
+          }}
+        >
+          No plans in ClickUp yet
+        </div>
+      ) : layout === 'C' ? (
+        <LanesBody
+          plans={project.plans}
+          chipStyle={chipStyle}
+          permits={
+            permitsHref ? (
+              <PermitsChip
+                label={project.permitsSummary.label}
+                count={project.permitsSummary.total}
+                href={permitsHref}
+                chipStyle={chipStyle}
+              />
+            ) : null
+          }
+        />
+      ) : (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+          {(layout === 'B' ? sortedPlans(project.plans) : project.plans).map((plan) => (
+            <FilingChip key={plan.id} plan={plan} chipStyle={chipStyle} />
+          ))}
+          {permitsHref ? (
+            <PermitsChip
+              label={project.permitsSummary.label}
+              count={project.permitsSummary.total}
+              href={permitsHref}
+              chipStyle={chipStyle}
+            />
+          ) : null}
+        </div>
+      )}
+    </div>
+  );
+}
+
+interface LanesBodyProps {
+  plans: Plan[];
+  chipStyle: ChipStyle;
+  permits: React.ReactNode;
+}
+
+function LanesBody({ plans, chipStyle, permits }: LanesBodyProps) {
+  const buckets = LANES.map((lane) => ({
+    lane,
+    plans: plans.filter(lane.match),
+  })).filter((b) => b.plans.length > 0);
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      {buckets.map((b, idx) => {
+        const isUrgent = b.lane.id === 'urgent';
+        return (
           <div
+            key={b.lane.id}
             style={{
-              fontSize: 11,
-              color: 'var(--color-text-tertiary)',
-              fontStyle: 'italic',
+              padding: isUrgent ? '12px 14px 6px' : 0,
+              margin: isUrgent ? `${idx === 0 ? 0 : 4}px -14px 0` : 0,
+              borderRadius: 'var(--border-radius-md)',
+              borderLeft: isUrgent ? '2px solid var(--warn-strong)' : undefined,
+              background: isUrgent
+                ? 'linear-gradient(180deg, rgba(250,199,117,0.08) 0%, transparent 60%)'
+                : 'transparent',
             }}
           >
-            No plans in ClickUp yet
-          </div>
-        ) : (
-          project.plans.map((plan) => {
-            const palette = plan.status ? CHIP_STYLE[plan.status] : null;
-            const bg = palette?.bg ?? UNMAPPED_CHIP.bg;
-            const fg = palette?.fg ?? UNMAPPED_CHIP.fg;
-            const statusLabel = palette?.statusLabel ?? plan.rawStatus ?? '—';
-            const isUrgent = plan.status === 'WO';
-            return (
-              <a
-                key={plan.id}
-                href={taskUrl(plan.id)}
-                target="_blank"
-                rel="noopener"
-                title={plan.planType ?? plan.name}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 10,
-                  padding: '6px 14px',
-                  borderRadius: 999,
-                  background: bg,
-                  color: fg,
-                  fontSize: 12.5,
-                  fontWeight: 600,
-                  letterSpacing: '-0.005em',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                {planLabel(plan)}
-                <span
-                  style={{
-                    fontSize: 9.5,
-                    fontWeight: isUrgent ? 700 : 500,
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.11em',
-                    color: fg,
-                    opacity: isUrgent ? 0.85 : 0.6,
-                    lineHeight: 1,
-                  }}
-                >
-                  {statusLabel}
-                </span>
-              </a>
-            );
-          })
-        )}
-        {project.permitsListId && project.permitsSummary.total > 0 ? (
-          <a
-            href={listUrl(project.permitsListId)}
-            target="_blank"
-            rel="noopener"
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 10,
-              padding: '6px 14px',
-              borderRadius: 999,
-              background: 'var(--good-bg)',
-              color: 'var(--good-fg)',
-              fontSize: 12.5,
-              fontWeight: 600,
-              letterSpacing: '-0.005em',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            Permits
-            <span
+            <div
               style={{
-                fontSize: 9.5,
-                fontWeight: 500,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                fontSize: 11,
+                letterSpacing: '0.08em',
                 textTransform: 'uppercase',
-                letterSpacing: '0.11em',
-                color: 'var(--good-fg)',
-                opacity: 0.7,
-                lineHeight: 1,
+                fontWeight: 600,
+                color: isUrgent ? 'var(--warn-strong)' : 'var(--color-text-tertiary)',
+                marginBottom: 8,
               }}
             >
-              {project.permitsSummary.label.replace('● ', '')}
-            </span>
-          </a>
-        ) : null}
-      </div>
+              <span
+                aria-hidden="true"
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: b.lane.id === 'queue' ? 2 : '50%',
+                  background: b.lane.accent,
+                  display: 'inline-block',
+                }}
+              />
+              {b.lane.label}
+              <span
+                style={{
+                  fontFamily: 'ui-monospace, "SF Mono", Menlo, monospace',
+                  fontWeight: 400,
+                  color: 'var(--color-text-tertiary)',
+                }}
+              >
+                · {b.plans.length}
+              </span>
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {b.plans.map((plan) => (
+                <FilingChip key={plan.id} plan={plan} chipStyle={chipStyle} />
+              ))}
+            </div>
+          </div>
+        );
+      })}
+      {permits ? (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>{permits}</div>
+      ) : null}
     </div>
   );
 }
