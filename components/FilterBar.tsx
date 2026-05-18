@@ -2,7 +2,7 @@
 
 import type { CoordinatorId, PhaseId } from '@/lib/constants';
 
-export type ViewMode = 'overview' | 'detailed';
+export type ViewMode = 'overview' | 'detailed' | 'matrix';
 
 interface Props {
   search: string;
@@ -124,6 +124,14 @@ export function FilterBar({
         >
           <i className="ti ti-list-details" style={{ fontSize: 14, verticalAlign: -2, marginRight: 4 }} />
           Detailed
+        </button>
+        <button
+          type="button"
+          className={`tab ${view === 'matrix' ? 'active' : ''}`}
+          onClick={() => onViewChange('matrix')}
+        >
+          <i className="ti ti-table" style={{ fontSize: 14, verticalAlign: -2, marginRight: 4 }} />
+          Matrix
         </button>
       </div>
     </div>
