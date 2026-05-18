@@ -1,4 +1,5 @@
 import { CLICKUP, PHASES } from './constants';
+import { filingSetUrl } from './urls';
 import type { PhaseId } from './constants';
 import { planStatusKey, permitStatusKey } from './status-map';
 import { buildMatrix, planTypeToColumn } from './plan-type-map';
@@ -271,13 +272,13 @@ function buildAlert(plans: Plan[], permits: Permit[], permitsSummary: ReturnType
 }
 
 // The "Approved Plans Link" coordinators hand to subcontractors is the
-// project's filing-set parent folder on SharePoint. Source priority:
-//   1) An overview-level custom field if one's set ("Filing Set Link",
-//      "Plans Folder", etc.)
-//   2) The most common Filing Plan Link across Plan tasks — every plan
-//      in a project typically points at the same shared filing-set folder.
-//   3) Archive Drive is intentionally skipped; per-plan archive URLs go
-//      to that plan's own archive (e.g. ID Drawings), not the project root.
+// project's filing-set parent folder on SharePoint. Every project's
+// folder follows the same path convention:
+//   /Shared Documents/01_ACTIVE_PROJECTS/{ProjectName}/04. Plans/01. Filing Set
+// so we construct the URL from the ClickUp folder name by default. A
+// Project Overview custom field ("Filing Set Link", "Plans Folder", etc.)
+// can override on a per-project basis if the SharePoint folder doesn't
+// follow the convention.
 const OVERVIEW_LINK_FIELD_PATTERNS = [
   'filing set',
   'filing plans',
@@ -287,35 +288,17 @@ const OVERVIEW_LINK_FIELD_PATTERNS = [
   'plans drive',
 ];
 
-function mostCommon(values: (string | null)[]): string | null {
-  const counts = new Map<string, number>();
-  for (const v of values) {
-    if (!v) continue;
-    counts.set(v, (counts.get(v) ?? 0) + 1);
-  }
-  if (counts.size === 0) return null;
-  let best: string | null = null;
-  let max = 0;
-  for (const [v, n] of counts) {
-    if (n > max) {
-      max = n;
-      best = v;
-    }
-  }
-  return best;
-}
-
 function deriveApprovedPlansLink(
   overview: ClickUpTask | undefined,
-  plans: Plan[],
-): string | null {
+  folderName: string,
+): string {
   if (overview) {
     for (const pattern of OVERVIEW_LINK_FIELD_PATTERNS) {
       const url = readUrl(findField(overview, (n) => n.includes(pattern)));
       if (url) return url;
     }
   }
-  return mostCommon(plans.map((p) => p.filingLink));
+  return filingSetUrl(folderName);
 }
 
 function buildMetaString(overview: ClickUpTask | undefined): string | null {
@@ -378,7 +361,7 @@ async function loadProject(folder: ClickUpFolder, now: number): Promise<Project 
     coord,
     plansListId: plansList?.id ?? null,
     permitsListId: permitsList?.id ?? null,
-    approvedPlansLink: deriveApprovedPlansLink(overview, plans),
+    approvedPlansLink: deriveApprovedPlansLink(overview, folder.name),
     plans,
     permits,
     matrix,

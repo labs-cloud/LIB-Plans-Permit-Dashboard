@@ -51,7 +51,7 @@ export interface Project {
   coord: CoordinatorId;
   plansListId: string | null;
   permitsListId: string | null;
-  approvedPlansLink: string | null;
+  approvedPlansLink: string;
   plans: Plan[];
   permits: Permit[];
   matrix: Partial<Record<MatrixColumn, StatusKey>>;
