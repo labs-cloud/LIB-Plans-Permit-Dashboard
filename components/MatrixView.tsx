@@ -217,11 +217,27 @@ export function MatrixView({ projects }: Props) {
 
   return (
     <div>
-      <DesignPicker design={design} onPick={pickDesign} />
-
-      {design === 'classic' && <ClassicMatrix projects={projects} index={index} />}
-      {design === 'board' && <StatusBoard projects={projects} index={index} />}
-      {design === 'heatmap' && <Heatmap projects={projects} index={index} />}
+      {design === 'classic' && (
+        <ClassicMatrix
+          projects={projects}
+          index={index}
+          settings={<DesignPicker design={design} onPick={pickDesign} />}
+        />
+      )}
+      {design === 'board' && (
+        <StatusBoard
+          projects={projects}
+          index={index}
+          settings={<DesignPicker design={design} onPick={pickDesign} />}
+        />
+      )}
+      {design === 'heatmap' && (
+        <Heatmap
+          projects={projects}
+          index={index}
+          settings={<DesignPicker design={design} onPick={pickDesign} />}
+        />
+      )}
 
       <div
         style={{
@@ -238,8 +254,14 @@ export function MatrixView({ projects }: Props) {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// Design picker bar
+// Design picker — compact dropdown that sits in the controls row of each view
 // ────────────────────────────────────────────────────────────────────────────
+
+const DESIGN_OPTIONS: { d: DesignType; icon: string; label: string; hint: string }[] = [
+  { d: 'classic', icon: 'ti-table', label: 'Classic', hint: 'Plans × projects table' },
+  { d: 'board', icon: 'ti-columns-3', label: 'Status board', hint: 'Kanban by status' },
+  { d: 'heatmap', icon: 'ti-color-swatch', label: 'Heatmap', hint: 'Color cells, hover for detail' },
+];
 
 function DesignPicker({
   design,
@@ -248,80 +270,146 @@ function DesignPicker({
   design: DesignType;
   onPick: (d: DesignType) => void;
 }) {
-  const opts: { d: DesignType; icon: string; label: string }[] = [
-    { d: 'classic', icon: 'ti-table', label: 'A · Classic' },
-    { d: 'board', icon: 'ti-columns-3', label: 'B · Status board' },
-    { d: 'heatmap', icon: 'ti-color-swatch', label: 'C · Heatmap' },
-  ];
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('mousedown', onDoc);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDoc);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  const active = DESIGN_OPTIONS.find((o) => o.d === design) ?? DESIGN_OPTIONS[0];
+
   return (
-    <div
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 12,
-        flexWrap: 'wrap',
-        padding: '11px 16px',
-        background: 'var(--lib-softblack)',
-        color: '#fff',
-        borderRadius: 'var(--border-radius-md)',
-        marginBottom: '1.25rem',
-      }}
-    >
-      <span
+    <div ref={ref} style={{ position: 'relative', flexShrink: 0 }}>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        title="Change matrix design"
         style={{
-          fontSize: 10,
-          letterSpacing: '0.1em',
-          textTransform: 'uppercase',
-          fontWeight: 600,
-          padding: '4px 9px',
-          borderRadius: 4,
-          background: 'var(--lib-orange)',
-          color: '#000',
-        }}
-      >
-        Design type
-      </span>
-      <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>
-        <strong style={{ color: '#fff', fontWeight: 500 }}>Three approaches</strong> to seeing the
-        whole portfolio at once · pick one
-      </span>
-      <div
-        style={{
-          display: 'flex',
-          gap: 4,
-          marginLeft: 'auto',
-          padding: 3,
-          background: 'rgba(255,255,255,0.08)',
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 6,
+          height: 30,
+          padding: '0 10px',
+          background: 'var(--color-background-primary)',
+          border: '0.5px solid var(--color-border-secondary)',
           borderRadius: 'var(--border-radius-md)',
+          fontSize: 12,
+          color: 'var(--color-text-secondary)',
+          cursor: 'pointer',
         }}
       >
-        {opts.map((o) => {
-          const active = design === o.d;
-          return (
-            <button
-              key={o.d}
-              type="button"
-              onClick={() => onPick(o.d)}
-              style={{
-                padding: '6px 14px',
-                fontSize: 12,
-                borderRadius: 6,
-                color: active ? '#000' : 'rgba(255,255,255,0.7)',
-                background: active ? 'var(--lib-orange)' : 'transparent',
-                fontWeight: active ? 600 : 400,
-                cursor: 'pointer',
-                userSelect: 'none',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 6,
-              }}
-            >
-              <i className={`ti ${o.icon}`} style={{ fontSize: 13 }} />
-              {o.label}
-            </button>
-          );
-        })}
-      </div>
+        <i className={`ti ${active.icon}`} style={{ fontSize: 14 }} />
+        {active.label}
+        <i
+          className={`ti ti-chevron-${open ? 'up' : 'down'}`}
+          style={{ fontSize: 12, opacity: 0.6 }}
+        />
+      </button>
+      {open && (
+        <div
+          role="menu"
+          style={{
+            position: 'absolute',
+            right: 0,
+            top: 'calc(100% + 6px)',
+            zIndex: 50,
+            width: 240,
+            padding: 6,
+            background: 'var(--color-background-primary)',
+            border: '0.5px solid var(--color-border-secondary)',
+            borderRadius: 'var(--border-radius-md)',
+            boxShadow: '0 12px 28px rgba(0,0,0,0.18)',
+          }}
+        >
+          <div
+            style={{
+              fontSize: 10,
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+              color: 'var(--color-text-tertiary)',
+              fontWeight: 600,
+              padding: '6px 8px 4px',
+            }}
+          >
+            Matrix design
+          </div>
+          {DESIGN_OPTIONS.map((o) => {
+            const selected = o.d === design;
+            return (
+              <button
+                key={o.d}
+                type="button"
+                onClick={() => {
+                  onPick(o.d);
+                  setOpen(false);
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  padding: '8px 8px',
+                  background: selected
+                    ? 'var(--color-background-secondary)'
+                    : 'transparent',
+                  borderRadius: 6,
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  width: '100%',
+                }}
+              >
+                <i
+                  className={`ti ${o.icon}`}
+                  style={{
+                    fontSize: 14,
+                    color: selected ? 'var(--lib-orange)' : 'var(--color-text-tertiary)',
+                    flexShrink: 0,
+                  }}
+                />
+                <span style={{ flex: 1, minWidth: 0 }}>
+                  <span
+                    style={{
+                      display: 'block',
+                      fontSize: 12.5,
+                      fontWeight: selected ? 600 : 500,
+                      color: 'var(--color-text-primary)',
+                    }}
+                  >
+                    {o.label}
+                  </span>
+                  <span
+                    style={{
+                      display: 'block',
+                      fontSize: 11,
+                      color: 'var(--color-text-tertiary)',
+                    }}
+                  >
+                    {o.hint}
+                  </span>
+                </span>
+                {selected && (
+                  <i
+                    className="ti ti-check"
+                    style={{ fontSize: 14, color: 'var(--lib-orange)', flexShrink: 0 }}
+                  />
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -355,7 +443,15 @@ function ProjectStats(project: Project) {
 // A · Classic matrix — plans as rows, projects as horizontal columns
 // ────────────────────────────────────────────────────────────────────────────
 
-function ClassicMatrix({ projects, index }: { projects: Project[]; index: PlanIndex }) {
+function ClassicMatrix({
+  projects,
+  index,
+  settings,
+}: {
+  projects: Project[];
+  index: PlanIndex;
+  settings: React.ReactNode;
+}) {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const toggleGroup = (id: string, force?: boolean) =>
     setCollapsed((prev) => ({ ...prev, [id]: force !== undefined ? force : !prev[id] }));
@@ -385,7 +481,11 @@ function ClassicMatrix({ projects, index }: { projects: Project[]; index: PlanIn
 
   return (
     <div>
-      <LegendStrip onExpandAll={expandAll} onCollapseAll={collapseAll} />
+      <LegendStrip
+        onExpandAll={expandAll}
+        onCollapseAll={collapseAll}
+        settings={settings}
+      />
       <div
         style={{
           background: 'var(--color-background-primary)',
@@ -434,9 +534,11 @@ function ClassicMatrix({ projects, index }: { projects: Project[]; index: PlanIn
 function LegendStrip({
   onExpandAll,
   onCollapseAll,
+  settings,
 }: {
   onExpandAll: () => void;
   onCollapseAll: () => void;
+  settings: React.ReactNode;
 }) {
   const sw = (bg: string, label: string, withBar?: boolean) => (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
@@ -489,6 +591,7 @@ function LegendStrip({
         {sw('var(--st-wo-bg)', 'Waiting', true)}
         {sw('var(--st-tf-bg)', 'To file')}
         {sw('var(--st-ts-bg)', 'To submit')}
+        {settings}
       </div>
     </div>
   );
@@ -1120,7 +1223,15 @@ const BOARD_COLS: { id: StatusCode; label: string; tone: '' | 'urgent' | 'danger
   { id: 'ap', label: 'Approved', tone: '' },
 ];
 
-function StatusBoard({ projects, index }: { projects: Project[]; index: PlanIndex }) {
+function StatusBoard({
+  projects,
+  index,
+  settings,
+}: {
+  projects: Project[];
+  index: PlanIndex;
+  settings: React.ReactNode;
+}) {
   // status → project.folderId → { plan-name list, plan-task list }
   const data = useMemo(() => {
     const map = new Map<
@@ -1178,6 +1289,7 @@ function StatusBoard({ projects, index }: { projects: Project[]; index: PlanInde
           Each filing becomes a chip under the column matching its current status, sub-grouped by
           project.
         </span>
+        <div style={{ marginLeft: 'auto' }}>{settings}</div>
       </div>
       <div
         style={{
@@ -1411,7 +1523,15 @@ type HeatSize = 'xs' | 's' | 'm';
 
 const HEAT_SIZES: Record<HeatSize, number> = { xs: 14, s: 22, m: 32 };
 
-function Heatmap({ projects, index }: { projects: Project[]; index: PlanIndex }) {
+function Heatmap({
+  projects,
+  index,
+  settings,
+}: {
+  projects: Project[];
+  index: PlanIndex;
+  settings: React.ReactNode;
+}) {
   const [orient, setOrient] = useState<HeatOrient>('rows');
   const [size, setSize] = useState<HeatSize>('s');
   const tipRef = useRef<HTMLDivElement | null>(null);
@@ -1493,6 +1613,7 @@ function Heatmap({ projects, index }: { projects: Project[]; index: PlanIndex })
         >
           Hover a cell for details · {totalFilings} filings across {projects.length} projects
         </span>
+        {settings}
       </div>
 
       {orient === 'rows' ? (
