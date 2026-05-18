@@ -471,3 +471,364 @@ button {
   color: inherit;
   padding: 0;
 }
+
+a.linklike {
+  color: var(--color-text-info);
+}
+a.linklike:hover {
+  text-decoration: underline;
+}
+
+/* ----- Permits dashboard (route: /permits) ----- */
+
+.permits-panel {
+  background: var(--color-background-primary);
+  border: 0.5px solid var(--color-border-tertiary);
+  border-radius: var(--border-radius-lg);
+  padding: 20px 22px;
+}
+
+.permits-panel-h {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  padding-bottom: 14px;
+  border-bottom: 0.5px solid var(--color-border-secondary);
+  margin-bottom: 16px;
+}
+
+.permits-panel-h h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.permits-panel-h h2 .ti {
+  font-size: 20px;
+}
+
+.permits-sub {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  margin-top: 4px;
+}
+
+.permits-kpis {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin: 0 0 16px;
+}
+
+.permits-kpi {
+  border-radius: var(--border-radius-md);
+  padding: 12px 14px;
+}
+.permits-kpi.good {
+  background: var(--good-bg);
+}
+.permits-kpi.warn {
+  background: var(--warn-bg);
+}
+.permits-kpi.danger {
+  background: var(--danger-bg);
+}
+.permits-kpi .l {
+  font-size: 11px;
+}
+.permits-kpi .v {
+  font-size: 24px;
+  font-weight: 500;
+  letter-spacing: -0.015em;
+  font-variant-numeric: tabular-nums;
+}
+.permits-kpi .s {
+  font-size: 11px;
+}
+.permits-kpi.good .l,
+.permits-kpi.good .v {
+  color: var(--good-fg);
+}
+.permits-kpi.good .s {
+  color: var(--good-strong);
+}
+.permits-kpi.warn .l,
+.permits-kpi.warn .v {
+  color: var(--warn-fg);
+}
+.permits-kpi.warn .s {
+  color: var(--warn-strong);
+}
+.permits-kpi.danger .l,
+.permits-kpi.danger .v {
+  color: var(--danger-fg);
+}
+.permits-kpi.danger .s {
+  color: var(--danger-strong);
+}
+
+.permits-cal-wrap {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr;
+  gap: 14px;
+}
+
+.permits-cal-card {
+  background: var(--color-background-secondary);
+  border-radius: var(--border-radius-lg);
+  padding: 16px 18px;
+}
+
+.permits-card-h {
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.permits-meta {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--color-text-tertiary);
+  font-weight: 400;
+}
+
+.permits-cal-months {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.permits-cal-month .name {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+  margin-bottom: 8px;
+  display: flex;
+  justify-content: space-between;
+}
+
+.permits-cal-month .name .count {
+  font-size: 11px;
+  color: var(--color-text-tertiary);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.permits-cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 3px;
+  font-size: 9px;
+}
+
+.permits-cal-dow {
+  text-align: center;
+  color: var(--color-text-tertiary);
+  padding: 4px 0 6px;
+  font-weight: 500;
+}
+
+.permits-cal-day {
+  aspect-ratio: 1 / 1;
+  border-radius: 4px;
+  background: var(--color-background-primary);
+  position: relative;
+  padding: 3px 4px;
+  border: 0.5px solid transparent;
+  cursor: default;
+  transition: border-color 0.12s;
+}
+
+.permits-cal-day .n {
+  font-size: 10px;
+  color: var(--color-text-secondary);
+  font-weight: 500;
+}
+
+.permits-cal-day.is-blank {
+  background: transparent;
+}
+
+.permits-cal-day.is-today {
+  border-color: var(--lib-black);
+}
+.permits-cal-day.is-today .n {
+  color: var(--lib-black);
+  font-weight: 700;
+}
+
+.permits-cal-day.has-expiring {
+  background: var(--warn-bg);
+}
+.permits-cal-day.has-expiring .n {
+  color: var(--warn-fg);
+}
+
+.permits-cal-day.has-expired {
+  background: var(--danger-bg);
+}
+.permits-cal-day.has-expired .n {
+  color: var(--danger-fg);
+}
+
+.permits-cal-day.has-active {
+  background: var(--good-bg);
+}
+.permits-cal-day.has-active .n {
+  color: var(--good-fg);
+}
+
+.permits-cal-day .pip {
+  position: absolute;
+  bottom: 3px;
+  left: 4px;
+  right: 4px;
+  display: flex;
+  gap: 1.5px;
+  flex-wrap: wrap;
+}
+
+.permits-cal-day .pip .dot-mini {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+}
+
+.permits-cal-day.has-expiring .dot-mini {
+  background: var(--warn-strong);
+}
+.permits-cal-day.has-expired .dot-mini {
+  background: var(--danger-strong);
+}
+.permits-cal-day.has-active .dot-mini {
+  background: var(--good-strong);
+}
+
+.permits-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 520px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.permits-list-row {
+  display: grid;
+  grid-template-columns: 56px 1fr auto;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 12px;
+  background: var(--color-background-primary);
+  border-radius: var(--border-radius-md);
+  border: 0.5px solid var(--color-border-tertiary);
+  cursor: pointer;
+  color: inherit;
+}
+.permits-list-row:hover {
+  background: var(--color-background-tertiary);
+}
+.permits-list-row .when {
+  text-align: center;
+  background: var(--color-background-secondary);
+  border-radius: 6px;
+  padding: 6px 4px;
+}
+.permits-list-row .when .d {
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.permits-list-row .when .mo {
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-tertiary);
+  margin-top: 2px;
+}
+.permits-list-row.is-expiring .when {
+  background: var(--warn-bg);
+}
+.permits-list-row.is-expiring .when .d,
+.permits-list-row.is-expiring .when .mo {
+  color: var(--warn-fg);
+}
+.permits-list-row.is-expired .when {
+  background: var(--danger-bg);
+}
+.permits-list-row.is-expired .when .d,
+.permits-list-row.is-expired .when .mo {
+  color: var(--danger-fg);
+}
+.permits-list-row .info .agency {
+  font-size: 10px;
+  color: var(--color-text-tertiary);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.permits-list-row .info .name {
+  font-size: 13px;
+  font-weight: 500;
+}
+.permits-list-row .info .proj {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+}
+.permits-list-row .countdown {
+  font-size: 11px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-variant-numeric: tabular-nums;
+}
+.permits-list-row.is-active .countdown {
+  background: var(--good-bg);
+  color: var(--good-fg);
+}
+.permits-list-row.is-expiring .countdown {
+  background: var(--warn-bg);
+  color: var(--warn-fg);
+}
+.permits-list-row.is-expired .countdown {
+  background: var(--danger-bg);
+  color: var(--danger-fg);
+}
+
+.permits-legend {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  margin-top: 14px;
+}
+.permits-legend .sw {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+}
+.permits-legend .sw i {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  display: inline-block;
+}
+
+@media (max-width: 860px) {
+  .permits-cal-wrap {
+    grid-template-columns: 1fr;
+  }
+  .permits-cal-months {
+    grid-template-columns: 1fr;
+  }
+  .permits-kpis {
+    grid-template-columns: 1fr;
+  }
+}

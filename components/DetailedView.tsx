@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import Link from 'next/link';
 import type { PermitsPanelData, Project } from '@/lib/types';
 import { permitsSearchUrl } from '@/lib/urls';
 import { CompactRow } from './CompactRow';
@@ -156,10 +157,8 @@ export function DetailedView({
           onLayoutChange={onLayoutChange}
           onChipStyleChange={onChipStyleChange}
         />
-        <a
-          href={permitsHref}
-          target="_blank"
-          rel="noopener"
+        <Link
+          href="/permits"
           style={{
             display: 'inline-flex',
             alignItems: 'center',
@@ -172,7 +171,7 @@ export function DetailedView({
             fontWeight: 500,
             flexShrink: 0,
           }}
-          title="Open the full permits view in ClickUp"
+          title="Open the permits dashboard"
         >
           <i className="ti ti-license" style={{ fontSize: 15 }} />
           Permits dashboard
@@ -191,7 +190,26 @@ export function DetailedView({
               {permitsCount}
             </span>
           )}
-          <i className="ti ti-arrow-up-right" style={{ fontSize: 14, opacity: 0.7 }} />
+          <i className="ti ti-arrow-right" style={{ fontSize: 14, opacity: 0.7 }} />
+        </Link>
+        <a
+          href={permitsHref}
+          target="_blank"
+          rel="noopener"
+          title="Open permits in ClickUp"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: 30,
+            height: 30,
+            borderRadius: 'var(--border-radius-md)',
+            border: '0.5px solid var(--color-border-secondary)',
+            color: 'var(--color-text-secondary)',
+            flexShrink: 0,
+          }}
+        >
+          <i className="ti ti-external-link" style={{ fontSize: 14 }} />
         </a>
       </div>
       <div
