@@ -36,11 +36,11 @@ export function DetailedView({
   const permitsHref = permitsSearchUrl(permits.allPermitsListIds);
   const permitsCount = permits.active + permits.expiring30d + permits.expired;
 
-  // Two-finger pinch on the project list zooms through three density
-  // stops: D (compact one-line stoplight) → C (grouped lanes) → A
-  // (every chip visible). macOS surfaces trackpad pinch as a `wheel`
-  // event with ctrlKey=true, so we listen on the list container and
-  // preventDefault to override browser page-zoom.
+  // Two-finger pinch zooms through three density stops:
+  //   D (compact stoplight) → C (grouped lanes) → A (every chip visible).
+  // macOS Chrome/Firefox surface pinch as a wheel event with ctrlKey=true;
+  // Safari surfaces it as a non-standard gesturechange event. Listen for
+  // both, and bind to window so the gesture works anywhere on the page.
   const ZOOM_STOPS: DetailedLayout[] = ['D', 'C', 'A'];
   const ZOOM_LABEL: Record<DetailedLayout, string> = {
     A: 'Plans',
@@ -49,37 +49,71 @@ export function DetailedView({
     D: 'Status',
   };
 
-  const listRef = useRef<HTMLDivElement>(null);
   const layoutRef = useRef(layout);
   layoutRef.current = layout;
   const onLayoutChangeRef = useRef(onLayoutChange);
   onLayoutChangeRef.current = onLayoutChange;
 
   useEffect(() => {
-    const el = listRef.current;
-    if (!el) return;
-    let accum = 0;
-    const THRESHOLD = 40;
-    const onWheel = (e: WheelEvent) => {
-      if (!e.ctrlKey) return; // only react to pinch, not regular scroll
-      e.preventDefault();
-      accum += e.deltaY;
-      if (Math.abs(accum) < THRESHOLD) return;
+    const stepZoom = (direction: 1 | -1) => {
       const cur = layoutRef.current === 'B' ? 'A' : layoutRef.current;
       const idx = ZOOM_STOPS.indexOf(cur);
-      // deltaY positive when fingers come together (zoom out);
-      // negative when fingers spread apart (zoom in).
-      if (accum > 0 && idx > 0) {
-        onLayoutChangeRef.current(ZOOM_STOPS[idx - 1]);
-      } else if (accum < 0 && idx < ZOOM_STOPS.length - 1) {
-        onLayoutChangeRef.current(ZOOM_STOPS[idx + 1]);
-      }
-      accum = 0;
+      const nextIdx = idx + direction;
+      if (nextIdx < 0 || nextIdx >= ZOOM_STOPS.length) return;
+      onLayoutChangeRef.current(ZOOM_STOPS[nextIdx]);
     };
-    el.addEventListener('wheel', onWheel, { passive: false });
-    return () => el.removeEventListener('wheel', onWheel);
-    // Stops are static; ref dance above keeps the handler reading the
-    // latest layout and callback without re-binding.
+
+    let wheelAccum = 0;
+    const WHEEL_THRESHOLD = 25;
+    let lastFiredAt = 0;
+    const COOLDOWN_MS = 250;
+
+    const fire = (direction: 1 | -1) => {
+      const now = Date.now();
+      if (now - lastFiredAt < COOLDOWN_MS) return;
+      lastFiredAt = now;
+      stepZoom(direction);
+    };
+
+    const onWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey) return;
+      e.preventDefault();
+      wheelAccum += e.deltaY;
+      if (Math.abs(wheelAccum) < WHEEL_THRESHOLD) return;
+      // deltaY > 0 = fingers come together (zoom out); < 0 = fingers spread.
+      fire(wheelAccum > 0 ? -1 : 1);
+      wheelAccum = 0;
+    };
+
+    // Safari trackpad gesture API
+    let gestureScale = 1;
+    const onGestureStart = (e: Event) => {
+      e.preventDefault();
+      gestureScale = 1;
+    };
+    const onGestureChange = (e: Event) => {
+      e.preventDefault();
+      const ev = e as unknown as { scale: number };
+      const scale = ev.scale ?? 1;
+      // Step once per 15% scale change.
+      if (scale / gestureScale >= 1.15) {
+        fire(1);
+        gestureScale = scale;
+      } else if (scale / gestureScale <= 1 / 1.15) {
+        fire(-1);
+        gestureScale = scale;
+      }
+    };
+
+    window.addEventListener('wheel', onWheel, { passive: false });
+    window.addEventListener('gesturestart', onGestureStart as EventListener, { passive: false });
+    window.addEventListener('gesturechange', onGestureChange as EventListener, { passive: false });
+    return () => {
+      window.removeEventListener('wheel', onWheel);
+      window.removeEventListener('gesturestart', onGestureStart as EventListener);
+      window.removeEventListener('gesturechange', onGestureChange as EventListener);
+    };
+    // Stops are static; refs keep the handler reading the latest layout.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -161,12 +195,10 @@ export function DetailedView({
         </a>
       </div>
       <div
-        ref={listRef}
         style={{
           display: 'flex',
           flexDirection: 'column',
           gap: 12,
-          touchAction: 'pan-y pinch-zoom',
         }}
       >
         {projects.length === 0 ? (
