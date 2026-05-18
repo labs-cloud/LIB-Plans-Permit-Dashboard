@@ -124,7 +124,11 @@ export function ProjectCard({ project, layout, chipStyle }: Props) {
         >
           {project.name}
         </a>
-        <ApprovedPlansCopyButton variant="button" />
+        <ApprovedPlansCopyButton
+          variant="button"
+          url={project.approvedPlansLink}
+          projectName={project.name}
+        />
         <span style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>
           {metaBits.length > 0 ? `${metaBits.join(' · ')} · ` : ''}
           <span style={{ color: coordMeta.color }}>{coordMeta.name}</span>

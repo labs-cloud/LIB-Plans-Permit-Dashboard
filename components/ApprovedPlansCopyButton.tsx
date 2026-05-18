@@ -5,6 +5,8 @@ import { APPROVED_PLANS_LINK } from '@/lib/constants';
 
 interface Props {
   variant?: 'button' | 'icon';
+  url?: string | null;
+  projectName?: string;
 }
 
 async function copyText(text: string) {
@@ -33,13 +35,21 @@ async function copyText(text: string) {
 const MONO_FONT =
   'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Roboto Mono", monospace';
 
-export function ApprovedPlansCopyButton({ variant = 'button' }: Props) {
+export function ApprovedPlansCopyButton({
+  variant = 'button',
+  url,
+  projectName,
+}: Props) {
   const [copied, setCopied] = useState(false);
+  const targetUrl = url ?? APPROVED_PLANS_LINK;
+  const tooltipBase = projectName
+    ? `Copy approved plans link for ${projectName}`
+    : 'Copy Approved Plans Link';
 
   const handle = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    await copyText(APPROVED_PLANS_LINK);
+    await copyText(targetUrl);
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1800);
   };
@@ -49,8 +59,8 @@ export function ApprovedPlansCopyButton({ variant = 'button' }: Props) {
       <button
         type="button"
         onClick={handle}
-        title={copied ? 'Copied!' : 'Copy Approved Plans Link'}
-        aria-label={copied ? 'Copied' : 'Copy Approved Plans Link'}
+        title={copied ? 'Copied!' : tooltipBase}
+        aria-label={copied ? 'Copied' : tooltipBase}
         style={{
           width: 24,
           height: 24,
@@ -99,7 +109,7 @@ export function ApprovedPlansCopyButton({ variant = 'button' }: Props) {
       <button
         type="button"
         onClick={handle}
-        title={copied ? 'Copied to clipboard' : 'Copy Approved Plans Link to clipboard'}
+        title={copied ? 'Copied to clipboard' : `${tooltipBase} to clipboard`}
         style={{
           display: 'inline-flex',
           alignItems: 'center',

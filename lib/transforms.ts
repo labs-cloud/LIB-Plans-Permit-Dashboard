@@ -270,6 +270,53 @@ function buildAlert(plans: Plan[], permits: Permit[], permitsSummary: ReturnType
   return null;
 }
 
+// The "Approved Plans Link" the coordinator hands to a subcontractor lives
+// on either the Project Overview task (preferred — set once per project) or
+// on the individual Plan tasks as the Archive / Filing Plan link. Use the
+// overview field first, then the most common plan-level link.
+const OVERVIEW_LINK_FIELD_PATTERNS = [
+  'approved plans',
+  'plans link',
+  'plans drive',
+  'archive drive',
+  'archive',
+  'plans folder',
+];
+
+function mostCommon(values: (string | null)[]): string | null {
+  const counts = new Map<string, number>();
+  for (const v of values) {
+    if (!v) continue;
+    counts.set(v, (counts.get(v) ?? 0) + 1);
+  }
+  if (counts.size === 0) return null;
+  let best: string | null = null;
+  let max = 0;
+  for (const [v, n] of counts) {
+    if (n > max) {
+      max = n;
+      best = v;
+    }
+  }
+  return best;
+}
+
+function deriveApprovedPlansLink(
+  overview: ClickUpTask | undefined,
+  plans: Plan[],
+): string | null {
+  if (overview) {
+    for (const pattern of OVERVIEW_LINK_FIELD_PATTERNS) {
+      const url = readUrl(findField(overview, (n) => n.includes(pattern)));
+      if (url) return url;
+    }
+  }
+  return (
+    mostCommon(plans.map((p) => p.archiveDrive)) ??
+    mostCommon(plans.map((p) => p.filingLink))
+  );
+}
+
 function buildMetaString(overview: ClickUpTask | undefined): string | null {
   if (!overview) return null;
   const stories =
@@ -330,6 +377,7 @@ async function loadProject(folder: ClickUpFolder, now: number): Promise<Project 
     coord,
     plansListId: plansList?.id ?? null,
     permitsListId: permitsList?.id ?? null,
+    approvedPlansLink: deriveApprovedPlansLink(overview, plans),
     plans,
     permits,
     matrix,
