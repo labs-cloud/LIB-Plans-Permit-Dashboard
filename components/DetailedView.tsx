@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
 import type { PermitsPanelData, Project } from '@/lib/types';
 import { permitsSearchUrl } from '@/lib/urls';
 import { CompactRow } from './CompactRow';
@@ -35,23 +36,52 @@ export function DetailedView({
   const permitsHref = permitsSearchUrl(permits.allPermitsListIds);
   const permitsCount = permits.active + permits.expiring30d + permits.expired;
 
-  // Zoom in/out cycles through three density stops: D (compact one-line
-  // stoplight) → C (grouped lanes) → A (every chip visible). B is an
-  // alternate ordering of A — treated as fully zoomed-in here.
+  // Two-finger pinch on the project list zooms through three density
+  // stops: D (compact one-line stoplight) → C (grouped lanes) → A
+  // (every chip visible). macOS surfaces trackpad pinch as a `wheel`
+  // event with ctrlKey=true, so we listen on the list container and
+  // preventDefault to override browser page-zoom.
   const ZOOM_STOPS: DetailedLayout[] = ['D', 'C', 'A'];
-  const zoomIndex = Math.max(0, ZOOM_STOPS.indexOf(layout === 'B' ? 'A' : layout));
-  const zoomOut = () => {
-    if (zoomIndex > 0) onLayoutChange(ZOOM_STOPS[zoomIndex - 1]);
-  };
-  const zoomIn = () => {
-    if (zoomIndex < ZOOM_STOPS.length - 1) onLayoutChange(ZOOM_STOPS[zoomIndex + 1]);
-  };
   const ZOOM_LABEL: Record<DetailedLayout, string> = {
     A: 'Plans',
     B: 'Plans',
     C: 'Grouped',
     D: 'Status',
   };
+
+  const listRef = useRef<HTMLDivElement>(null);
+  const layoutRef = useRef(layout);
+  layoutRef.current = layout;
+  const onLayoutChangeRef = useRef(onLayoutChange);
+  onLayoutChangeRef.current = onLayoutChange;
+
+  useEffect(() => {
+    const el = listRef.current;
+    if (!el) return;
+    let accum = 0;
+    const THRESHOLD = 40;
+    const onWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey) return; // only react to pinch, not regular scroll
+      e.preventDefault();
+      accum += e.deltaY;
+      if (Math.abs(accum) < THRESHOLD) return;
+      const cur = layoutRef.current === 'B' ? 'A' : layoutRef.current;
+      const idx = ZOOM_STOPS.indexOf(cur);
+      // deltaY positive when fingers come together (zoom out);
+      // negative when fingers spread apart (zoom in).
+      if (accum > 0 && idx > 0) {
+        onLayoutChangeRef.current(ZOOM_STOPS[idx - 1]);
+      } else if (accum < 0 && idx < ZOOM_STOPS.length - 1) {
+        onLayoutChangeRef.current(ZOOM_STOPS[idx + 1]);
+      }
+      accum = 0;
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+    // Stops are static; ref dance above keeps the handler reading the
+    // latest layout and callback without re-binding.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div>
@@ -67,78 +97,25 @@ export function DetailedView({
         <div style={{ flex: 1, minWidth: 0 }}>
           <SortChips sort={sort} onSortChange={onSortChange} />
         </div>
-        <div
-          role="group"
-          aria-label="Zoom level"
+        <span
+          title="Pinch with two fingers on the list to zoom in or out"
           style={{
             display: 'inline-flex',
             alignItems: 'center',
-            gap: 0,
+            gap: 6,
             height: 30,
-            border: '0.5px solid var(--color-border-secondary)',
+            padding: '0 10px',
+            fontSize: 11.5,
+            color: 'var(--color-text-secondary)',
+            background: 'var(--color-background-secondary)',
             borderRadius: 'var(--border-radius-md)',
-            background: 'var(--color-background-primary)',
-            overflow: 'hidden',
             flexShrink: 0,
+            fontVariantNumeric: 'tabular-nums',
           }}
         >
-          <button
-            type="button"
-            onClick={zoomOut}
-            disabled={zoomIndex === 0}
-            title="Zoom out — collapse projects to status summary"
-            aria-label="Zoom out"
-            style={{
-              width: 28,
-              height: 28,
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: zoomIndex === 0 ? 'var(--color-text-tertiary)' : 'var(--color-text-primary)',
-              cursor: zoomIndex === 0 ? 'not-allowed' : 'pointer',
-            }}
-          >
-            <i className="ti ti-minus" style={{ fontSize: 14 }} />
-          </button>
-          <span
-            style={{
-              minWidth: 56,
-              textAlign: 'center',
-              fontSize: 11.5,
-              color: 'var(--color-text-secondary)',
-              borderLeft: '0.5px solid var(--color-border-tertiary)',
-              borderRight: '0.5px solid var(--color-border-tertiary)',
-              height: 28,
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontVariantNumeric: 'tabular-nums',
-            }}
-          >
-            {ZOOM_LABEL[layout]}
-          </span>
-          <button
-            type="button"
-            onClick={zoomIn}
-            disabled={zoomIndex === ZOOM_STOPS.length - 1}
-            title="Zoom in — show every plan"
-            aria-label="Zoom in"
-            style={{
-              width: 28,
-              height: 28,
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color:
-                zoomIndex === ZOOM_STOPS.length - 1
-                  ? 'var(--color-text-tertiary)'
-                  : 'var(--color-text-primary)',
-              cursor: zoomIndex === ZOOM_STOPS.length - 1 ? 'not-allowed' : 'pointer',
-            }}
-          >
-            <i className="ti ti-plus" style={{ fontSize: 14 }} />
-          </button>
-        </div>
+          <i className="ti ti-zoom-in-area" style={{ fontSize: 13, opacity: 0.7 }} />
+          {ZOOM_LABEL[layout]}
+        </span>
         <ViewSettings
           layout={layout}
           chipStyle={chipStyle}
@@ -184,10 +161,12 @@ export function DetailedView({
         </a>
       </div>
       <div
+        ref={listRef}
         style={{
           display: 'flex',
           flexDirection: 'column',
           gap: 12,
+          touchAction: 'pan-y pinch-zoom',
         }}
       >
         {projects.length === 0 ? (
