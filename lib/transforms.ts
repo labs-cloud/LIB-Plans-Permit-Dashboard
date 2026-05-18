@@ -270,17 +270,21 @@ function buildAlert(plans: Plan[], permits: Permit[], permitsSummary: ReturnType
   return null;
 }
 
-// The "Approved Plans Link" the coordinator hands to a subcontractor lives
-// on either the Project Overview task (preferred — set once per project) or
-// on the individual Plan tasks as the Archive / Filing Plan link. Use the
-// overview field first, then the most common plan-level link.
+// The "Approved Plans Link" coordinators hand to subcontractors is the
+// project's filing-set parent folder on SharePoint. Source priority:
+//   1) An overview-level custom field if one's set ("Filing Set Link",
+//      "Plans Folder", etc.)
+//   2) The most common Filing Plan Link across Plan tasks — every plan
+//      in a project typically points at the same shared filing-set folder.
+//   3) Archive Drive is intentionally skipped; per-plan archive URLs go
+//      to that plan's own archive (e.g. ID Drawings), not the project root.
 const OVERVIEW_LINK_FIELD_PATTERNS = [
+  'filing set',
+  'filing plans',
   'approved plans',
+  'plans folder',
   'plans link',
   'plans drive',
-  'archive drive',
-  'archive',
-  'plans folder',
 ];
 
 function mostCommon(values: (string | null)[]): string | null {
@@ -311,10 +315,7 @@ function deriveApprovedPlansLink(
       if (url) return url;
     }
   }
-  return (
-    mostCommon(plans.map((p) => p.archiveDrive)) ??
-    mostCommon(plans.map((p) => p.filingLink))
-  );
+  return mostCommon(plans.map((p) => p.filingLink));
 }
 
 function buildMetaString(overview: ClickUpTask | undefined): string | null {
