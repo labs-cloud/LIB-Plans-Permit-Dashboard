@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { useMemo } from 'react';
 
 import { buildPermitsCalendar } from '@/lib/permits-calendar';
@@ -75,51 +74,6 @@ export function PermitsDashboard({ initial, initialError }: Props) {
         warning={warning}
       />
 
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 12,
-          flexWrap: 'wrap',
-          marginBottom: 16,
-        }}
-      >
-        <Link
-          href="/"
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 8,
-            padding: '8px 14px',
-            background: 'var(--color-background-secondary)',
-            border: '0.5px solid var(--color-border-tertiary)',
-            borderRadius: 'var(--border-radius-md)',
-            fontSize: 13,
-            fontWeight: 500,
-            color: 'var(--color-text-primary)',
-          }}
-        >
-          <i className="ti ti-arrow-left" style={{ fontSize: 15 }} />
-          Plans dashboard
-        </Link>
-
-        <div style={{ flex: 1 }} />
-
-        <a
-          href={allPermitsHref}
-          target="_blank"
-          rel="noopener"
-          className="linklike"
-          style={{
-            fontSize: 12,
-            color: 'var(--color-text-info)',
-            fontWeight: 500,
-          }}
-        >
-          Open all permits in ClickUp →
-        </a>
-      </div>
-
       <div className="permits-panel">
         <div className="permits-panel-h">
           <div>
@@ -130,6 +84,18 @@ export function PermitsDashboard({ initial, initialError }: Props) {
               Active permits · expiration tracking · agency breakdown
             </div>
           </div>
+          <a
+            href={allPermitsHref}
+            target="_blank"
+            rel="noopener"
+            style={{
+              fontSize: 12,
+              color: 'var(--color-text-info)',
+              fontWeight: 500,
+            }}
+          >
+            View all permits in ClickUp →
+          </a>
         </div>
 
         <div className="permits-kpis">
