@@ -1,12 +1,14 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 import { buildPermitsCalendar } from '@/lib/permits-calendar';
 import type { DashboardPayload } from '@/lib/types';
 import { permitsSearchUrl, taskUrl } from '@/lib/urls';
 
 import { LogoHeader } from './LogoHeader';
+import { PermitsDetailedView } from './PermitsDetailedView';
 
 interface Props {
   initial: DashboardPayload | null;
@@ -41,8 +43,28 @@ function rowClass(status: 'active' | 'expiring' | 'expired'): string {
   return `permits-list-row is-${status}`;
 }
 
+type PermitsView = 'overview' | 'detailed';
+
 export function PermitsDashboard({ initial, initialError }: Props) {
   const payload = initial;
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const searchParamsRef = useRef(searchParams);
+  searchParamsRef.current = searchParams;
+
+  const view: PermitsView =
+    searchParams.get('view') === 'detailed' ? 'detailed' : 'overview';
+
+  const setView = useCallback(
+    (v: PermitsView) => {
+      const params = new URLSearchParams(searchParamsRef.current.toString());
+      if (v === 'overview') params.delete('view');
+      else params.set('view', v);
+      const qs = params.toString();
+      router.replace(qs ? `?${qs}` : '?', { scroll: false });
+    },
+    [router],
+  );
 
   const calendar = useMemo(
     () => buildPermitsCalendar(payload?.projects ?? []),
@@ -93,18 +115,30 @@ export function PermitsDashboard({ initial, initialError }: Props) {
               Active permits · expiration tracking · agency breakdown
             </div>
           </div>
-          <a
-            href={allPermitsHref}
-            target="_blank"
-            rel="noopener"
-            style={{
-              fontSize: 12,
-              color: 'var(--color-text-info)',
-              fontWeight: 500,
-            }}
+          <div
+            className="permits-view-toggle"
+            role="tablist"
+            aria-label="Permits view"
           >
-            View all permits in ClickUp →
-          </a>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={view === 'overview'}
+              className={view === 'overview' ? 'active' : ''}
+              onClick={() => setView('overview')}
+            >
+              <i className="ti ti-layout-dashboard" /> Overview
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={view === 'detailed'}
+              className={view === 'detailed' ? 'active' : ''}
+              onClick={() => setView('detailed')}
+            >
+              <i className="ti ti-list-details" /> Detailed
+            </button>
+          </div>
         </div>
 
         <div className="permits-kpis">
@@ -131,6 +165,24 @@ export function PermitsDashboard({ initial, initialError }: Props) {
           </div>
         </div>
 
+        {view === 'overview' && (
+        <div className="permits-view-subhead">
+          <span className="crumb">
+            <i className="ti ti-calendar-month" />
+            <b>Overview</b> · forward-looking 90-day read
+          </span>
+          <a
+            href={allPermitsHref}
+            target="_blank"
+            rel="noopener"
+            style={{ fontSize: 12, color: 'var(--color-text-info)', fontWeight: 500 }}
+          >
+            View all permits in ClickUp →
+          </a>
+        </div>
+        )}
+
+        {view === 'overview' && (
         <div className="permits-cal-wrap">
           <div className="permits-cal-card">
             <div className="permits-card-h">
@@ -263,6 +315,11 @@ export function PermitsDashboard({ initial, initialError }: Props) {
             </div>
           </div>
         </div>
+        )}
+
+        {view === 'detailed' && (
+          <PermitsDetailedView projects={payload?.projects ?? []} />
+        )}
       </div>
 
       <div
