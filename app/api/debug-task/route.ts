@@ -8,6 +8,9 @@ export const runtime = 'nodejs';
 // custom_fields raw so we can see whether a given field has its value set
 // or is coming back null.
 export async function GET(req: Request) {
+  if (process.env.NODE_ENV === 'production') {
+    return NextResponse.json({ error: 'Not available' }, { status: 404 });
+  }
   if (!hasClickUpToken()) {
     return NextResponse.json({ error: 'CLICKUP_API_TOKEN not set' }, { status: 503 });
   }

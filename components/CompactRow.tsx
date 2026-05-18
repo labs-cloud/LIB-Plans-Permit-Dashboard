@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { memo, useState } from 'react';
 import type { Project, StatusKey } from '@/lib/types';
 import { COORD_BY_ID } from '@/lib/constants';
 import { folderUrl } from '@/lib/urls';
@@ -42,7 +42,7 @@ function maxStuckDays(project: Project): number {
   return max;
 }
 
-export function CompactRow({ project, chipStyle }: Props) {
+function CompactRowImpl({ project, chipStyle }: Props) {
   const [expanded, setExpanded] = useState(false);
   const coordMeta = COORD_BY_ID[project.coord];
   const c = counts(project);
@@ -198,3 +198,5 @@ export function CompactRow({ project, chipStyle }: Props) {
     </div>
   );
 }
+
+export const CompactRow = memo(CompactRowImpl);

@@ -1,12 +1,21 @@
 import { Suspense } from 'react';
-import { getDashboardPayload } from '@/lib/cache';
 import { Dashboard } from '@/components/Dashboard';
 import { DashboardSkeleton } from '@/components/Skeleton';
+import { getDashboardPayload } from '@/lib/cache';
 
 export const revalidate = 60;
-export const dynamic = 'force-dynamic';
 
-export default async function Page() {
+export default function Page() {
+  return (
+    <main className="dashboard-main">
+      <Suspense fallback={<DashboardSkeleton />}>
+        <DashboardLoader />
+      </Suspense>
+    </main>
+  );
+}
+
+async function DashboardLoader() {
   let initial = null;
   let error: string | null = null;
   try {
@@ -14,12 +23,5 @@ export default async function Page() {
   } catch (err) {
     error = err instanceof Error ? err.message : String(err);
   }
-
-  return (
-    <main className="dashboard-main">
-      <Suspense fallback={<DashboardSkeleton />}>
-        <Dashboard initial={initial} initialError={error} />
-      </Suspense>
-    </main>
-  );
+  return <Dashboard initial={initial} initialError={error} />;
 }
