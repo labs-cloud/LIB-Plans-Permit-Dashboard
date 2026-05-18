@@ -70,6 +70,24 @@ const VIEW_KEYS: readonly ViewMode[] = ['overview', 'detailed', 'matrix'] as con
 const LAYOUT_KEYS: readonly DetailedLayout[] = ['A', 'B', 'C', 'D'] as const;
 const CHIP_KEYS: readonly ChipStyle[] = ['solid', 'dot', 'stripe'] as const;
 
+// Per-user "launch this view by default" preference. Read-once on mount and
+// then never auto-updated, so toggling default in one tab doesn't yank views
+// out from under another open tab.
+const DEFAULT_VIEW_STORAGE_KEY = 'lib.dashboard.defaultView';
+
+function readDefaultView(): ViewMode {
+  if (typeof window === 'undefined') return 'overview';
+  try {
+    const saved = window.localStorage.getItem(DEFAULT_VIEW_STORAGE_KEY);
+    if (saved && (VIEW_KEYS as readonly string[]).includes(saved)) {
+      return saved as ViewMode;
+    }
+  } catch {
+    /* ignore — private mode, sandbox iframe, etc. */
+  }
+  return 'overview';
+}
+
 function sortProjects(list: Project[], key: SortKey): Project[] {
   const arr = [...list];
   if (key === 'urgency') arr.sort((a, b) => a.urgency - b.urgency || a.name.localeCompare(b.name));
@@ -88,6 +106,12 @@ function sortProjects(list: Project[], key: SortKey): Project[] {
 export function Dashboard({ initial, initialError }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
+
+  // The user's saved "open this view on launch" preference. Tracked in state
+  // so the FilterBar pin button reflects updates without a refresh; persisted
+  // to localStorage on every change.
+  const [defaultView, setDefaultViewState] = useState<ViewMode>('overview');
+  useEffect(() => setDefaultViewState(readDefaultView()), []);
 
   const view = readParam(searchParams, 'view', VIEW_KEYS, 'overview');
   const coord = readParam(searchParams, 'coord', COORD_KEYS, 'all');
@@ -135,6 +159,32 @@ export function Dashboard({ initial, initialError }: Props) {
   );
 
   const setView = (v: ViewMode) => setParam({ view: v === 'overview' ? null : v });
+  const setDefaultView = useCallback((v: ViewMode | null) => {
+    const next = v ?? 'overview';
+    setDefaultViewState(next);
+    try {
+      if (v === null || v === 'overview') {
+        window.localStorage.removeItem(DEFAULT_VIEW_STORAGE_KEY);
+      } else {
+        window.localStorage.setItem(DEFAULT_VIEW_STORAGE_KEY, v);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  // On first load with no explicit ?view= in the URL, navigate to the user's
+  // saved default. We only do this once on mount and only when there's a real
+  // preference to honor (i.e. not the implicit 'overview' fallback).
+  const didApplyDefaultRef = useRef(false);
+  useEffect(() => {
+    if (didApplyDefaultRef.current) return;
+    didApplyDefaultRef.current = true;
+    const saved = readDefaultView();
+    if (saved === 'overview') return;
+    if (searchParamsRef.current.get('view')) return;
+    setParam({ view: saved });
+  }, [setParam]);
   const setCoord = (c: CoordinatorId | 'all') => setParam({ coord: c === 'all' ? null : c });
   const setPhase = (p: PhaseId | 'all') => setParam({ phase: p === 'all' ? null : p });
   const setAssetType = (s: string | 'all') => setParam({ assetType: s === 'all' ? null : s });
@@ -224,6 +274,8 @@ export function Dashboard({ initial, initialError }: Props) {
         assetType={assetType}
         assetTypeOptions={payload.assetTypes}
         view={view}
+        defaultView={defaultView}
+        onSetDefaultView={setDefaultView}
         onSearchChange={setSearchInput}
         onCoordChange={setCoord}
         onPhaseChange={setPhase}
