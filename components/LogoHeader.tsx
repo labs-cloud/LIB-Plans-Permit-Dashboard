@@ -6,11 +6,13 @@ import { SyncButton } from './SyncButton';
 import { ThemeToggle } from './ThemeToggle';
 
 interface Props {
-  shownCount: number;
-  totalCount: number;
+  shownCount?: number;
+  totalCount?: number;
   syncedAt: number | null;
   filterLine?: string | null;
   warning?: string | null;
+  title?: string;
+  subtitleOverride?: string;
 }
 
 function formatRelative(syncedAt: number | null): { label: string; stale: boolean } {
@@ -20,12 +22,21 @@ function formatRelative(syncedAt: number | null): { label: string; stale: boolea
   return { label: `Stale · ${mins}m ago`, stale: true };
 }
 
-export function LogoHeader({ shownCount, totalCount, syncedAt, filterLine, warning }: Props) {
+export function LogoHeader({
+  shownCount,
+  totalCount,
+  syncedAt,
+  filterLine,
+  warning,
+  title = 'Plans Dashboard',
+  subtitleOverride,
+}: Props) {
   const [imgError, setImgError] = useState(false);
   const { label, stale } = formatRelative(syncedAt);
 
   const subtitle = (() => {
     if (warning) return warning;
+    if (subtitleOverride) return `${subtitleOverride} · live from ClickUp · ${label}`;
     const base = `${shownCount} of ${totalCount} active projects · live from ClickUp · ${label}`;
     return filterLine ? `${shownCount} of ${totalCount} shown · ${filterLine} · ${label}` : base;
   })();
@@ -93,7 +104,7 @@ export function LogoHeader({ shownCount, totalCount, syncedAt, filterLine, warni
 
       <div style={{ flex: 1, minWidth: 0 }}>
         <div className="dashboard-title" style={{ fontSize: 18, fontWeight: 500, letterSpacing: 0.2 }}>
-          Plans Dashboard
+          {title}
         </div>
         <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 2 }}>
           {subtitle}

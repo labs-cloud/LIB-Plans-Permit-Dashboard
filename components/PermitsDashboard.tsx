@@ -65,12 +65,21 @@ export function PermitsDashboard({ initial, initialError }: Props) {
       }}
     >
       <LogoHeader
-        shownCount={permits?.active ?? 0}
-        totalCount={
-          (permits?.active ?? 0) + (permits?.expiring30d ?? 0) + (permits?.expired ?? 0)
-        }
+        title="Permits Dashboard"
+        subtitleOverride={(() => {
+          const active = permits?.active ?? 0;
+          const projects = permits?.activeProjects ?? 0;
+          const expiring = permits?.expiring30d ?? 0;
+          const expired = permits?.expired ?? 0;
+          const tail =
+            expired > 0
+              ? `${expired} expired · ${expiring} expiring 30d`
+              : `${expiring} expiring in 30d`;
+          return `${active} active permits across ${projects} project${
+            projects === 1 ? '' : 's'
+          } · ${tail}`;
+        })()}
         syncedAt={payload?.syncedAt ?? null}
-        filterLine="Permits dashboard"
         warning={warning}
       />
 
