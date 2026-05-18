@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import Link from 'next/link';
 import type { PermitsPanelData, Project } from '@/lib/types';
 import { permitsSearchUrl } from '@/lib/urls';
 import { CompactRow } from './CompactRow';
@@ -35,7 +34,6 @@ export function DetailedView({
   onChipStyleChange,
 }: Props) {
   const permitsHref = permitsSearchUrl(permits.allPermitsListIds);
-  const permitsCount = permits.active + permits.expiring30d + permits.expired;
 
   // Two-finger pinch zooms through three density stops:
   //   D (compact stoplight) → C (grouped lanes) → A (every chip visible).
@@ -157,41 +155,6 @@ export function DetailedView({
           onLayoutChange={onLayoutChange}
           onChipStyleChange={onChipStyleChange}
         />
-        <Link
-          href="/permits"
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 8,
-            padding: '8px 14px',
-            background: 'var(--lib-softblack)',
-            color: '#fff',
-            borderRadius: 'var(--border-radius-md)',
-            fontSize: 13,
-            fontWeight: 500,
-            flexShrink: 0,
-          }}
-          title="Open the permits dashboard"
-        >
-          <i className="ti ti-license" style={{ fontSize: 15 }} />
-          Permits dashboard
-          {permitsCount > 0 && (
-            <span
-              style={{
-                background: 'var(--lib-orange)',
-                color: '#000',
-                fontSize: 11,
-                fontWeight: 600,
-                padding: '1px 7px',
-                borderRadius: 999,
-                fontVariantNumeric: 'tabular-nums',
-              }}
-            >
-              {permitsCount}
-            </span>
-          )}
-          <i className="ti ti-arrow-right" style={{ fontSize: 14, opacity: 0.7 }} />
-        </Link>
         <a
           href={permitsHref}
           target="_blank"

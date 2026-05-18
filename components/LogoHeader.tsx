@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { DashboardSwitcher } from './DashboardSwitcher';
 import { SyncButton } from './SyncButton';
 import { ThemeToggle } from './ThemeToggle';
 
@@ -100,6 +101,7 @@ export function LogoHeader({ shownCount, totalCount, syncedAt, filterLine, warni
       </div>
 
       <div className="dashboard-header-actions">
+        <DashboardSwitcher />
         <SyncButton />
         <ThemeToggle />
       </div>
