@@ -17,6 +17,7 @@ import { KpiStrip } from './KpiStrip';
 import { CoordinatorRoster } from './CoordinatorRoster';
 import { OverviewView } from './OverviewView';
 import { DetailedView } from './DetailedView';
+import { MatrixView } from './MatrixView';
 import type { SortKey } from './SortChips';
 import type { ChipStyle, DetailedLayout } from './ViewSettings';
 
@@ -65,7 +66,7 @@ function readParam<T extends string>(
 const SORT_KEYS: readonly SortKey[] = ['urgency', 'coord', 'phase', 'name', 'activity'] as const;
 const COORD_KEYS: readonly (CoordinatorId | 'all')[] = ['all', 'faigy', 'malky', 'unassigned'] as const;
 const PHASE_KEYS: readonly (PhaseId | 'all')[] = ['all', 'pre', 'con', 'post'] as const;
-const VIEW_KEYS: readonly ViewMode[] = ['overview', 'detailed'] as const;
+const VIEW_KEYS: readonly ViewMode[] = ['overview', 'detailed', 'matrix'] as const;
 const LAYOUT_KEYS: readonly DetailedLayout[] = ['A', 'B', 'C', 'D'] as const;
 const CHIP_KEYS: readonly ChipStyle[] = ['solid', 'dot', 'stripe'] as const;
 
@@ -241,7 +242,9 @@ export function Dashboard({ initial, initialError }: Props) {
         </>
       )}
 
-      {view === 'overview' ? (
+      {view === 'matrix' && <KpiStrip data={filteredKpis} projects={filtered} />}
+
+      {view === 'overview' && (
         <OverviewView
           projects={sorted}
           totalCount={payload.projects.length}
@@ -254,7 +257,8 @@ export function Dashboard({ initial, initialError }: Props) {
           onPhaseToggle={(p) => setPhase(phase === p ? 'all' : p)}
           onSwitchToDetailed={() => setView('detailed')}
         />
-      ) : (
+      )}
+      {view === 'detailed' && (
         <DetailedView
           projects={sorted}
           permits={filteredPermits}
@@ -266,6 +270,7 @@ export function Dashboard({ initial, initialError }: Props) {
           onChipStyleChange={setChipStyle}
         />
       )}
+      {view === 'matrix' && <MatrixView projects={sorted} />}
 
       <div
         style={{
