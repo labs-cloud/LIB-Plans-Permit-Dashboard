@@ -11,12 +11,20 @@ interface Props {
   assetType: string | 'all';
   assetTypeOptions: string[];
   view: ViewMode;
+  defaultView: ViewMode;
   onSearchChange: (s: string) => void;
   onCoordChange: (c: CoordinatorId | 'all') => void;
   onPhaseChange: (p: PhaseId | 'all') => void;
   onAssetTypeChange: (s: string | 'all') => void;
   onViewChange: (v: ViewMode) => void;
+  onSetDefaultView: (v: ViewMode | null) => void;
 }
+
+const VIEW_TABS: { id: ViewMode; icon: string; label: string }[] = [
+  { id: 'overview', icon: 'ti-grid-dots', label: 'Overview' },
+  { id: 'detailed', icon: 'ti-list-details', label: 'Detailed' },
+  { id: 'matrix', icon: 'ti-table', label: 'Matrix' },
+];
 
 export function FilterBar({
   search,
@@ -25,12 +33,18 @@ export function FilterBar({
   assetType,
   assetTypeOptions,
   view,
+  defaultView,
   onSearchChange,
   onCoordChange,
   onPhaseChange,
   onAssetTypeChange,
   onViewChange,
+  onSetDefaultView,
 }: Props) {
+  const isDefault = view === defaultView;
+  const pinLabel = isDefault
+    ? `${VIEW_TABS.find((t) => t.id === view)?.label} is your default — click to clear`
+    : `Set ${VIEW_TABS.find((t) => t.id === view)?.label} as the default view on launch`;
   return (
     <div
       className="filter-bar"
@@ -99,39 +113,84 @@ export function FilterBar({
         ))}
       </select>
       <div
-        className="view-toggle"
         style={{
           display: 'flex',
-          gap: 4,
-          padding: 4,
-          background: 'var(--color-background-secondary)',
-          borderRadius: 'var(--border-radius-md)',
+          gap: 6,
+          alignItems: 'center',
           marginLeft: 'auto',
         }}
       >
+        <div
+          className="view-toggle"
+          style={{
+            display: 'flex',
+            gap: 4,
+            padding: 4,
+            background: 'var(--color-background-secondary)',
+            borderRadius: 'var(--border-radius-md)',
+          }}
+        >
+          {VIEW_TABS.map((tab) => {
+            const active = view === tab.id;
+            const tabIsDefault = defaultView === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                className={`tab ${active ? 'active' : ''}`}
+                onClick={() => onViewChange(tab.id)}
+                title={tabIsDefault ? `${tab.label} (default)` : tab.label}
+                style={{ position: 'relative' }}
+              >
+                <i
+                  className={`ti ${tab.icon}`}
+                  style={{ fontSize: 14, verticalAlign: -2, marginRight: 4 }}
+                />
+                {tab.label}
+                {tabIsDefault && (
+                  <i
+                    className="ti ti-pin-filled"
+                    aria-hidden="true"
+                    style={{
+                      fontSize: 10,
+                      marginLeft: 5,
+                      color: 'var(--lib-orange)',
+                      verticalAlign: 1,
+                    }}
+                  />
+                )}
+              </button>
+            );
+          })}
+        </div>
         <button
           type="button"
-          className={`tab ${view === 'overview' ? 'active' : ''}`}
-          onClick={() => onViewChange('overview')}
+          className="filter-pin-default"
+          onClick={() => onSetDefaultView(isDefault ? null : view)}
+          title={pinLabel}
+          aria-label={pinLabel}
+          aria-pressed={isDefault}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: 30,
+            height: 30,
+            border: `0.5px solid ${
+              isDefault ? 'var(--lib-orange)' : 'var(--color-border-secondary)'
+            }`,
+            background: isDefault
+              ? '#FEF1E5'
+              : 'var(--color-background-primary)',
+            color: isDefault ? '#7A3A11' : 'var(--color-text-secondary)',
+            borderRadius: 'var(--border-radius-md)',
+            cursor: 'pointer',
+          }}
         >
-          <i className="ti ti-grid-dots" style={{ fontSize: 14, verticalAlign: -2, marginRight: 4 }} />
-          Overview
-        </button>
-        <button
-          type="button"
-          className={`tab ${view === 'detailed' ? 'active' : ''}`}
-          onClick={() => onViewChange('detailed')}
-        >
-          <i className="ti ti-list-details" style={{ fontSize: 14, verticalAlign: -2, marginRight: 4 }} />
-          Detailed
-        </button>
-        <button
-          type="button"
-          className={`tab ${view === 'matrix' ? 'active' : ''}`}
-          onClick={() => onViewChange('matrix')}
-        >
-          <i className="ti ti-table" style={{ fontSize: 14, verticalAlign: -2, marginRight: 4 }} />
-          Matrix
+          <i
+            className={`ti ${isDefault ? 'ti-pin-filled' : 'ti-pin'}`}
+            style={{ fontSize: 15 }}
+          />
         </button>
       </div>
     </div>
