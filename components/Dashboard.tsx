@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import useSWR from 'swr';
 import { useRouter, useSearchParams } from 'next/navigation';
 
@@ -28,7 +28,6 @@ const fetcher = async (url: string): Promise<DashboardPayload> => {
 
 const EMPTY_PAYLOAD: DashboardPayload = {
   projects: [],
-  matrixColumns: [],
   assetTypes: [],
   kpis: { filingsInFlight: 0, approved7d: 0, waitingOn: 0, expiring30d: 0, expired: 0 },
   sticking: [],
@@ -102,9 +101,10 @@ export function Dashboard({ initial, initialError }: Props) {
 
   const { data, error } = useSWR<DashboardPayload>('/api/projects', fetcher, {
     fallbackData: initial ?? undefined,
-    refreshInterval: 60_000,
-    revalidateOnFocus: true,
+    refreshInterval: 300_000,
+    revalidateOnFocus: false,
     revalidateOnReconnect: true,
+    dedupingInterval: 60_000,
   });
 
   const payload = data ?? initial ?? EMPTY_PAYLOAD;
@@ -114,9 +114,15 @@ export function Dashboard({ initial, initialError }: Props) {
   const assetType =
     assetTypeRaw !== 'all' && payload.assetTypes.includes(assetTypeRaw) ? assetTypeRaw : 'all';
 
+  // Hold `searchParams` in a ref so `setParam` keeps stable identity across
+  // renders. Otherwise it's recreated every render (URL change, SWR refetch,
+  // search-input keystrokes) and re-arms the search-debounce effect.
+  const searchParamsRef = useRef(searchParams);
+  searchParamsRef.current = searchParams;
+
   const setParam = useCallback(
     (updates: Record<string, string | null>) => {
-      const params = new URLSearchParams(searchParams.toString());
+      const params = new URLSearchParams(searchParamsRef.current.toString());
       for (const [k, v] of Object.entries(updates)) {
         if (v == null || v === '') params.delete(k);
         else params.set(k, v);
@@ -124,7 +130,7 @@ export function Dashboard({ initial, initialError }: Props) {
       const qs = params.toString();
       router.replace(qs ? `?${qs}` : '?', { scroll: false });
     },
-    [router, searchParams],
+    [router],
   );
 
   const setView = (v: ViewMode) => setParam({ view: v === 'overview' ? null : v });

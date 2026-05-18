@@ -1,5 +1,6 @@
 'use client';
 
+import { memo } from 'react';
 import type { Plan, StatusKey } from '@/lib/types';
 import { taskUrl } from '@/lib/urls';
 import type { ChipStyle } from './ViewSettings';
@@ -97,7 +98,7 @@ interface ChipProps {
   chipStyle: ChipStyle;
 }
 
-export function FilingChip({ plan, chipStyle }: ChipProps) {
+export const FilingChip = memo(function FilingChip({ plan, chipStyle }: ChipProps) {
   const spec = plan.status ? SPECS[plan.status] : UNMAPPED;
   const statusLabel = spec.statusLabel === '—' ? plan.rawStatus || '—' : spec.statusLabel;
   const name = planLabel(plan);
@@ -250,7 +251,7 @@ export function FilingChip({ plan, chipStyle }: ChipProps) {
       </span>
     </a>
   );
-}
+});
 
 interface PermitsChipProps {
   label: string;
@@ -259,7 +260,12 @@ interface PermitsChipProps {
   chipStyle: ChipStyle;
 }
 
-export function PermitsChip({ label, count, href, chipStyle }: PermitsChipProps) {
+export const PermitsChip = memo(function PermitsChip({
+  label,
+  count,
+  href,
+  chipStyle,
+}: PermitsChipProps) {
   if (chipStyle === 'stripe') {
     return (
       <a
@@ -348,4 +354,4 @@ export function PermitsChip({ label, count, href, chipStyle }: PermitsChipProps)
       </span>
     </a>
   );
-}
+});

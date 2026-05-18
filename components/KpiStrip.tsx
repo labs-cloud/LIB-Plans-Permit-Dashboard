@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { KpiStripData, Project } from '@/lib/types';
 import { PLAN_STATUS_TABLE } from '@/lib/status-map';
 import { folderUrl, taskUrl } from '@/lib/urls';
@@ -350,7 +350,10 @@ interface Props {
 export function KpiStrip({ data, projects }: Props) {
   const [openKey, setOpenKey] = useState<KpiKey | null>(null);
 
-  const items = openKey ? bucketItems(projects, openKey, Date.now()) : [];
+  const items = useMemo(
+    () => (openKey ? bucketItems(projects, openKey, Date.now()) : []),
+    [openKey, projects],
+  );
   const openSpec = openKey ? CARDS.find((c) => c.key === openKey) : null;
 
   return (

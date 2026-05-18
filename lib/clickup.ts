@@ -71,8 +71,9 @@ async function clickupFetch<T>(path: string, init: RequestInit = {}): Promise<T>
       'Content-Type': 'application/json',
       ...(init.headers || {}),
     },
-    // Server-side only. Next.js caches at the route level via unstable_cache.
-    cache: 'no-store',
+    // Per-endpoint cache so a partial failure doesn't blow away the whole
+    // dashboard. Outer unstable_cache still wraps the aggregated payload.
+    next: { revalidate: 60, tags: ['clickup'] },
   });
 
   if (!res.ok) {

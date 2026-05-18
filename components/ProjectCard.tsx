@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import type { Plan, Project, StatusKey } from '@/lib/types';
 import { COORD_BY_ID } from '@/lib/constants';
 import { folderUrl, listUrl } from '@/lib/urls';
@@ -11,6 +12,8 @@ interface Props {
   layout: DetailedLayout;
   chipStyle: ChipStyle;
 }
+
+type LaneId = 'urgent' | 'flight' | 'queue' | 'done';
 
 const TRIAGE_RANK: Record<StatusKey, number> = {
   WO: 0,
@@ -44,40 +47,36 @@ function sortedPlans(plans: Plan[]): Plan[] {
 }
 
 interface Lane {
-  id: 'urgent' | 'flight' | 'queue' | 'done';
+  id: LaneId;
   label: string;
   accent: string;
-  match: (p: Plan) => boolean;
 }
 
 const LANES: Lane[] = [
-  {
-    id: 'urgent',
-    label: 'Needs attention',
-    accent: 'var(--warn-strong)',
-    match: (p) => p.status === 'WO',
-  },
-  {
-    id: 'flight',
-    label: 'In flight with agency',
-    accent: 'var(--info-strong)',
-    match: (p) => p.status === 'FI',
-  },
-  {
-    id: 'queue',
-    label: 'Drafting · to submit',
-    accent: 'var(--color-text-tertiary)',
-    match: (p) => p.status === 'TF' || p.status === 'TS',
-  },
-  {
-    id: 'done',
-    label: 'Approved',
-    accent: 'var(--good-strong)',
-    match: (p) => p.status === 'AP',
-  },
+  { id: 'urgent', label: 'Needs attention', accent: 'var(--warn-strong)' },
+  { id: 'flight', label: 'In flight with agency', accent: 'var(--info-strong)' },
+  { id: 'queue', label: 'Drafting · to submit', accent: 'var(--color-text-tertiary)' },
+  { id: 'done', label: 'Approved', accent: 'var(--good-strong)' },
 ];
 
-export function ProjectCard({ project, layout, chipStyle }: Props) {
+const STATUS_TO_LANE: Record<StatusKey, LaneId> = {
+  WO: 'urgent',
+  FI: 'flight',
+  TF: 'queue',
+  TS: 'queue',
+  AP: 'done',
+};
+
+function bucketByLane(plans: Plan[]): Record<LaneId, Plan[]> {
+  const out: Record<LaneId, Plan[]> = { urgent: [], flight: [], queue: [], done: [] };
+  for (const plan of plans) {
+    if (!plan.status) continue;
+    out[STATUS_TO_LANE[plan.status]].push(plan);
+  }
+  return out;
+}
+
+function ProjectCardImpl({ project, layout, chipStyle }: Props) {
   const coordMeta = COORD_BY_ID[project.coord];
   const { count: waitingCount, maxDays: waitingDays } = waitingMeta(project);
   const waitingActive = waitingCount > 0;
@@ -209,10 +208,10 @@ interface LanesBodyProps {
 }
 
 function LanesBody({ plans, chipStyle, permits }: LanesBodyProps) {
-  const buckets = LANES.map((lane) => ({
-    lane,
-    plans: plans.filter(lane.match),
-  })).filter((b) => b.plans.length > 0);
+  const byLane = bucketByLane(plans);
+  const buckets = LANES.map((lane) => ({ lane, plans: byLane[lane.id] })).filter(
+    (b) => b.plans.length > 0,
+  );
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -279,3 +278,5 @@ function LanesBody({ plans, chipStyle, permits }: LanesBodyProps) {
     </div>
   );
 }
+
+export const ProjectCard = memo(ProjectCardImpl);

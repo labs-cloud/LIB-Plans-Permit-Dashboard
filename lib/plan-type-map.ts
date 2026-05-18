@@ -10,21 +10,6 @@ export function planTypeToColumn(planType: string | null | undefined): string | 
   return trimmed.length ? trimmed : null;
 }
 
-// Build the matrix column list across every project, ordered by frequency
-// (most-used plan types first) with alphabetical tie-break.
-export function computeMatrixColumns(projects: Project[]): string[] {
-  const counts = new Map<string, number>();
-  for (const project of projects) {
-    for (const plan of project.plans) {
-      if (!plan.matrixColumn) continue;
-      counts.set(plan.matrixColumn, (counts.get(plan.matrixColumn) ?? 0) + 1);
-    }
-  }
-  return Array.from(counts.entries())
-    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-    .map(([name]) => name);
-}
-
 // Distinct ClickUp "Asset Type" values (Filing Set / Field Set / Shop Drawing
 // / Misc / …) discovered across all plans. Ordered the way ClickUp lists them
 // — Filing Set first, then Field Set, Shop Drawing, Misc — with anything new
