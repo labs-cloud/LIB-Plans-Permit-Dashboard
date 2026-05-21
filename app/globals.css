@@ -38,6 +38,16 @@
   --danger-bg: #FCEBEB; --danger-fg: #501313; --danger-strong: #A32D2D;
   --good-bg: #EAF3DE; --good-fg: #173404; --good-strong: #3B6D11;
   --info-bg: #E6F1FB; --info-fg: #042C53; --info-strong: #185fa5;
+
+  /* bidding status palette — 8 colors matching the design */
+  --bid-ntb-bg: #E8E6E1; --bid-ntb-fg: #3F3D38; --bid-ntb-ring: #9C9A92; --bid-ntb-strong: #6B6963;
+  --bid-snt-bg: #7DD3F2; --bid-snt-fg: #053A5F; --bid-snt-ring: #1B7CB0; --bid-snt-strong: #1B7CB0;
+  --bid-rec-bg: #FFE74A; --bid-rec-fg: #3D2D00; --bid-rec-ring: #9C7A00; --bid-rec-strong: #9C7A00;
+  --bid-hld-bg: #F47B7B; --bid-hld-fg: #3E0707; --bid-hld-ring: #A82828; --bid-hld-strong: #A82828;
+  --bid-fnl-bg: #7DD68F; --bid-fnl-fg: #0D3E18; --bid-fnl-ring: #1F7A38; --bid-fnl-strong: #1F7A38;
+  --bid-fu1-bg: #C8A7E6; --bid-fu1-fg: #33124F; --bid-fu1-ring: #6B3A95; --bid-fu1-strong: #6B3A95;
+  --bid-fu2-bg: #F8CEAC; --bid-fu2-fg: #4A2308; --bid-fu2-ring: #A85F18; --bid-fu2-strong: #A85F18;
+  --bid-fu3-bg: #F5C8DD; --bid-fu3-fg: #5A1338; --bid-fu3-ring: #A8336E; --bid-fu3-strong: #A8336E;
 }
 
 html[data-theme='dark'] {
@@ -48,6 +58,15 @@ html[data-theme='dark'] {
   --danger-bg: #3A1818; --danger-fg: #F2B0B0; --danger-strong: #E26565;
   --good-bg: #1C2E14; --good-fg: #B4DA88; --good-strong: #9CCC65;
   --info-bg: #18283A; --info-fg: #B0CFEF; --info-strong: #6FA7DF;
+
+  --bid-ntb-bg: rgba(190,186,176,0.18); --bid-ntb-fg: #cfcbbf; --bid-ntb-ring: #807c70; --bid-ntb-strong: #a09c8e;
+  --bid-snt-bg: rgba(125,211,242,0.18); --bid-snt-fg: #9fd9f5; --bid-snt-ring: #5fb2dc; --bid-snt-strong: #5fb2dc;
+  --bid-rec-bg: rgba(255,231,74,0.18);  --bid-rec-fg: #ffe98a; --bid-rec-ring: #d6b300; --bid-rec-strong: #d6b300;
+  --bid-hld-bg: rgba(244,123,123,0.20); --bid-hld-fg: #ff9a9a; --bid-hld-ring: #c95050; --bid-hld-strong: #c95050;
+  --bid-fnl-bg: rgba(125,214,143,0.20); --bid-fnl-fg: #9adfa9; --bid-fnl-ring: #4ea063; --bid-fnl-strong: #4ea063;
+  --bid-fu1-bg: rgba(200,167,230,0.20); --bid-fu1-fg: #d8baf2; --bid-fu1-ring: #9a6cc1; --bid-fu1-strong: #9a6cc1;
+  --bid-fu2-bg: rgba(248,206,172,0.20); --bid-fu2-fg: #f4cba6; --bid-fu2-ring: #cb8a4c; --bid-fu2-strong: #cb8a4c;
+  --bid-fu3-bg: rgba(245,200,221,0.20); --bid-fu3-fg: #f0aac9; --bid-fu3-ring: #cb6a96; --bid-fu3-strong: #cb6a96;
 }
 
 html[data-theme='dark'] {
