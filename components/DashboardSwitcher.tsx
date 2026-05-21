@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 
 interface Option {
-  id: 'plans' | 'permits' | 'bidding';
+  id: 'budget' | 'bidding' | 'plans' | 'permits';
   href: string;
   label: string;
   icon: string;
@@ -13,6 +13,20 @@ interface Option {
 }
 
 const OPTIONS: Option[] = [
+  {
+    id: 'budget',
+    href: '/budget',
+    label: 'Budget dashboard',
+    icon: 'ti-wallet',
+    hint: 'Portfolio · per-trade variance',
+  },
+  {
+    id: 'bidding',
+    href: '/bidding',
+    label: 'Bidding dashboard',
+    icon: 'ti-gavel',
+    hint: 'Trade × sub matrix · 8-color palette',
+  },
   {
     id: 'plans',
     href: '/',
@@ -27,18 +41,11 @@ const OPTIONS: Option[] = [
     icon: 'ti-license',
     hint: 'Expiration calendar · upcoming',
   },
-  {
-    id: 'bidding',
-    href: '/bidding',
-    label: 'Bidding dashboard',
-    icon: 'ti-gavel',
-    hint: 'Trade × sub matrix · 8-color palette',
-  },
 ];
 
 export function DashboardSwitcher() {
   const pathname = usePathname() ?? '/';
-  const activeId: Option['id'] = pathname.startsWith('/bidding') ? 'bidding' : pathname.startsWith('/permits') ? 'permits' : 'plans';
+  const activeId: Option['id'] = pathname.startsWith('/budget') ? 'budget' : pathname.startsWith('/bidding') ? 'bidding' : pathname.startsWith('/permits') ? 'permits' : 'plans';
   const active = OPTIONS.find((o) => o.id === activeId)!;
 
   const [open, setOpen] = useState(false);
