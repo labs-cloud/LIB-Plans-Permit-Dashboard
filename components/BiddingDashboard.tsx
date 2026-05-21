@@ -888,7 +888,7 @@ const FILTER_CHIPS: { key: FilterKey; label: string }[] = [
   { key: 'fu', label: 'Follow-up' },
 ];
 
-function DetailedView({ onBack }: { onBack: () => void }) {
+function DetailedView({ onBack, search = '' }: { onBack: () => void; search?: string }) {
   const { project } = BIDDING_SAMPLE;
   const trades = project.trades;
 
@@ -921,15 +921,25 @@ function DetailedView({ onBack }: { onBack: () => void }) {
   }, [trades]);
 
   const filteredTrades = useMemo(() => {
-    if (filter === 'all') return trades;
+    let result = trades;
     if (filter === 'fu')
-      return trades.filter((t) =>
+      result = result.filter((t) =>
         t.subs.some(
           (s) => s.status === 'fu1' || s.status === 'fu2' || s.status === 'fu3',
         ),
       );
-    return trades.filter((t) => t.subs.some((s) => s.status === filter));
-  }, [trades, filter]);
+    else if (filter !== 'all')
+      result = result.filter((t) => t.subs.some((s) => s.status === filter));
+    if (search.trim()) {
+      const q = search.trim().toLowerCase();
+      result = result.filter(
+        (t) =>
+          t.trade.toLowerCase().includes(q) ||
+          t.subs.some((s) => s.name.toLowerCase().includes(q)),
+      );
+    }
+    return result;
+  }, [trades, filter, search]);
 
   const chipCounts = useMemo<Record<FilterKey, number>>(() => {
     return {
@@ -1204,12 +1214,41 @@ function DetailedView({ onBack }: { onBack: () => void }) {
             </colgroup>
             <thead>
               <tr>
-                {['Trade', 'SUB 1', 'SUB 2', 'SUB 3', 'SUB 4', 'SUB 5', 'Lowest Bid'].map(
+                <th
+                  style={{
+                    textAlign: 'left',
+                    padding: '8px 10px',
+                    fontSize: 10,
+                    letterSpacing: '0.06em',
+                    textTransform: 'uppercase',
+                    color: 'var(--color-text-tertiary)',
+                    fontWeight: 600,
+                    background: 'var(--color-background-secondary)',
+                    border: '0.5px solid var(--color-border-tertiary)',
+                  }}
+                >
+                  Trade
+                  <span
+                    style={{
+                      display: 'block',
+                      fontSize: 9,
+                      fontWeight: 400,
+                      textTransform: 'none',
+                      letterSpacing: 0,
+                      color: 'var(--color-text-tertiary)',
+                      opacity: 0.7,
+                      marginTop: 1,
+                    }}
+                  >
+                    canonical · from ClickUp
+                  </span>
+                </th>
+                {['SUB 1', 'SUB 2', 'SUB 3', 'SUB 4', 'SUB 5', 'Lowest Bid'].map(
                   (h, i) => (
                     <th
                       key={i}
                       style={{
-                        textAlign: i === 0 ? 'left' : i === 6 ? 'right' : 'center',
+                        textAlign: i === 5 ? 'right' : 'center',
                         padding: '8px 10px',
                         fontSize: 10,
                         letterSpacing: '0.06em',
@@ -1251,7 +1290,7 @@ function DetailedView({ onBack }: { onBack: () => void }) {
                         <div
                           style={{
                             fontSize: 10,
-                            color: 'var(--color-text-tertiary)',
+                            color: 'var(--danger-fg)',
                             marginTop: 2,
                             fontStyle: 'italic',
                           }}
@@ -1413,7 +1452,7 @@ function DetailedView({ onBack }: { onBack: () => void }) {
   );
 }
 
-// ─── Matrix placeholder ────────────────────────────────────────────────────────
+// ─── Matrix heatmap view ──────────────────────────────────────────────────────
 
 function MatrixView({
   onBack,
@@ -1422,86 +1461,861 @@ function MatrixView({
   onBack: () => void;
   onGoDetailed: () => void;
 }) {
+  const { project, portfolioProjects } = BIDDING_SAMPLE;
+  const trades = project.trades;
+  const cols = portfolioProjects.slice(0, 8);
+
+  return (
+    <SectionCard
+      title="Trade × project coverage matrix"
+      icon="ti-layout-grid"
+      action={
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button
+            type="button"
+            onClick={onBack}
+            style={{
+              padding: '4px 10px',
+              borderRadius: 'var(--border-radius-md)',
+              border: '0.5px solid var(--color-border-secondary)',
+              background: 'var(--color-background-secondary)',
+              fontSize: 11,
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 4,
+            }}
+          >
+            <i className="ti ti-arrow-left" style={{ fontSize: 12 }} />
+            Overview
+          </button>
+          <button
+            type="button"
+            onClick={onGoDetailed}
+            style={{
+              padding: '4px 10px',
+              borderRadius: 'var(--border-radius-md)',
+              border: '0.5px solid var(--color-border-secondary)',
+              background: 'var(--color-background-secondary)',
+              fontSize: 11,
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 4,
+            }}
+          >
+            Detailed
+            <i className="ti ti-arrow-right" style={{ fontSize: 12 }} />
+          </button>
+        </div>
+      }
+    >
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
+          <thead>
+            <tr>
+              <th
+                style={{
+                  textAlign: 'left',
+                  padding: '8px 12px',
+                  fontSize: 10,
+                  letterSpacing: '0.06em',
+                  textTransform: 'uppercase',
+                  color: 'var(--color-text-tertiary)',
+                  fontWeight: 600,
+                  background: 'var(--color-background-secondary)',
+                  border: '0.5px solid var(--color-border-tertiary)',
+                  position: 'sticky',
+                  left: 0,
+                  zIndex: 2,
+                  minWidth: 200,
+                }}
+              >
+                Trade
+              </th>
+              {cols.map((proj, pi) => (
+                <th
+                  key={pi}
+                  style={{
+                    textAlign: 'center',
+                    padding: '6px 8px',
+                    fontSize: 10,
+                    fontWeight: 600,
+                    background: proj.isReal
+                      ? 'var(--color-background-secondary)'
+                      : 'var(--color-background-tertiary, var(--color-background-secondary))',
+                    border: '0.5px solid var(--color-border-tertiary)',
+                    minWidth: 90,
+                    color: proj.isReal ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)',
+                  }}
+                >
+                  <div style={{ fontWeight: 600 }}>
+                    {proj.isReal && (
+                      <span style={{ color: 'var(--lib-orange)', marginRight: 2 }}>★</span>
+                    )}
+                    {proj.name.split(' ').slice(0, 2).join(' ')}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 9,
+                      fontWeight: 400,
+                      color: 'var(--color-text-tertiary)',
+                      marginTop: 1,
+                    }}
+                  >
+                    {proj.location.split(',')[0]}
+                  </div>
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {trades.map((trade, ti) => {
+              const ts = tradeStatus(trade);
+              const isEven = ti % 2 === 0;
+              return (
+                <tr key={ti}>
+                  <td
+                    style={{
+                      padding: '7px 12px',
+                      border: '0.5px solid var(--color-border-tertiary)',
+                      fontWeight: 500,
+                      fontSize: 11.5,
+                      background: isEven
+                        ? 'var(--color-background-primary)'
+                        : 'var(--color-background-secondary)',
+                      position: 'sticky',
+                      left: 0,
+                      zIndex: 1,
+                    }}
+                  >
+                    {trade.trade}
+                    {trade.annot && (
+                      <div style={{ fontSize: 9, color: 'var(--danger-fg)', fontStyle: 'italic', marginTop: 1 }}>
+                        {trade.annot}
+                      </div>
+                    )}
+                  </td>
+                  {cols.map((proj, pi) => {
+                    if (!proj.isReal) {
+                      return (
+                        <td
+                          key={pi}
+                          style={{
+                            padding: '6px 8px',
+                            border: '0.5px solid var(--color-border-tertiary)',
+                            textAlign: 'center',
+                            color: 'var(--color-text-tertiary)',
+                            fontSize: 10,
+                            fontStyle: 'italic',
+                            background: isEven
+                              ? 'var(--color-background-primary)'
+                              : 'var(--color-background-secondary)',
+                          }}
+                        >
+                          pending
+                        </td>
+                      );
+                    }
+                    const m = ts ? STATUS_META[ts] : null;
+                    return (
+                      <td
+                        key={pi}
+                        style={{
+                          padding: '4px 6px',
+                          border: '0.5px solid var(--color-border-tertiary)',
+                          textAlign: 'center',
+                          verticalAlign: 'middle',
+                        }}
+                      >
+                        {m ? (
+                          <div
+                            style={{
+                              background: m.bg,
+                              color: m.fg,
+                              border: `1px solid ${m.ring}`,
+                              borderRadius: 4,
+                              padding: '2px 5px',
+                              fontSize: 9,
+                              fontWeight: 600,
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            {m.label.split(' ')[0]}
+                            {trade.low !== null && (
+                              <div style={{ fontSize: 8, fontWeight: 400, color: m.fg, opacity: 0.8 }}>
+                                {fmt$(trade.low)}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)' }}>
+                            —
+                          </span>
+                        )}
+                      </td>
+                    );
+                  })}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Status legend */}
+      <div
+        style={{
+          display: 'flex',
+          gap: 12,
+          flexWrap: 'wrap',
+          marginTop: 14,
+          fontSize: 11,
+          color: 'var(--color-text-secondary)',
+        }}
+      >
+        {(Object.keys(STATUS_META) as BidStatus[]).map((st) => {
+          const m = STATUS_META[st];
+          return (
+            <span key={st} style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+              <span
+                style={{
+                  display: 'inline-block',
+                  width: 10,
+                  height: 10,
+                  borderRadius: 2,
+                  background: m.bg,
+                  border: `1px solid ${m.ring}`,
+                }}
+              />
+              {m.label}
+            </span>
+          );
+        })}
+      </div>
+    </SectionCard>
+  );
+}
+
+// ─── Pipeline view (kanban) ───────────────────────────────────────────────────
+
+function PipelineView() {
+  const { project } = BIDDING_SAMPLE;
+  const trades = project.trades;
+
+  const columns: { key: BidStatus; label: string; items: BidTrade[] }[] = [
+    {
+      key: 'snt',
+      label: 'Sent',
+      items: trades.filter(
+        (t) =>
+          t.subs.some((s) => s.status === 'snt') &&
+          !t.subs.some((s) => s.status === 'rec' || s.status === 'fnl'),
+      ),
+    },
+    {
+      key: 'rec',
+      label: 'Received',
+      items: trades.filter(
+        (t) =>
+          t.subs.some((s) => s.status === 'rec') && !t.subs.some((s) => s.status === 'fnl'),
+      ),
+    },
+    {
+      key: 'fu1',
+      label: 'Follow-up',
+      items: trades.filter((t) =>
+        t.subs.some((s) => s.status === 'fu1' || s.status === 'fu2' || s.status === 'fu3'),
+      ),
+    },
+    {
+      key: 'hld',
+      label: 'Hold',
+      items: trades.filter((t) => t.subs.some((s) => s.status === 'hld')),
+    },
+    {
+      key: 'fnl',
+      label: 'Finalized',
+      items: trades.filter((t) => t.subs.some((s) => s.status === 'fnl')),
+    },
+  ];
+
   return (
     <div
       style={{
-        background: 'var(--color-background-primary)',
-        border: '0.5px solid var(--color-border-tertiary)',
-        borderRadius: 'var(--border-radius-lg)',
-        padding: '40px 32px',
-        textAlign: 'center',
+        display: 'grid',
+        gridTemplateColumns: 'repeat(5, 1fr)',
+        gap: 10,
         marginBottom: '1.25rem',
       }}
     >
-      <i
-        className="ti ti-layout-grid"
-        style={{
-          fontSize: 40,
-          color: 'var(--color-text-tertiary)',
-          marginBottom: 12,
-          display: 'block',
-        }}
-      />
-      <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>
-        Heatmap variant — coming next
-      </div>
-      <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginBottom: 24 }}>
-        A cross-project × trade heatmap showing bid coverage intensity will appear here.
-      </div>
-      <div style={{ display: 'flex', justifyContent: 'center', gap: 10 }}>
-        <button
-          type="button"
-          onClick={onBack}
-          style={{
-            padding: '8px 16px',
-            borderRadius: 'var(--border-radius-md)',
-            border: '0.5px solid var(--color-border-secondary)',
-            background: 'var(--color-background-secondary)',
-            fontSize: 13,
-            cursor: 'pointer',
-            fontFamily: 'inherit',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 6,
-          }}
-        >
-          <i className="ti ti-arrow-left" style={{ fontSize: 14 }} />
-          Back to Overview
-        </button>
-        <button
-          type="button"
-          onClick={onGoDetailed}
-          style={{
-            padding: '8px 16px',
-            borderRadius: 'var(--border-radius-md)',
-            border: '0.5px solid var(--color-border-secondary)',
-            background: 'var(--color-background-primary)',
-            fontSize: 13,
-            cursor: 'pointer',
-            fontFamily: 'inherit',
-            color: 'var(--color-text-info)',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 6,
-          }}
-        >
-          Open Detailed view
-          <i className="ti ti-arrow-right" style={{ fontSize: 14 }} />
-        </button>
-      </div>
+      {columns.map((col) => {
+        const m = STATUS_META[col.key];
+        return (
+          <div
+            key={col.key}
+            style={{
+              background: 'var(--color-background-secondary)',
+              borderRadius: 'var(--border-radius-md)',
+              padding: '10px 10px 14px',
+              minHeight: 120,
+            }}
+          >
+            {/* Column header */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                marginBottom: 10,
+                paddingBottom: 8,
+                borderBottom: `2px solid ${m.ring}`,
+              }}
+            >
+              <span
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: '50%',
+                  background: m.strong,
+                  flexShrink: 0,
+                }}
+              />
+              <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>
+                {col.label}
+              </span>
+              <span
+                style={{
+                  marginLeft: 'auto',
+                  fontSize: 11,
+                  fontWeight: 600,
+                  color: 'var(--color-text-tertiary)',
+                  background: 'var(--color-background-primary)',
+                  borderRadius: 999,
+                  padding: '1px 6px',
+                }}
+              >
+                {col.items.length}
+              </span>
+            </div>
+            {/* Cards */}
+            {col.items.map((trade, i) => (
+              <div
+                key={i}
+                style={{
+                  background: 'var(--color-background-primary)',
+                  borderRadius: 6,
+                  padding: '8px 10px',
+                  marginBottom: 6,
+                  border: `0.5px solid ${m.ring}`,
+                }}
+              >
+                <div style={{ fontSize: 12, fontWeight: 500 }}>{trade.trade}</div>
+                {trade.low !== null && (
+                  <div
+                    style={{
+                      fontSize: 10,
+                      color: 'var(--good-fg)',
+                      marginTop: 2,
+                      fontVariantNumeric: 'tabular-nums',
+                    }}
+                  >
+                    {fmt$(trade.low)}
+                  </div>
+                )}
+                <div
+                  style={{
+                    fontSize: 10,
+                    color: 'var(--color-text-tertiary)',
+                    marginTop: 2,
+                  }}
+                >
+                  {trade.subs.length} sub{trade.subs.length !== 1 ? 's' : ''}
+                </div>
+              </div>
+            ))}
+            {col.items.length === 0 && (
+              <div
+                style={{
+                  fontSize: 11,
+                  color: 'var(--color-text-tertiary)',
+                  textAlign: 'center',
+                  padding: '16px 0',
+                  fontStyle: 'italic',
+                }}
+              >
+                none
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
+  );
+}
+
+// ─── Follow-ups view ──────────────────────────────────────────────────────────
+
+function FollowUpsView() {
+  const { project } = BIDDING_SAMPLE;
+
+  const bands: {
+    key: 'fu1' | 'fu2' | 'fu3';
+    label: string;
+    sub: string;
+    fg: string;
+    bg: string;
+    ring: string;
+  }[] = [
+    {
+      key: 'fu1',
+      label: 'Overdue',
+      sub: '14+ days ago',
+      fg: 'var(--danger-fg)',
+      bg: 'var(--danger-bg)',
+      ring: 'var(--danger-ring, var(--bid-fu1-ring))',
+    },
+    {
+      key: 'fu2',
+      label: 'Due soon',
+      sub: '~7 days ago',
+      fg: 'var(--warn-fg)',
+      bg: 'var(--warn-bg)',
+      ring: 'var(--warn-ring, var(--bid-fu2-ring))',
+    },
+    {
+      key: 'fu3',
+      label: 'Fresh',
+      sub: 'just sent',
+      fg: 'var(--good-fg)',
+      bg: 'var(--good-bg)',
+      ring: 'var(--good-ring, var(--bid-fu3-ring))',
+    },
+  ];
+
+  const hasSomething = bands.some((b) =>
+    project.trades.some((t) => t.subs.some((s) => s.status === b.key)),
+  );
+
+  if (!hasSomething) {
+    return (
+      <div
+        style={{
+          background: 'var(--color-background-primary)',
+          border: '0.5px solid var(--color-border-tertiary)',
+          borderRadius: 'var(--border-radius-lg)',
+          padding: '32px',
+          textAlign: 'center',
+          color: 'var(--color-text-tertiary)',
+          marginBottom: '1.25rem',
+        }}
+      >
+        No active follow-ups — great job!
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ marginBottom: '1.25rem' }}>
+      {bands.map((band) => {
+        const tradesInBand = project.trades.filter((t) =>
+          t.subs.some((s) => s.status === band.key),
+        );
+        if (tradesInBand.length === 0) return null;
+        return (
+          <SectionCard
+            key={band.key}
+            title={`${band.label} · ${band.sub}`}
+            icon="ti-message-2"
+          >
+            {tradesInBand.map((trade, i) => {
+              const fuSubs = trade.subs.filter((s) => s.status === band.key);
+              return (
+                <div
+                  key={i}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 12,
+                    padding: '10px 0',
+                    borderBottom:
+                      i < tradesInBand.length - 1
+                        ? '0.5px solid var(--color-border-tertiary)'
+                        : 'none',
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 4,
+                      alignSelf: 'stretch',
+                      borderRadius: 2,
+                      background: band.fg,
+                      flexShrink: 0,
+                    }}
+                  />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 500 }}>{trade.trade}</div>
+                    <div
+                      style={{
+                        fontSize: 11,
+                        color: 'var(--color-text-secondary)',
+                        marginTop: 2,
+                      }}
+                    >
+                      {fuSubs.map((s) => s.name).join(' · ')}
+                    </div>
+                  </div>
+                  <span
+                    style={{
+                      background: band.bg,
+                      color: band.fg,
+                      padding: '3px 10px',
+                      borderRadius: 999,
+                      fontSize: 11,
+                      fontWeight: 600,
+                      flexShrink: 0,
+                    }}
+                  >
+                    {STATUS_META[band.key].label}
+                  </span>
+                  <button
+                    type="button"
+                    style={{
+                      padding: '5px 12px',
+                      borderRadius: 'var(--border-radius-md)',
+                      border: '0.5px solid var(--color-border-secondary)',
+                      background: 'var(--color-background-secondary)',
+                      fontSize: 11,
+                      cursor: 'pointer',
+                      fontFamily: 'inherit',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 4,
+                      flexShrink: 0,
+                      color: 'var(--color-text-primary)',
+                    }}
+                  >
+                    <i className="ti ti-send" style={{ fontSize: 11 }} />
+                    Send FU
+                  </button>
+                </div>
+              );
+            })}
+          </SectionCard>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─── Spreads view ─────────────────────────────────────────────────────────────
+
+function SpreadsView() {
+  const { project } = BIDDING_SAMPLE;
+
+  const tradesWithBids = project.trades
+    .map((t) => {
+      const amounts = t.subs
+        .map((s) => s.amount)
+        .filter((a): a is number => a !== null);
+      return { trade: t, amounts };
+    })
+    .filter((x) => x.amounts.length >= 2);
+
+  const allAmounts = tradesWithBids.flatMap((x) => x.amounts);
+  const globalMax = allAmounts.length > 0 ? Math.max(...allAmounts) : 1;
+
+  return (
+    <SectionCard title="Bid spreads by trade" icon="ti-chart-bar">
+      {tradesWithBids.length === 0 ? (
+        <div style={{ color: 'var(--color-text-tertiary)', fontSize: 13, textAlign: 'center', padding: 24 }}>
+          No trades with multiple bids yet.
+        </div>
+      ) : (
+        tradesWithBids.map(({ trade, amounts }, i) => {
+          const min = Math.min(...amounts);
+          const max = Math.max(...amounts);
+          const spread = max > 0 ? Math.round(((max - min) / min) * 100) : 0;
+          const leftPct = (min / globalMax) * 100;
+          const rightPct = (max / globalMax) * 100;
+          const isHighSpread = spread > 30;
+          return (
+            <div key={i} style={{ marginBottom: 12 }}>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  marginBottom: 4,
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 500,
+                    width: 220,
+                    flexShrink: 0,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {trade.trade}
+                </span>
+                <div
+                  style={{
+                    flex: 1,
+                    position: 'relative',
+                    height: 16,
+                    background: 'var(--color-background-secondary)',
+                    borderRadius: 3,
+                  }}
+                >
+                  <div
+                    style={{
+                      position: 'absolute',
+                      left: `${leftPct}%`,
+                      width: `${rightPct - leftPct}%`,
+                      top: 0,
+                      bottom: 0,
+                      background: isHighSpread ? 'var(--bid-fu1-bg)' : 'var(--bid-rec-bg)',
+                      border: `1px solid ${isHighSpread ? 'var(--bid-fu1-ring)' : 'var(--bid-rec-ring)'}`,
+                      borderRadius: 3,
+                    }}
+                  />
+                </div>
+                <div
+                  style={{
+                    width: 80,
+                    textAlign: 'right',
+                    flexShrink: 0,
+                    fontSize: 11,
+                    fontVariantNumeric: 'tabular-nums',
+                  }}
+                >
+                  <span style={{ color: 'var(--good-fg)', fontWeight: 500 }}>{fmt$(min)}</span>
+                  <span style={{ color: 'var(--color-text-tertiary)', margin: '0 3px' }}>–</span>
+                  <span style={{ color: 'var(--color-text-secondary)' }}>{fmt$(max)}</span>
+                </div>
+                <div
+                  style={{
+                    width: 42,
+                    textAlign: 'right',
+                    flexShrink: 0,
+                    fontSize: 11,
+                    fontWeight: 600,
+                    color: isHighSpread ? 'var(--danger-fg)' : 'var(--color-text-secondary)',
+                  }}
+                >
+                  {spread}%
+                </div>
+              </div>
+            </div>
+          );
+        })
+      )}
+      <div
+        style={{
+          fontSize: 10,
+          color: 'var(--color-text-tertiary)',
+          marginTop: 6,
+          display: 'flex',
+          gap: 16,
+        }}
+      >
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+          <span
+            style={{
+              display: 'inline-block',
+              width: 10,
+              height: 10,
+              borderRadius: 2,
+              background: 'var(--bid-rec-bg)',
+              border: '1px solid var(--bid-rec-ring)',
+            }}
+          />
+          Normal spread
+        </span>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+          <span
+            style={{
+              display: 'inline-block',
+              width: 10,
+              height: 10,
+              borderRadius: 2,
+              background: 'var(--bid-fu1-bg)',
+              border: '1px solid var(--bid-fu1-ring)',
+            }}
+          />
+          High spread (&gt;30%)
+        </span>
+      </div>
+    </SectionCard>
+  );
+}
+
+// ─── Subs leaderboard view ────────────────────────────────────────────────────
+
+function SubsView() {
+  const { project } = BIDDING_SAMPLE;
+
+  const subMap = new Map<
+    string,
+    { name: string; count: number; totalAmount: number; statuses: Set<BidStatus>; trades: string[] }
+  >();
+
+  project.trades.forEach((trade) => {
+    trade.subs.forEach((sub) => {
+      if (!subMap.has(sub.name)) {
+        subMap.set(sub.name, {
+          name: sub.name,
+          count: 0,
+          totalAmount: 0,
+          statuses: new Set(),
+          trades: [],
+        });
+      }
+      const entry = subMap.get(sub.name)!;
+      entry.count++;
+      if (sub.amount !== null) entry.totalAmount += sub.amount;
+      entry.statuses.add(sub.status);
+      entry.trades.push(trade.trade);
+    });
+  });
+
+  const ranked = Array.from(subMap.values()).sort(
+    (a, b) => b.count - a.count || b.totalAmount - a.totalAmount,
+  );
+
+  return (
+    <SectionCard title="Subcontractor leaderboard" icon="ti-users">
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+          <thead>
+            <tr>
+              {['#', 'Sub name', 'Trades', 'Total bid', 'Statuses'].map((h, i) => (
+                <th
+                  key={i}
+                  style={{
+                    textAlign: i === 0 || i === 2 || i === 3 ? 'center' : 'left',
+                    padding: '8px 10px',
+                    fontSize: 10,
+                    letterSpacing: '0.06em',
+                    textTransform: 'uppercase',
+                    color: 'var(--color-text-tertiary)',
+                    fontWeight: 600,
+                    background: 'var(--color-background-secondary)',
+                    border: '0.5px solid var(--color-border-tertiary)',
+                  }}
+                >
+                  {h}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {ranked.map((sub, i) => (
+              <tr key={sub.name}>
+                <td
+                  style={{
+                    padding: '8px 10px',
+                    border: '0.5px solid var(--color-border-tertiary)',
+                    textAlign: 'center',
+                    color: 'var(--color-text-tertiary)',
+                    fontSize: 11,
+                    fontVariantNumeric: 'tabular-nums',
+                  }}
+                >
+                  {i + 1}
+                </td>
+                <td
+                  style={{
+                    padding: '8px 10px',
+                    border: '0.5px solid var(--color-border-tertiary)',
+                    fontWeight: 500,
+                  }}
+                >
+                  {sub.name}
+                  <div
+                    style={{
+                      fontSize: 10,
+                      color: 'var(--color-text-tertiary)',
+                      marginTop: 1,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      maxWidth: 260,
+                    }}
+                  >
+                    {sub.trades.join(', ')}
+                  </div>
+                </td>
+                <td
+                  style={{
+                    padding: '8px 10px',
+                    border: '0.5px solid var(--color-border-tertiary)',
+                    textAlign: 'center',
+                    fontVariantNumeric: 'tabular-nums',
+                  }}
+                >
+                  {sub.count}
+                </td>
+                <td
+                  style={{
+                    padding: '8px 10px',
+                    border: '0.5px solid var(--color-border-tertiary)',
+                    textAlign: 'right',
+                    fontVariantNumeric: 'tabular-nums',
+                    color:
+                      sub.totalAmount > 0 ? 'var(--good-fg)' : 'var(--color-text-tertiary)',
+                    fontWeight: sub.totalAmount > 0 ? 600 : 400,
+                  }}
+                >
+                  {sub.totalAmount > 0 ? fmtLong$(sub.totalAmount) : '—'}
+                </td>
+                <td
+                  style={{
+                    padding: '6px 10px',
+                    border: '0.5px solid var(--color-border-tertiary)',
+                  }}
+                >
+                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                    {Array.from(sub.statuses).map((s) => (
+                      <StatusPill key={s} status={s} small />
+                    ))}
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </SectionCard>
   );
 }
 
 // ─── Main BiddingDashboard ─────────────────────────────────────────────────────
 
-type View = 'overview' | 'detailed' | 'matrix';
+type View = 'overview' | 'detailed' | 'matrix' | 'pipeline' | 'followups' | 'spreads' | 'subs';
+
+const VIEW_TABS: { id: View; label: string; icon: string }[] = [
+  { id: 'overview',  label: 'Overview',   icon: 'ti-layout-dashboard' },
+  { id: 'detailed',  label: 'Detailed',   icon: 'ti-table-options' },
+  { id: 'matrix',    label: 'Matrix',     icon: 'ti-layout-grid' },
+  { id: 'pipeline',  label: 'Pipeline',   icon: 'ti-git-branch' },
+  { id: 'followups', label: 'Follow-ups', icon: 'ti-message-2' },
+  { id: 'spreads',   label: 'Spreads',    icon: 'ti-chart-bar' },
+  { id: 'subs',      label: 'Subs',       icon: 'ti-users' },
+];
 
 export function BiddingDashboard() {
   const { project, portfolioProjects, syncedAt } = BIDDING_SAMPLE;
 
   const [view, setView] = useState<View>('overview');
   const [selectedProject, setSelectedProject] = useState<string>(project.name);
+  const [search, setSearch] = useState('');
 
   const subtitle = useMemo(() => {
     const fnlCount = project.trades.filter((t) =>
@@ -1518,7 +2332,7 @@ export function BiddingDashboard() {
         syncedAt={syncedAt}
       />
 
-      {/* View toggle + project picker */}
+      {/* Filter bar */}
       <div
         style={{
           display: 'flex',
@@ -1529,6 +2343,61 @@ export function BiddingDashboard() {
         }}
         className="filter-bar"
       >
+        {/* Search */}
+        <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+          <i
+            className="ti ti-search"
+            style={{
+              position: 'absolute',
+              left: 8,
+              fontSize: 13,
+              color: 'var(--color-text-tertiary)',
+              pointerEvents: 'none',
+            }}
+          />
+          <input
+            type="search"
+            placeholder="Search trades, subs…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            style={{
+              height: 32,
+              paddingLeft: 26,
+              paddingRight: 8,
+              border: '0.5px solid var(--color-border-secondary)',
+              borderRadius: 'var(--border-radius-md)',
+              background: 'var(--color-background-primary)',
+              color: 'var(--color-text-primary)',
+              fontSize: 12.5,
+              fontFamily: 'inherit',
+              width: 200,
+              outline: 'none',
+            }}
+          />
+        </div>
+
+        {/* Portfolio filter dropdown */}
+        <select
+          style={{
+            height: 32,
+            padding: '0 10px',
+            border: '0.5px solid var(--color-border-secondary)',
+            borderRadius: 'var(--border-radius-md)',
+            background: 'var(--color-background-primary)',
+            color: 'var(--color-text-primary)',
+            fontSize: 12.5,
+            fontFamily: 'inherit',
+          }}
+          defaultValue="all"
+        >
+          <option value="all">All projects ({portfolioProjects.length})</option>
+          {portfolioProjects.filter((p) => p.isReal).map((p) => (
+            <option key={p.name} value={p.name}>
+              ★ {p.name}
+            </option>
+          ))}
+        </select>
+
         {/* Project picker */}
         <select
           value={selectedProject}
@@ -1557,7 +2426,7 @@ export function BiddingDashboard() {
           ))}
         </select>
 
-        {/* View toggle */}
+        {/* View tab strip */}
         <div
           className="view-toggle"
           style={{
@@ -1569,31 +2438,15 @@ export function BiddingDashboard() {
             marginLeft: 'auto',
           }}
         >
-          {(['overview', 'detailed', 'matrix'] as View[]).map((v) => (
+          {VIEW_TABS.map((tab) => (
             <button
-              key={v}
+              key={tab.id}
               type="button"
-              className={`tab${view === v ? ' active' : ''}`}
-              onClick={() => setView(v)}
+              className={`tab${view === tab.id ? ' active' : ''}`}
+              onClick={() => setView(tab.id)}
             >
-              {v === 'overview' && (
-                <>
-                  <i className="ti ti-layout-dashboard" style={{ fontSize: 13, marginRight: 5 }} />
-                  Overview
-                </>
-              )}
-              {v === 'detailed' && (
-                <>
-                  <i className="ti ti-table-options" style={{ fontSize: 13, marginRight: 5 }} />
-                  Detailed
-                </>
-              )}
-              {v === 'matrix' && (
-                <>
-                  <i className="ti ti-layout-grid" style={{ fontSize: 13, marginRight: 5 }} />
-                  Matrix
-                </>
-              )}
+              <i className={`ti ${tab.icon}`} style={{ fontSize: 13, marginRight: 5 }} />
+              {tab.label}
             </button>
           ))}
         </div>
@@ -1601,13 +2454,17 @@ export function BiddingDashboard() {
 
       {/* View content */}
       {view === 'overview' && <OverviewView onGoDetailed={() => setView('detailed')} />}
-      {view === 'detailed' && <DetailedView onBack={() => setView('overview')} />}
+      {view === 'detailed' && <DetailedView onBack={() => setView('overview')} search={search} />}
       {view === 'matrix' && (
         <MatrixView
           onBack={() => setView('overview')}
           onGoDetailed={() => setView('detailed')}
         />
       )}
+      {view === 'pipeline' && <PipelineView />}
+      {view === 'followups' && <FollowUpsView />}
+      {view === 'spreads' && <SpreadsView />}
+      {view === 'subs' && <SubsView />}
 
       {/* Footer */}
       <div
@@ -1618,8 +2475,9 @@ export function BiddingDashboard() {
           paddingBottom: 12,
         }}
       >
-        Live from ClickUp · 60-second cache · click any project, trade row, or sub cell to open
-        in ClickUp
+        Live from ClickUp · 60-second cache · click any project, trade row, or sub cell to open in ClickUp
+        <br />
+        Bid status: Sent → Received → Follow-up → Hold → Finalized · 8-color palette · search filters all views
       </div>
     </>
   );
