@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 
 interface Option {
-  id: 'plans' | 'permits';
+  id: 'plans' | 'permits' | 'bidding';
   href: string;
   label: string;
   icon: string;
@@ -27,11 +27,18 @@ const OPTIONS: Option[] = [
     icon: 'ti-license',
     hint: 'Expiration calendar · upcoming',
   },
+  {
+    id: 'bidding',
+    href: '/bidding',
+    label: 'Bidding dashboard',
+    icon: 'ti-gavel',
+    hint: 'Trade × sub matrix · 8-color palette',
+  },
 ];
 
 export function DashboardSwitcher() {
   const pathname = usePathname() ?? '/';
-  const activeId: Option['id'] = pathname.startsWith('/permits') ? 'permits' : 'plans';
+  const activeId: Option['id'] = pathname.startsWith('/bidding') ? 'bidding' : pathname.startsWith('/permits') ? 'permits' : 'plans';
   const active = OPTIONS.find((o) => o.id === activeId)!;
 
   const [open, setOpen] = useState(false);
