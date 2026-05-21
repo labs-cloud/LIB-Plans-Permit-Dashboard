@@ -557,7 +557,7 @@ function DetailedView({
           <h2 style={{ margin: '0 0 14px', fontSize: 13, fontWeight: 500, display: 'flex', alignItems: 'center', gap: 8 }}>
             <i className="ti ti-table" /> Per-trade budget
             <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--color-text-tertiary)', fontWeight: 400 }}>
-              click a row → bid history drawer · "Manual" = auto-rule overridden
+              click a row → bid history drawer · &quot;Manual&quot; = auto-rule overridden
             </span>
           </h2>
           <div style={{ maxHeight: 680, overflowY: 'auto', background: 'var(--color-background-primary)', borderRadius: 8, border: '0.5px solid var(--color-border-tertiary)' }}>
@@ -714,7 +714,7 @@ function MatrixView({ onGoDetailed }: { onGoDetailed: () => void }) {
       <p style={{ margin: '0 auto', fontSize: 12.5, color: 'var(--color-text-secondary)', lineHeight: 1.55, maxWidth: 480 }}>
         Budget has a single source of truth — the per-trade table in{' '}
         <button onClick={onGoDetailed} style={{ background: 'none', border: 'none', color: 'var(--color-text-info)', cursor: 'pointer', padding: 0, fontSize: 12.5, fontFamily: 'inherit' }}>Detailed view</button>
-        {' '}— so a separate matrix layout doesn't add a new angle. The Trade × Sub matrix with the 8-color status palette lives on the{' '}
+        {' '}— so a separate matrix layout doesn&apos;t add a new angle. The Trade × Sub matrix with the 8-color status palette lives on the{' '}
         <Link href="/bidding" style={{ color: 'var(--color-text-info)' }}>Bidding dashboard</Link>.
       </p>
       <div style={{ display: 'inline-flex', gap: 8, marginTop: 18 }}>
@@ -833,7 +833,7 @@ export function BudgetDashboard() {
       <div style={{ marginTop: '1.5rem', textAlign: 'center', padding: '14px 0 6px', fontSize: 11.5, color: 'var(--color-text-tertiary)', lineHeight: 1.6 }}>
         Live from ClickUp · 60-second cache · click any trade row to open in ClickUp
         <span style={{ display: 'block', marginTop: 4, fontSize: 11 }}>
-          Variance bar = New − Estimated · "Manual" = auto-rule overridden
+          Variance bar = New − Estimated · &quot;Manual&quot; = auto-rule overridden
         </span>
       </div>
 
