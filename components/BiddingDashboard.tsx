@@ -1457,12 +1457,22 @@ function DetailedView({ onBack, search = '' }: { onBack: () => void; search?: st
 function MatrixView({
   onBack,
   onGoDetailed,
+  search = '',
 }: {
   onBack: () => void;
   onGoDetailed: () => void;
+  search?: string;
 }) {
   const { project, portfolioProjects } = BIDDING_SAMPLE;
-  const trades = project.trades;
+  const trades = useMemo(() => {
+    if (!search.trim()) return project.trades;
+    const q = search.toLowerCase();
+    return project.trades.filter(
+      (t) =>
+        t.trade.toLowerCase().includes(q) ||
+        t.subs.some((s) => s.name.toLowerCase().includes(q)),
+    );
+  }, [project.trades, search]);
   const cols = portfolioProjects.slice(0, 8);
 
   return (
@@ -1701,9 +1711,17 @@ function MatrixView({
 
 // ─── Pipeline view (kanban) ───────────────────────────────────────────────────
 
-function PipelineView() {
+function PipelineView({ search = '' }: { search?: string }) {
   const { project } = BIDDING_SAMPLE;
-  const trades = project.trades;
+  const trades = useMemo(() => {
+    if (!search.trim()) return project.trades;
+    const q = search.toLowerCase();
+    return project.trades.filter(
+      (t) =>
+        t.trade.toLowerCase().includes(q) ||
+        t.subs.some((s) => s.name.toLowerCase().includes(q)),
+    );
+  }, [project.trades, search]);
 
   const columns: { key: BidStatus; label: string; items: BidTrade[] }[] = [
     {
@@ -1858,8 +1876,18 @@ function PipelineView() {
 
 // ─── Follow-ups view ──────────────────────────────────────────────────────────
 
-function FollowUpsView() {
+function FollowUpsView({ search = '' }: { search?: string }) {
   const { project } = BIDDING_SAMPLE;
+
+  const filteredTrades = useMemo(() => {
+    if (!search.trim()) return project.trades;
+    const q = search.toLowerCase();
+    return project.trades.filter(
+      (t) =>
+        t.trade.toLowerCase().includes(q) ||
+        t.subs.some((s) => s.name.toLowerCase().includes(q)),
+    );
+  }, [project.trades, search]);
 
   const bands: {
     key: 'fu1' | 'fu2' | 'fu3';
@@ -1896,7 +1924,7 @@ function FollowUpsView() {
   ];
 
   const hasSomething = bands.some((b) =>
-    project.trades.some((t) => t.subs.some((s) => s.status === b.key)),
+    filteredTrades.some((t) => t.subs.some((s) => s.status === b.key)),
   );
 
   if (!hasSomething) {
@@ -1920,13 +1948,13 @@ function FollowUpsView() {
   return (
     <div style={{ marginBottom: '1.25rem' }}>
       {bands.map((band) => {
-        const tradesInBand = project.trades.filter((t) =>
+        const tradesInBand = filteredTrades.filter((t) =>
           t.subs.some((s) => s.status === band.key),
         );
         if (tradesInBand.length === 0) return null;
         return (
+          <div key={band.key}>
           <SectionCard
-            key={band.key}
             title={`${band.label} · ${band.sub}`}
             icon="ti-message-2"
           >
@@ -2004,6 +2032,7 @@ function FollowUpsView() {
               );
             })}
           </SectionCard>
+          </div>
         );
       })}
     </div>
@@ -2012,10 +2041,20 @@ function FollowUpsView() {
 
 // ─── Spreads view ─────────────────────────────────────────────────────────────
 
-function SpreadsView() {
+function SpreadsView({ search = '' }: { search?: string }) {
   const { project } = BIDDING_SAMPLE;
 
-  const tradesWithBids = project.trades
+  const sourceTrades = useMemo(() => {
+    if (!search.trim()) return project.trades;
+    const q = search.toLowerCase();
+    return project.trades.filter(
+      (t) =>
+        t.trade.toLowerCase().includes(q) ||
+        t.subs.some((s) => s.name.toLowerCase().includes(q)),
+    );
+  }, [project.trades, search]);
+
+  const tradesWithBids = sourceTrades
     .map((t) => {
       const amounts = t.subs
         .map((s) => s.amount)
@@ -2034,7 +2073,7 @@ function SpreadsView() {
           No trades with multiple bids yet.
         </div>
       ) : (
-        tradesWithBids.map(({ trade, amounts }, i) => {
+        tradesWithBids.map(({ trade, amounts }: { trade: BidTrade; amounts: number[] }, i: number) => {
           const min = Math.min(...amounts);
           const max = Math.max(...amounts);
           const spread = max > 0 ? Math.round(((max - min) / min) * 100) : 0;
@@ -2158,7 +2197,7 @@ function SpreadsView() {
 
 // ─── Subs leaderboard view ────────────────────────────────────────────────────
 
-function SubsView() {
+function SubsView({ search = '' }: { search?: string }) {
   const { project } = BIDDING_SAMPLE;
 
   const subMap = new Map<
@@ -2185,9 +2224,11 @@ function SubsView() {
     });
   });
 
-  const ranked = Array.from(subMap.values()).sort(
-    (a, b) => b.count - a.count || b.totalAmount - a.totalAmount,
-  );
+  const ranked = Array.from(subMap.values())
+    .filter((s) => !search.trim() || s.name.toLowerCase().includes(search.toLowerCase()))
+    .sort(
+      (a, b) => b.count - a.count || b.totalAmount - a.totalAmount,
+    );
 
   return (
     <SectionCard title="Subcontractor leaderboard" icon="ti-users">
@@ -2283,7 +2324,7 @@ function SubsView() {
                 >
                   <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                     {Array.from(sub.statuses).map((s) => (
-                      <StatusPill key={s} status={s} small />
+                      <span key={s}><StatusPill status={s} small /></span>
                     ))}
                   </div>
                 </td>
@@ -2459,25 +2500,30 @@ export function BiddingDashboard() {
         <MatrixView
           onBack={() => setView('overview')}
           onGoDetailed={() => setView('detailed')}
+          search={search}
         />
       )}
-      {view === 'pipeline' && <PipelineView />}
-      {view === 'followups' && <FollowUpsView />}
-      {view === 'spreads' && <SpreadsView />}
-      {view === 'subs' && <SubsView />}
+      {view === 'pipeline' && <PipelineView search={search} />}
+      {view === 'followups' && <FollowUpsView search={search} />}
+      {view === 'spreads' && <SpreadsView search={search} />}
+      {view === 'subs' && <SubsView search={search} />}
 
-      {/* Footer */}
+      {/* Footer — two lines */}
       <div
         style={{
           fontSize: 11,
           color: 'var(--color-text-tertiary)',
           textAlign: 'center',
           paddingBottom: 12,
+          lineHeight: 1.7,
         }}
       >
-        Live from ClickUp · 60-second cache · click any project, trade row, or sub cell to open in ClickUp
-        <br />
-        Bid status: Sent → Received → Follow-up → Hold → Finalized · 8-color palette · search filters all views
+        <div>
+          Live from ClickUp · 60-second cache · click any project, trade row, or sub cell to open in ClickUp
+        </div>
+        <div>
+          Color = bidding status from the 8-color PDF palette · variance bar = New − Estimated · &quot;Manual&quot; = auto-rule overridden
+        </div>
       </div>
     </>
   );
