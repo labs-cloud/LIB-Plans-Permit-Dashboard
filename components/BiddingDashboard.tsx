@@ -2368,17 +2368,24 @@ const VIEW_TABS: { id: View; label: string; icon: string }[] = [
 ];
 
 export function BiddingDashboard() {
-  const { data, isLoading } = useSWR<BiddingPayload>('/api/bidding', fetcher, {
+  const [view, setView] = useState<View>('overview');
+  const [selectedProject, setSelectedProject] = useState<string>('');
+  const [search, setSearch] = useState('');
+
+  // SWR URL includes projectId once the user (or the first-load effect) has picked a project.
+  // Changing selectedProject changes the key, which triggers a re-fetch.
+  const swrUrl = selectedProject
+    ? `/api/bidding?projectId=${encodeURIComponent(selectedProject)}`
+    : '/api/bidding';
+
+  const { data, isLoading } = useSWR<BiddingPayload>(swrUrl, fetcher, {
     refreshInterval: 300_000,
     revalidateOnFocus: false,
     dedupingInterval: 60_000,
   });
 
-  const [view, setView] = useState<View>('overview');
-  const [selectedProject, setSelectedProject] = useState<string>('');
-  const [search, setSearch] = useState('');
-
-  // When data arrives, default selectedProject to the first real project
+  // When the initial (no-param) fetch returns, lock in the first real project so subsequent
+  // project-picker changes produce a stable URL key change rather than replacing stale data.
   useEffect(() => {
     if (data && !selectedProject) {
       const first = data.portfolioProjects.find(p => p.isReal) ?? data.portfolioProjects[0];
@@ -2470,7 +2477,7 @@ export function BiddingDashboard() {
           />
         </div>
 
-        {/* Portfolio filter dropdown */}
+        {/* Portfolio filter dropdown — drives the active project fetch */}
         <select
           style={{
             height: 32,
@@ -2482,9 +2489,9 @@ export function BiddingDashboard() {
             fontSize: 12.5,
             fontFamily: 'inherit',
           }}
-          defaultValue="all"
+          value={selectedProject}
+          onChange={(e) => setSelectedProject(e.target.value)}
         >
-          <option value="all">All projects ({portfolioProjects.length})</option>
           {portfolioProjects.filter((p) => p.isReal).map((p) => (
             <option key={p.name} value={p.name}>
               ★ {p.name}

@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useCallback, useContext, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 import useSWR from 'swr';
 import Link from 'next/link';
 import { LogoHeader } from '@/components/LogoHeader';
@@ -1433,17 +1433,31 @@ type BudgetMode = 'table' | 'variance' | 'treemap' | 'categories';
 type BudgetTableView = 'overview' | 'detailed' | 'matrix';
 
 export function BudgetDashboard() {
-  const { data, isLoading } = useSWR<BudgetPayload>('/api/budget', fetcher, {
+  const [mode, setMode] = useState<BudgetMode>('table');
+  const [tableView, setTableView] = useState<BudgetTableView>('overview');
+  const [drawerTrade, setDrawerTrade] = useState<BudgetTrade | null>(null);
+  const [search, setSearch] = useState('');
+  const [selectedProject, setSelectedProject] = useState<string>('');
+  const closeDrawer = useCallback(() => setDrawerTrade(null), []);
+
+  // SWR URL includes projectId once the user (or the first-load effect) has picked a project.
+  const swrUrl = selectedProject
+    ? `/api/budget?projectId=${encodeURIComponent(selectedProject)}`
+    : '/api/budget';
+
+  const { data, isLoading } = useSWR<BudgetPayload>(swrUrl, fetcher, {
     refreshInterval: 300_000,
     revalidateOnFocus: false,
     dedupingInterval: 60_000,
   });
 
-  const [mode, setMode] = useState<BudgetMode>('table');
-  const [tableView, setTableView] = useState<BudgetTableView>('overview');
-  const [drawerTrade, setDrawerTrade] = useState<BudgetTrade | null>(null);
-  const [search, setSearch] = useState('');
-  const closeDrawer = useCallback(() => setDrawerTrade(null), []);
+  // Lock in the first real project after the initial load.
+  useEffect(() => {
+    if (data && !selectedProject) {
+      const first = data.portfolioProjects.find(p => p.real) ?? data.portfolioProjects[0];
+      if (first) setSelectedProject(first.name);
+    }
+  }, [data, selectedProject]);
 
   if (isLoading || !data) {
     return (
@@ -1529,8 +1543,11 @@ export function BudgetDashboard() {
         </div>
 
         {/* Portfolio dropdown */}
-        <select style={{ height: 32, padding: '0 10px', border: '0.5px solid var(--color-border-secondary)', borderRadius: 'var(--border-radius-md)', background: 'var(--color-background-primary)', color: 'var(--color-text-primary)', fontFamily: 'inherit', fontSize: 13, minWidth: 200, fontWeight: 500 }} defaultValue="__all">
-          <option value="__all">All projects ({portfolioProjects.length})</option>
+        <select
+          style={{ height: 32, padding: '0 10px', border: '0.5px solid var(--color-border-secondary)', borderRadius: 'var(--border-radius-md)', background: 'var(--color-background-primary)', color: 'var(--color-text-primary)', fontFamily: 'inherit', fontSize: 13, minWidth: 200, fontWeight: 500 }}
+          value={selectedProject}
+          onChange={e => setSelectedProject(e.target.value)}
+        >
           {portfolioProjects.filter(p => p.real).map(p => (
             <option key={p.name} value={p.name}>★ {p.name}</option>
           ))}
