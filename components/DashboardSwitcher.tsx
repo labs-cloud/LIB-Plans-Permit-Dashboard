@@ -18,7 +18,7 @@ const OPTIONS: Option[] = [
     href: '/budget',
     label: 'Budget dashboard',
     icon: 'ti-wallet',
-    hint: 'Portfolio · per-trade variance',
+    hint: 'Estimated vs committed · variance · per-project drill-in',
   },
   {
     id: 'bidding',
