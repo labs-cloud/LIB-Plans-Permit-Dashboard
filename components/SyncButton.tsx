@@ -15,7 +15,12 @@ export function SyncButton() {
     try {
       const res = await fetch('/api/refresh', { method: 'POST' });
       if (!res.ok) throw new Error(`refresh failed: ${res.status}`);
-      await mutate('/api/projects');
+      // Revalidate all dashboard API caches simultaneously
+      await Promise.all([
+        mutate('/api/projects'),
+        mutate((key) => typeof key === 'string' && key.startsWith('/api/bidding')),
+        mutate((key) => typeof key === 'string' && key.startsWith('/api/budget')),
+      ]);
     } catch (err) {
       console.error(err);
       setError(true);

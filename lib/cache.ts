@@ -8,6 +8,8 @@ import type { DashboardPayload } from './types';
 import { CACHE_TTL_SECONDS } from './constants';
 
 export const PROJECTS_CACHE_TAG = 'projects';
+export const BIDDING_CACHE_TAG = 'bidding';
+export const BUDGET_CACHE_TAG = 'budget';
 
 async function buildPayload(): Promise<DashboardPayload> {
   if (!hasClickUpToken()) {

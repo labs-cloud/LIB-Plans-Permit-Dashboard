@@ -28,4 +28,6 @@ export interface BudgetPayload {
   project: BudgetProject;
   portfolioProjects: BudgetPortfolioStub[];
   syncedAt: number;
+  source?: 'live' | 'empty';
+  warning?: string;
 }

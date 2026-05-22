@@ -1,9 +1,25 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import useSWR from 'swr';
 import { LogoHeader } from './LogoHeader';
-import { BIDDING_SAMPLE } from '@/lib/bidding-data';
-import type { BidStatus, BidSub, BidTrade } from '@/lib/bidding-types';
+import type { BidStatus, BidSub, BidTrade, BiddingPayload } from '@/lib/bidding-types';
+
+// ─── Data context (replaces static fixture import) ────────────────────────────
+
+const BiddingCtx = createContext<BiddingPayload | null>(null);
+
+function useBidding(): BiddingPayload {
+  const ctx = useContext(BiddingCtx);
+  if (!ctx) throw new Error('useBidding must be used inside BiddingDashboard');
+  return ctx;
+}
+
+async function fetcher(url: string): Promise<BiddingPayload> {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`fetch ${url} → ${res.status}`);
+  return res.json() as Promise<BiddingPayload>;
+}
 
 // ─── Status metadata ──────────────────────────────────────────────────────────
 
@@ -572,7 +588,7 @@ function Drawer({ payload, onClose }: { payload: DrawerPayload; onClose: () => v
 // ─── Overview view ────────────────────────────────────────────────────────────
 
 function OverviewView({ onGoDetailed }: { onGoDetailed: () => void }) {
-  const { project, portfolioProjects } = BIDDING_SAMPLE;
+  const { project, portfolioProjects } = useBidding();
   const trades = project.trades;
 
   const kpis = useMemo(() => {
@@ -889,7 +905,7 @@ const FILTER_CHIPS: { key: FilterKey; label: string }[] = [
 ];
 
 function DetailedView({ onBack, search = '' }: { onBack: () => void; search?: string }) {
-  const { project } = BIDDING_SAMPLE;
+  const { project } = useBidding();
   const trades = project.trades;
 
   const [filter, setFilter] = useState<FilterKey>('all');
@@ -1463,7 +1479,7 @@ function MatrixView({
   onGoDetailed: () => void;
   search?: string;
 }) {
-  const { project, portfolioProjects } = BIDDING_SAMPLE;
+  const { project, portfolioProjects } = useBidding();
   const trades = useMemo(() => {
     if (!search.trim()) return project.trades;
     const q = search.toLowerCase();
@@ -1712,7 +1728,7 @@ function MatrixView({
 // ─── Pipeline view (kanban) ───────────────────────────────────────────────────
 
 function PipelineView({ search = '' }: { search?: string }) {
-  const { project } = BIDDING_SAMPLE;
+  const { project } = useBidding();
   const trades = useMemo(() => {
     if (!search.trim()) return project.trades;
     const q = search.toLowerCase();
@@ -1877,7 +1893,7 @@ function PipelineView({ search = '' }: { search?: string }) {
 // ─── Follow-ups view ──────────────────────────────────────────────────────────
 
 function FollowUpsView({ search = '' }: { search?: string }) {
-  const { project } = BIDDING_SAMPLE;
+  const { project } = useBidding();
 
   const filteredTrades = useMemo(() => {
     if (!search.trim()) return project.trades;
@@ -2042,7 +2058,7 @@ function FollowUpsView({ search = '' }: { search?: string }) {
 // ─── Spreads view ─────────────────────────────────────────────────────────────
 
 function SpreadsView({ search = '' }: { search?: string }) {
-  const { project } = BIDDING_SAMPLE;
+  const { project } = useBidding();
 
   const sourceTrades = useMemo(() => {
     if (!search.trim()) return project.trades;
@@ -2198,7 +2214,7 @@ function SpreadsView({ search = '' }: { search?: string }) {
 // ─── Subs leaderboard view ────────────────────────────────────────────────────
 
 function SubsView({ search = '' }: { search?: string }) {
-  const { project } = BIDDING_SAMPLE;
+  const { project } = useBidding();
 
   const subMap = new Map<
     string,
@@ -2352,25 +2368,62 @@ const VIEW_TABS: { id: View; label: string; icon: string }[] = [
 ];
 
 export function BiddingDashboard() {
-  const { project, portfolioProjects, syncedAt } = BIDDING_SAMPLE;
+  const { data, isLoading } = useSWR<BiddingPayload>('/api/bidding', fetcher, {
+    refreshInterval: 300_000,
+    revalidateOnFocus: false,
+    dedupingInterval: 60_000,
+  });
 
   const [view, setView] = useState<View>('overview');
-  const [selectedProject, setSelectedProject] = useState<string>(project.name);
+  const [selectedProject, setSelectedProject] = useState<string>('');
   const [search, setSearch] = useState('');
 
+  // When data arrives, default selectedProject to the first real project
+  useEffect(() => {
+    if (data && !selectedProject) {
+      const first = data.portfolioProjects.find(p => p.isReal) ?? data.portfolioProjects[0];
+      if (first) setSelectedProject(first.name);
+    }
+  }, [data, selectedProject]);
+
   const subtitle = useMemo(() => {
-    const fnlCount = project.trades.filter((t) =>
-      t.subs.some((s) => s.status === 'fnl'),
-    ).length;
+    if (!data) return 'Loading…';
+    const { project, portfolioProjects } = data;
+    const fnlCount = project.trades.filter(t => t.subs.some(s => s.status === 'fnl')).length;
     return `${project.trades.length} trades · ${fnlCount} finalized · ${portfolioProjects.length} projects in portfolio`;
-  }, [project, portfolioProjects]);
+  }, [data]);
+
+  if (isLoading || !data) {
+    return (
+      <>
+        <LogoHeader title="Bidding Dashboard" subtitleOverride="Loading from ClickUp…" syncedAt={null} />
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 240, color: 'var(--color-text-tertiary)', fontSize: 13 }}>
+          <i className="ti ti-loader" style={{ fontSize: 20, marginRight: 8, animation: 'lib-spin 1s linear infinite' }} />
+          Loading bidding data…
+        </div>
+      </>
+    );
+  }
+
+  if (data.warning) {
+    return (
+      <>
+        <LogoHeader title="Bidding Dashboard" subtitleOverride={data.warning} syncedAt={null} />
+        <div style={{ padding: '32px 24px', color: 'var(--color-text-secondary)', fontSize: 13, lineHeight: 1.6 }}>
+          <strong>No data available.</strong> {data.warning}
+        </div>
+      </>
+    );
+  }
+
+  const { portfolioProjects } = data;
 
   return (
-    <>
+    <BiddingCtx.Provider value={data}>
       <LogoHeader
         title="Bidding Dashboard"
         subtitleOverride={subtitle}
-        syncedAt={syncedAt}
+        syncedAt={data.syncedAt || null}
       />
 
       {/* Filter bar */}
@@ -2462,7 +2515,7 @@ export function BiddingDashboard() {
           {portfolioProjects.map((p) => (
             <option key={p.name} value={p.name}>
               {p.isReal ? '★ ' : ''}
-              {p.name} · {p.location}
+              {p.name}{p.location ? ` · ${p.location}` : ''}
             </option>
           ))}
         </select>
@@ -2525,6 +2578,6 @@ export function BiddingDashboard() {
           Color = bidding status from the 8-color PDF palette · variance bar = New − Estimated · &quot;Manual&quot; = auto-rule overridden
         </div>
       </div>
-    </>
+    </BiddingCtx.Provider>
   );
 }
