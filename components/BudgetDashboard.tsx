@@ -250,11 +250,16 @@ function ProjectHeroCard({ onBack }: { onBack: () => void }) {
           onClick={onBack}
           style={{ height: 32, padding: '0 13px', borderRadius: 'var(--border-radius-md)', border: '0.5px solid var(--color-border-secondary)', fontSize: 12.5, display: 'inline-flex', alignItems: 'center', gap: 6, background: 'var(--color-background-primary)', color: 'var(--color-text-primary)', cursor: 'pointer', fontFamily: 'inherit' }}
         >
-          <i className="ti ti-arrow-left" /> Table view
+          <i className="ti ti-arrow-left" /> Standard view
         </button>
-        <button style={{ height: 32, padding: '0 13px', borderRadius: 'var(--border-radius-md)', border: '0.5px solid var(--lib-black)', fontSize: 12.5, display: 'inline-flex', alignItems: 'center', gap: 6, background: 'var(--lib-black)', color: '#fff', cursor: 'pointer', fontFamily: 'inherit' }}>
+        <a
+          href="https://app.clickup.com/9017603275/v/l/90173230172"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{ height: 32, padding: '0 13px', borderRadius: 'var(--border-radius-md)', border: '0.5px solid var(--lib-black)', fontSize: 12.5, display: 'inline-flex', alignItems: 'center', gap: 6, background: 'var(--lib-black)', color: '#fff', textDecoration: 'none', fontFamily: 'inherit' }}
+        >
           <i className="ti ti-external-link" /> Open in ClickUp
-        </button>
+        </a>
       </div>
     </div>
   );
@@ -865,12 +870,17 @@ function VarianceView({ onBack }: { onBack: () => void }) {
       <ProjectHeroCard onBack={onBack} />
 
       {/* 4-KPI strip */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, marginBottom: '1.25rem' }}>
-        <KpiCard label="Total saved vs est" value={fmt$(totalSaved)} sub="sum of under-budget trades" icon="ti-trending-down" tone="good" />
-        <KpiCard label="Total over vs est" value={fmt$(totalOver)} sub="sum of over-budget trades" icon="ti-trending-up" tone="danger" />
-        <KpiCard label="Net Δ vs estimated" value={(netDelta < 0 ? '−' : netDelta > 0 ? '+' : '') + fmt$(Math.abs(netDelta))} sub="new budget vs estimate total" icon="ti-arrow-bounce" tone="amber" />
-        <KpiCard label="Estimate-only trades" value={String(eoCount)} sub="no bids yet" icon="ti-hourglass" tone="info" />
-      </div>
+      {(() => {
+        const netPct = bs.est > 0 ? (netDelta / bs.est * 100) : 0;
+        return (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, marginBottom: '1.25rem' }}>
+            <KpiCard label="Total saved (vs est)" value={(totalSaved > 0 ? '−' : '') + fmt$(totalSaved)} sub={`${underTrades.length} trades under`} icon="ti-trending-down" tone="good" />
+            <KpiCard label="Total over (vs est)" value={'+' + fmt$(totalOver)} sub={`${overTrades.length} trades over`} icon="ti-trending-up" tone="danger" />
+            <KpiCard label="Net Δ vs estimated" value={(netDelta < 0 ? '−' : netDelta > 0 ? '+' : '') + fmt$(Math.abs(netDelta))} sub={netPct.toFixed(1) + '% vs estimate'} icon="ti-arrow-bounce" tone="amber" />
+            <KpiCard label="Still estimate-only" value={String(eoCount)} sub="no bid yet · carry-forward" icon="ti-hourglass" tone="info" />
+          </div>
+        );
+      })()}
 
       {/* Top 5 cards side by side */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: '1.25rem' }}>
@@ -1522,7 +1532,7 @@ export function BudgetDashboard() {
       </div>
 
       {/* Mode content */}
-      {mode === 'table' && tableView === 'overview' && <OverviewView onGoBrady={() => setTableView('detailed')} />}
+      {mode === 'table' && tableView === 'overview' && <OverviewView onGoBrady={() => setMode('variance')} />}
       {mode === 'table' && tableView === 'detailed' && <DetailedView onGoOverview={() => setTableView('overview')} onTradeClick={setDrawerTrade} />}
       {mode === 'table' && tableView === 'matrix' && <MatrixView onGoDetailed={() => setTableView('detailed')} />}
       {mode === 'variance'   && <VarianceView   onBack={() => setMode('table')} />}
