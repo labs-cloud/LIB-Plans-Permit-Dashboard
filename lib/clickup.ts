@@ -108,16 +108,16 @@ export async function getTask(taskId: string): Promise<ClickUpTask> {
   return clickupFetch<ClickUpTask>(`/task/${encodeURIComponent(taskId)}`);
 }
 
-export async function getTasksInList(listId: string): Promise<ClickUpTask[]> {
+export async function getTasksInList(listId: string, includeClosed = false): Promise<ClickUpTask[]> {
   const out: ClickUpTask[] = [];
   let page = 0;
+  const closedParam = includeClosed ? 'true' : 'false';
   while (true) {
-    // include_closed=false: skip archived
-    // subtasks=false: every Plan is a discrete task; including subtasks via
+    // subtasks=false: every task is a discrete entry; including subtasks via
     //   the list endpoint has been observed to drop custom-field VALUES
     //   (e.g. Asset Type comes back with value: null even when set in UI).
     const data = await clickupFetch<{ tasks: ClickUpTask[]; last_page?: boolean }>(
-      `/list/${listId}/task?subtasks=false&include_closed=false&page=${page}`,
+      `/list/${listId}/task?subtasks=false&include_closed=${closedParam}&page=${page}`,
     );
     out.push(...data.tasks);
     if (!data.tasks.length || data.last_page || data.tasks.length < 100) break;

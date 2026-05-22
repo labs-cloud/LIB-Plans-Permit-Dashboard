@@ -1,53 +1,68 @@
 import type { ClickUpCustomFieldValue, ClickUpTask } from './clickup';
 import type { BidStatus, BidSub, BidTrade, BiddingProject } from './bidding-types';
+import { CLICKUP } from './constants';
 
-/** Maps a raw ClickUp task status string to our 8-color BidStatus palette. */
-export function mapBidStatus(raw: string): BidStatus {
-  const s = raw.toLowerCase().trim().replace(/[-_]+/g, ' ');
-  if (s === 'ntb' || (s.includes('not') && (s.includes('bid') || s.includes('bidding')))) return 'ntb';
-  if (s === 'fnl' || s.includes('final') || s.includes('signed') || s.includes('awarded') || s.includes('contracted')) return 'fnl';
-  if (s === 'hld' || s.includes('hold') || s.includes('paused')) return 'hld';
-  if (s === 'fu3' || (s.includes('follow') && (s.includes('3') || s.includes('third')))) return 'fu3';
-  if (s === 'fu2' || (s.includes('follow') && (s.includes('2') || s.includes('second')))) return 'fu2';
-  if (s === 'fu1' || s.includes('follow') || s.includes('chase') || s.includes('remind')) return 'fu1';
-  if (s === 'rec' || s.includes('received') || s.includes('in hand') || s.includes('quoted')) return 'rec';
-  if (s === 'snt' || s.includes('sent') || s.includes('out for bid') || s.includes('out to bid')) return 'snt';
-  return 'snt';
+const F = CLICKUP.FIELD;
+
+// Maps ClickUp Bidding Status dropdown option names to the 8-color palette.
+//
+// The ClickUp field stores the selected option's orderindex as a number.
+// FOLLOWED UP is always mapped to fu1. Bucketing into fu1/fu2/fu3 by age
+// requires a dedicated last_contact_at timestamp field; when that field exists
+// wire it here by comparing task.date_updated against Date.now().
+function mapBiddingStatusName(name: string): BidStatus {
+  switch (name.toUpperCase().trim()) {
+    case 'TO SEND':            return 'ntb';
+    case 'RFP SENT':           return 'snt';
+    case 'FOLLOWED UP':        return 'fu1';
+    // TO CLARIFY / LEVELED / REVIEWED all resolve to the same REC bucket per design spec
+    case 'PROPOSALS RECEIVED': return 'rec';
+    case 'TO CLARIFY':         return 'rec';
+    case 'LEVELED':            return 'rec';
+    case 'REVIEWED':           return 'rec';
+    case 'REJECTED':           return 'hld';
+    case 'AWARDED':            return 'fnl';
+    default:                   return 'ntb';
+  }
 }
 
-function getStr(f: ClickUpCustomFieldValue | undefined): string | null {
+function getFieldById(task: ClickUpTask, id: string): ClickUpCustomFieldValue | undefined {
+  return task.custom_fields?.find(f => f.id === id);
+}
+
+function getString(task: ClickUpTask, id: string): string | null {
+  const f = getFieldById(task, id);
   if (!f || f.value == null) return null;
-  if (typeof f.value === 'string') return f.value.trim() || null;
-  return null;
+  return typeof f.value === 'string' ? f.value.trim() || null : null;
 }
 
-function getNum(f: ClickUpCustomFieldValue | undefined): number | null {
+function getCurrency(task: ClickUpTask, id: string): number | null {
+  const f = getFieldById(task, id);
   if (!f || f.value == null) return null;
   const n = Number(f.value);
   return Number.isFinite(n) && n >= 0 ? n : null;
 }
 
-function findField(task: ClickUpTask, pred: (n: string) => boolean): ClickUpCustomFieldValue | undefined {
-  return task.custom_fields?.find(f => pred(f.name.toLowerCase().trim()));
+function getBiddingStatus(task: ClickUpTask): BidStatus {
+  const f = getFieldById(task, F.BIDDING_STATUS);
+  if (!f || f.value == null) return 'ntb';
+
+  // ClickUp stores dropdown values as the option's orderindex (number).
+  // Fall back to matching by option id (string) for newer ClickUp API versions.
+  const options = (f.type_config?.options ?? []) as Array<{ id: string; name: string; orderindex: number }>;
+  let opt: typeof options[0] | undefined;
+
+  const numVal = Number(f.value);
+  if (Number.isFinite(numVal)) {
+    opt = options.find(o => o.orderindex === numVal);
+  }
+  if (!opt && typeof f.value === 'string') {
+    opt = options.find(o => o.id === f.value);
+  }
+
+  return mapBiddingStatusName(opt?.name ?? '');
 }
 
-/**
- * Builds a BiddingProject from ClickUp tasks in a project's Bidding list.
- *
- * Two data models are auto-detected:
- *
- * Flat model (preferred): one task per bid (sub × trade).
- *   - task.name = sub company name
- *   - "trade" / "trade name" / "scope" custom field = trade name
- *   - "amount" / "bid amount" / "price" field = bid amount (currency)
- *   - "annotation" / "notes" / "trade notes" field = trade annotation
- *   - task status = bid status (mapped to 8-color palette)
- *
- * Trade model (fallback): one task per trade.
- *   - task.name = trade name
- *   - task status = representative bid status
- *   - "amount" / "price" field = committed amount
- */
 export function transformBiddingTasks(
   tasks: ClickUpTask[],
   projectName: string,
@@ -56,52 +71,39 @@ export function transformBiddingTasks(
   coordInitials: string,
   coordName: string,
 ): BiddingProject {
-  // Detect flat model: any task has a "trade" field whose value differs from task name
-  const isFlat = tasks.some(t => {
-    const tf = findField(t, n => n === 'trade' || n === 'trade name' || n === 'scope' || n === 'division');
-    const val = getStr(tf);
-    return val !== null && val.toLowerCase().trim() !== t.name.toLowerCase().trim();
-  });
+  const trades: BidTrade[] = tasks.map(task => {
+    const tradeName = task.name;
+    const tradeStatus = getBiddingStatus(task);
 
-  let trades: BidTrade[];
-
-  if (isFlat) {
-    const tradeMap = new Map<string, { annot: string | null; subs: BidSub[] }>();
-
-    for (const task of tasks) {
-      const tradeField = findField(task, n => n === 'trade' || n === 'trade name' || n === 'scope' || n === 'division');
-      const tradeName = getStr(tradeField) ?? task.name;
-      const amountField = findField(task, n => n.includes('amount') || n === 'price' || n === 'bid' || n === 'quote');
-      const amount = getNum(amountField);
-      const status = mapBidStatus(task.status?.status ?? '');
-      const annotField = findField(task, n => n.includes('annot') || n === 'notes' || n.includes('trade note') || n === 'comment');
-      const annot = getStr(annotField);
-
-      if (!tradeMap.has(tradeName)) {
-        tradeMap.set(tradeName, { annot, subs: [] });
-      }
-      const entry = tradeMap.get(tradeName)!;
-      if (!entry.annot && annot) entry.annot = annot;
-      entry.subs.push({ name: task.name, amount, status });
+    // Build subs from Sub 1–5 fields. A sub slot is populated if the name field is non-empty.
+    const subs: BidSub[] = [];
+    const slots: [string, string][] = [
+      [F.SUB_1, F.SUB_1_AMT],
+      [F.SUB_2, F.SUB_2_AMT],
+      [F.SUB_3, F.SUB_3_AMT],
+      [F.SUB_4, F.SUB_4_AMT],
+      [F.SUB_5, F.SUB_5_AMT],
+    ];
+    for (const [nameId, amtId] of slots) {
+      const name = getString(task, nameId);
+      if (!name) continue;
+      subs.push({ name, amount: getCurrency(task, amtId), status: tradeStatus });
     }
 
-    trades = Array.from(tradeMap.entries()).map(([trade, { annot, subs }]) => {
+    // Derive lowest bid: min of sub amounts, or fall back to Best Bid / Lowest Bid / Contract.
+    let low: number | null = null;
+    if (subs.length > 0) {
       const amounts = subs.map(s => s.amount).filter((a): a is number => a !== null);
-      const low = amounts.length > 0 ? Math.min(...amounts) : null;
-      return { trade, annot, subs, low };
-    });
-  } else {
-    // Trade model: each task is one trade
-    trades = tasks.map(task => {
-      const amountField = findField(task, n => n.includes('amount') || n === 'price' || n === 'committed');
-      const amount = getNum(amountField);
-      const status = mapBidStatus(task.status?.status ?? '');
-      const annotField = findField(task, n => n.includes('annot') || n === 'notes');
-      const annot = getStr(annotField);
-      const subs: BidSub[] = amount !== null ? [{ name: task.name, amount, status }] : [];
-      return { trade: task.name, annot, subs, low: amount };
-    });
-  }
+      if (amounts.length > 0) low = Math.min(...amounts);
+    }
+    if (low === null) {
+      low = getCurrency(task, F.BEST_BID)
+        ?? getCurrency(task, F.LOWEST_BID)
+        ?? getCurrency(task, F.CONTRACT);
+    }
+
+    return { trade: tradeName, annot: null, subs, low };
+  });
 
   return { name: projectName, location: projectLocation, id: projectId, phase: 'Bidding', coordInitials, coordName, trades };
 }
