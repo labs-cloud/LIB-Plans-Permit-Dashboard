@@ -5,6 +5,12 @@ export const CLICKUP = {
   PERMITS_LIST_NAME: '04. Permits',
   PROJECT_OVERVIEW_LIST_NAME: '00. Project Overview',
   BASE_URL: process.env.NEXT_PUBLIC_CLICKUP_BASE_URL || 'https://app.clickup.com',
+  // Master Projects Board — flat list of all active projects (portfolio metadata).
+  MASTER_PROJECTS_BOARD_LIST_ID: '901710536629',
+  // Candidate list names for per-project Bidding and Budget lists.
+  // The transforms check these in order and use the first match found.
+  BIDDING_LIST_NAMES: ['02. Bidding', 'Bidding', '02. Bid', '01. Bidding', '00. Bidding'],
+  BUDGET_LIST_NAMES: ['01. Budget', 'Budget', '05. Budget', '02. Budget', '00. Budget'],
 } as const;
 
 export type CoordinatorId = 'faigy' | 'malky' | 'unassigned';

@@ -34,4 +34,6 @@ export interface BiddingPayload {
   project: BiddingProject;
   portfolioProjects: PortfolioProjectStub[];
   syncedAt: number;
+  source?: 'live' | 'empty';
+  warning?: string;
 }

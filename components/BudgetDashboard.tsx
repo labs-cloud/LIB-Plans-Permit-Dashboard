@@ -1,10 +1,27 @@
 'use client';
 
-import { useState, useCallback, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useState, type ReactNode } from 'react';
+import useSWR from 'swr';
 import Link from 'next/link';
 import { LogoHeader } from '@/components/LogoHeader';
-import { BUDGET_SAMPLE } from '@/lib/budget-data';
-import type { BudgetTrade, MoneyVal } from '@/lib/budget-types';
+import type { BudgetTrade, BudgetPayload, MoneyVal } from '@/lib/budget-types';
+
+// ──────────────────────────────────────────────────────────────
+// Data context (replaces static fixture import)
+// ──────────────────────────────────────────────────────────────
+const BudgetCtx = createContext<BudgetPayload | null>(null);
+
+function useBudget(): BudgetPayload {
+  const ctx = useContext(BudgetCtx);
+  if (!ctx) throw new Error('useBudget must be used inside BudgetDashboard');
+  return ctx;
+}
+
+async function fetcher(url: string): Promise<BudgetPayload> {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`fetch ${url} → ${res.status}`);
+  return res.json() as Promise<BudgetPayload>;
+}
 
 // ──────────────────────────────────────────────────────────────
 // helpers
@@ -225,7 +242,7 @@ function ManualBadge() {
 // ProjectHeroCard — shared
 // ──────────────────────────────────────────────────────────────
 function ProjectHeroCard({ onBack }: { onBack: () => void }) {
-  const { project } = BUDGET_SAMPLE;
+  const { project } = useBudget();
   return (
     <div style={{
       display: 'grid', gridTemplateColumns: '1fr auto', gap: 24, alignItems: 'flex-start',
@@ -371,7 +388,7 @@ function Drawer({
 // VIEWS
 // ──────────────────────────────────────────────────────────────
 function OverviewView({ onGoBrady }: { onGoBrady: () => void }) {
-  const { project, portfolioProjects } = BUDGET_SAMPLE;
+  const { project, portfolioProjects } = useBudget();
   const bs = computeStats(project.trades);
   const bDelta = bs.newv - bs.est;
   const bDp = bs.est > 0 ? (bDelta / bs.est * 100) : 0;
@@ -532,7 +549,7 @@ function DetailedView({
   onGoOverview: () => void;
   onTradeClick: (t: BudgetTrade) => void;
 }) {
-  const { project } = BUDGET_SAMPLE;
+  const { project } = useBudget();
   const bs = computeStats(project.trades);
   const d = bs.newv - bs.est;
   const dp = bs.est > 0 ? (d / bs.est * 100) : 0;
@@ -784,7 +801,7 @@ function MatrixView({ onGoDetailed }: { onGoDetailed: () => void }) {
 // VarianceView
 // ──────────────────────────────────────────────────────────────
 function VarianceView({ onBack }: { onBack: () => void }) {
-  const { project } = BUDGET_SAMPLE;
+  const { project } = useBudget();
   const trades = project.trades;
   const [drawerTrade, setDrawerTrade] = useState<BudgetTrade | null>(null);
   const closeDrawer = useCallback(() => setDrawerTrade(null), []);
@@ -990,7 +1007,7 @@ function VarianceView({ onBack }: { onBack: () => void }) {
 // TreemapView
 // ──────────────────────────────────────────────────────────────
 function TreemapView({ onBack }: { onBack: () => void }) {
-  const { project } = BUDGET_SAMPLE;
+  const { project } = useBudget();
   const trades = project.trades;
   const bs = computeStats(trades);
 
@@ -1227,7 +1244,7 @@ const WORK_PACKAGES = [
 ];
 
 function CategoriesView({ onBack }: { onBack: () => void }) {
-  const { project } = BUDGET_SAMPLE;
+  const { project } = useBudget();
   const trades = project.trades;
   const [openPkg, setOpenPkg] = useState<string | null>(null);
   const [allOpen, setAllOpen] = useState(false);
@@ -1416,11 +1433,43 @@ type BudgetMode = 'table' | 'variance' | 'treemap' | 'categories';
 type BudgetTableView = 'overview' | 'detailed' | 'matrix';
 
 export function BudgetDashboard() {
+  const { data, isLoading } = useSWR<BudgetPayload>('/api/budget', fetcher, {
+    refreshInterval: 300_000,
+    revalidateOnFocus: false,
+    dedupingInterval: 60_000,
+  });
+
   const [mode, setMode] = useState<BudgetMode>('table');
   const [tableView, setTableView] = useState<BudgetTableView>('overview');
   const [drawerTrade, setDrawerTrade] = useState<BudgetTrade | null>(null);
   const [search, setSearch] = useState('');
   const closeDrawer = useCallback(() => setDrawerTrade(null), []);
+
+  if (isLoading || !data) {
+    return (
+      <div className="dashboard-shell">
+        <LogoHeader title="Budget Dashboard" subtitleOverride="Loading from ClickUp…" syncedAt={null} />
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 240, color: 'var(--color-text-tertiary)', fontSize: 13 }}>
+          <i className="ti ti-loader" style={{ fontSize: 20, marginRight: 8, animation: 'lib-spin 1s linear infinite' }} />
+          Loading budget data…
+        </div>
+      </div>
+    );
+  }
+
+  if (data.warning) {
+    return (
+      <div className="dashboard-shell">
+        <LogoHeader title="Budget Dashboard" subtitleOverride={data.warning} syncedAt={null} />
+        <div style={{ padding: '32px 24px', color: 'var(--color-text-secondary)', fontSize: 13, lineHeight: 1.6 }}>
+          <strong>No data available.</strong> {data.warning}
+        </div>
+      </div>
+    );
+  }
+
+  const { project, portfolioProjects } = data;
+  const n = project.trades.length;
 
   const titleMap: Record<BudgetMode, string> = {
     table: 'Budget Dashboard',
@@ -1430,10 +1479,10 @@ export function BudgetDashboard() {
   };
 
   const subtitleMap: Record<BudgetMode, string> = {
-    table: '43 active projects · live from ClickUp',
-    variance: `800 Brady · ${BUDGET_SAMPLE.project.trades.length} trades · sorted by $ delta`,
-    treemap: `800 Brady · ${BUDGET_SAMPLE.project.trades.length} trades · area = New Budget · color = Δ vs estimated`,
-    categories: `800 Brady · ${BUDGET_SAMPLE.project.trades.length} trades grouped into 8 work-packages`,
+    table: `${portfolioProjects.length} active projects · live from ClickUp`,
+    variance: `${project.name} · ${n} trades · sorted by $ delta`,
+    treemap: `${project.name} · ${n} trades · area = New Budget · color = Δ vs estimated`,
+    categories: `${project.name} · ${n} trades grouped into 8 work-packages`,
   };
 
   const MODE_TABS: { id: BudgetMode; icon: string; label: string }[] = [
@@ -1450,11 +1499,12 @@ export function BudgetDashboard() {
   ];
 
   return (
+    <BudgetCtx.Provider value={data}>
     <div className="dashboard-shell">
       <LogoHeader
         title={titleMap[mode]}
         subtitleOverride={subtitleMap[mode]}
-        syncedAt={BUDGET_SAMPLE.syncedAt}
+        syncedAt={data.syncedAt || null}
       />
 
       {/* Filter bar */}
@@ -1480,8 +1530,10 @@ export function BudgetDashboard() {
 
         {/* Portfolio dropdown */}
         <select style={{ height: 32, padding: '0 10px', border: '0.5px solid var(--color-border-secondary)', borderRadius: 'var(--border-radius-md)', background: 'var(--color-background-primary)', color: 'var(--color-text-primary)', fontFamily: 'inherit', fontSize: 13, minWidth: 200, fontWeight: 500 }} defaultValue="__all">
-          <option value="__all">All projects (43)</option>
-          <option value="800brady">★ 800 Brady Ave</option>
+          <option value="__all">All projects ({portfolioProjects.length})</option>
+          {portfolioProjects.filter(p => p.real).map(p => (
+            <option key={p.name} value={p.name}>★ {p.name}</option>
+          ))}
         </select>
 
         {/* Primary mode tabs */}
@@ -1549,5 +1601,6 @@ export function BudgetDashboard() {
 
       <Drawer open={drawerTrade !== null} trade={drawerTrade} onClose={closeDrawer} />
     </div>
+    </BudgetCtx.Provider>
   );
 }
