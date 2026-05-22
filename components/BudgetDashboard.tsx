@@ -205,6 +205,67 @@ function SideCard({ title, icon, children }: { title: string; icon: string; chil
 }
 
 // ──────────────────────────────────────────────────────────────
+// ManualBadge — shared
+// ──────────────────────────────────────────────────────────────
+function ManualBadge() {
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 3,
+      marginLeft: 8, padding: '1px 6px', borderRadius: 999,
+      background: 'var(--warn-bg)', color: 'var(--warn-fg)',
+      fontSize: 9, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase',
+      border: '1px solid rgba(186,117,23,0.35)',
+    }}>
+      <i className="ti ti-settings-2" style={{ fontSize: 9 }} /> Manual
+    </span>
+  );
+}
+
+// ──────────────────────────────────────────────────────────────
+// ProjectHeroCard — shared
+// ──────────────────────────────────────────────────────────────
+function ProjectHeroCard({ onBack }: { onBack: () => void }) {
+  const { project } = BUDGET_SAMPLE;
+  return (
+    <div style={{
+      display: 'grid', gridTemplateColumns: '1fr auto', gap: 24, alignItems: 'flex-start',
+      paddingBottom: 14, borderBottom: '0.5px solid var(--color-border-tertiary)', marginBottom: 14,
+    }}>
+      <div>
+        <h1 style={{ fontSize: 22, fontWeight: 500, letterSpacing: '-0.015em', margin: '0 0 6px' }}>{project.name}</h1>
+        <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'center', fontSize: 12.5, color: 'var(--color-text-secondary)' }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: 999, background: 'var(--c-sol-bg)', color: 'var(--c-sol-dark)' }}>
+            <span style={{ width: 18, height: 18, borderRadius: '50%', background: '#fff', color: 'var(--c-sol-dark)', fontSize: 9, fontWeight: 700, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>{project.coordInitials}</span>
+            {project.coordName}
+          </span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: 999, background: 'var(--info-bg)', color: 'var(--info-fg)' }}>
+            <i className="ti ti-calculator" style={{ fontSize: 13 }} />{project.phase}
+          </span>
+          <span><i className="ti ti-map-pin" style={{ fontSize: 13, verticalAlign: '-2px' }} /> {project.location}</span>
+          <span><i className="ti ti-id" style={{ fontSize: 13, verticalAlign: '-2px' }} /> {project.id}</span>
+        </div>
+      </div>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button
+          onClick={onBack}
+          style={{ height: 32, padding: '0 13px', borderRadius: 'var(--border-radius-md)', border: '0.5px solid var(--color-border-secondary)', fontSize: 12.5, display: 'inline-flex', alignItems: 'center', gap: 6, background: 'var(--color-background-primary)', color: 'var(--color-text-primary)', cursor: 'pointer', fontFamily: 'inherit' }}
+        >
+          <i className="ti ti-arrow-left" /> Standard view
+        </button>
+        <a
+          href="https://app.clickup.com/9017603275/v/l/90173230172"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{ height: 32, padding: '0 13px', borderRadius: 'var(--border-radius-md)', border: '0.5px solid var(--lib-black)', fontSize: 12.5, display: 'inline-flex', alignItems: 'center', gap: 6, background: 'var(--lib-black)', color: '#fff', textDecoration: 'none', fontFamily: 'inherit' }}
+        >
+          <i className="ti ti-external-link" /> Open in ClickUp
+        </a>
+      </div>
+    </div>
+  );
+}
+
+// ──────────────────────────────────────────────────────────────
 // drawer
 // ──────────────────────────────────────────────────────────────
 function Drawer({
@@ -587,17 +648,7 @@ function DetailedView({
                   >
                     <td style={{ padding: '10px 12px', borderBottom: '0.5px solid var(--color-border-tertiary)', verticalAlign: 'middle', fontSize: 13, fontWeight: 500 }}>
                       {r.trade}
-                      {r.manual && (
-                        <span style={{
-                          display: 'inline-flex', alignItems: 'center', gap: 3,
-                          marginLeft: 8, padding: '1px 6px', borderRadius: 999,
-                          background: 'var(--warn-bg)', color: 'var(--warn-fg)',
-                          fontSize: 9, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase',
-                          border: '1px solid rgba(186,117,23,0.35)',
-                        }}>
-                          <i className="ti ti-edit" style={{ fontSize: 9 }} /> Manual
-                        </span>
-                      )}
+                      {r.manual && <ManualBadge />}
                     </td>
                     <td style={{ padding: '10px 12px', borderBottom: '0.5px solid var(--color-border-tertiary)', textAlign: 'right', verticalAlign: 'middle', fontVariantNumeric: 'tabular-nums', fontSize: 13 }}>
                       <MoneyToken v={r.est} dim={!isMoney(r.est)} />
@@ -730,104 +781,763 @@ function MatrixView({ onGoDetailed }: { onGoDetailed: () => void }) {
 }
 
 // ──────────────────────────────────────────────────────────────
-// MAIN
+// VarianceView
 // ──────────────────────────────────────────────────────────────
-type BudgetView = 'overview' | 'detailed' | 'matrix';
-
-export function BudgetDashboard() {
-  const [view, setView] = useState<BudgetView>('overview');
+function VarianceView({ onBack }: { onBack: () => void }) {
+  const { project } = BUDGET_SAMPLE;
+  const trades = project.trades;
   const [drawerTrade, setDrawerTrade] = useState<BudgetTrade | null>(null);
-  const [search, setSearch] = useState('');
-
   const closeDrawer = useCallback(() => setDrawerTrade(null), []);
 
-  const TAB_META: { id: BudgetView; icon: string; label: string }[] = [
-    { id: 'overview', icon: 'ti-grid-dots', label: 'Overview' },
+  // Partition trades
+  const underTrades = trades
+    .filter(r => isMoney(r.est) && isMoney(r.fin) && (r.fin as number) < (r.est as number))
+    .map(r => ({ r, delta: (r.fin as number) - (r.est as number) }))
+    .sort((a, b) => a.delta - b.delta);
+
+  const overTrades = trades
+    .filter(r => isMoney(r.est) && isMoney(r.fin) && (r.fin as number) > (r.est as number))
+    .map(r => ({ r, delta: (r.fin as number) - (r.est as number) }))
+    .sort((a, b) => b.delta - a.delta);
+
+  const cfTrades = trades.filter(r => {
+    if (isMoney(r.est) && isMoney(r.fin)) return false;
+    return true;
+  });
+
+  // KPI computations
+  const totalSaved = underTrades.reduce((s, x) => s + Math.abs(x.delta), 0);
+  const totalOver = overTrades.reduce((s, x) => s + x.delta, 0);
+  const bs = computeStats(trades);
+  const netDelta = bs.newv - bs.est;
+  const eoCount = bs.eo;
+
+  const top5Under = underTrades.slice(0, 5);
+  const top5Over = overTrades.slice(0, 5);
+
+  // Max abs delta for bar scaling
+  const allDeltas = [...underTrades.map(x => Math.abs(x.delta)), ...overTrades.map(x => x.delta)];
+  const maxDelta = allDeltas.length > 0 ? Math.max(...allDeltas) : 1;
+
+  function VarianceRow({ r, delta, side }: { r: BudgetTrade; delta: number; side: 'under' | 'over' }) {
+    const pct = Math.min(48, (Math.abs(delta) / maxDelta) * 48);
+    const absDelta = Math.abs(delta);
+    const dPct = isMoney(r.est) && (r.est as number) > 0 ? (delta / (r.est as number) * 100) : 0;
+    return (
+      <div
+        onClick={() => setDrawerTrade(r)}
+        style={{
+          display: 'grid', gridTemplateColumns: '220px 1fr 90px 50px',
+          alignItems: 'center', padding: '7px 12px', cursor: 'pointer', gap: 8,
+          borderBottom: '0.5px solid var(--color-border-tertiary)',
+        }}
+        onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-background-secondary)')}
+        onMouseLeave={e => (e.currentTarget.style.background = '')}
+      >
+        <div style={{ fontSize: 12.5, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {r.trade}
+          {r.manual && <ManualBadge />}
+        </div>
+        {/* bar */}
+        <div style={{ position: 'relative', height: 14 }}>
+          <div style={{ position: 'absolute', left: '50%', top: 0, bottom: 0, width: 1, background: 'var(--color-border-secondary)' }} />
+          {side === 'under' && (
+            <div style={{ position: 'absolute', top: 2, bottom: 2, right: '50%', width: `${pct}%`, borderRadius: 2, background: 'var(--var-under)' }} />
+          )}
+          {side === 'over' && (
+            <div style={{ position: 'absolute', top: 2, bottom: 2, left: '50%', width: `${pct}%`, borderRadius: 2, background: 'var(--var-over)' }} />
+          )}
+        </div>
+        <div style={{ fontSize: 12, fontVariantNumeric: 'tabular-nums', textAlign: 'right', color: side === 'under' ? 'var(--var-under)' : 'var(--var-over)', fontWeight: 500 }}>
+          {side === 'under' ? '−' : '+'}{fmt$(absDelta)}
+        </div>
+        <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+          {Math.abs(dPct).toFixed(0)}%
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      {/* Breadcrumb */}
+      <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginBottom: 12, display: 'flex', gap: 6, alignItems: 'center' }}>
+        <button onClick={onBack} style={{ background: 'none', border: 'none', color: 'var(--color-text-info)', cursor: 'pointer', padding: 0, fontSize: 12, fontFamily: 'inherit' }}>Portfolio</button>
+        <i className="ti ti-chevron-right" style={{ fontSize: 14, opacity: 0.6 }} />
+        <span>800 Brady Ave · Budget</span>
+      </div>
+
+      <ProjectHeroCard onBack={onBack} />
+
+      {/* 4-KPI strip */}
+      {(() => {
+        const netPct = bs.est > 0 ? (netDelta / bs.est * 100) : 0;
+        return (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, marginBottom: '1.25rem' }}>
+            <KpiCard label="Total saved (vs est)" value={(totalSaved > 0 ? '−' : '') + fmt$(totalSaved)} sub={`${underTrades.length} trades under`} icon="ti-trending-down" tone="good" />
+            <KpiCard label="Total over (vs est)" value={'+' + fmt$(totalOver)} sub={`${overTrades.length} trades over`} icon="ti-trending-up" tone="danger" />
+            <KpiCard label="Net Δ vs estimated" value={(netDelta < 0 ? '−' : netDelta > 0 ? '+' : '') + fmt$(Math.abs(netDelta))} sub={netPct.toFixed(1) + '% vs estimate'} icon="ti-arrow-bounce" tone="amber" />
+            <KpiCard label="Still estimate-only" value={String(eoCount)} sub="no bid yet · carry-forward" icon="ti-hourglass" tone="info" />
+          </div>
+        );
+      })()}
+
+      {/* Top 5 cards side by side */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: '1.25rem' }}>
+        {/* Top 5 savings */}
+        <div style={{ background: 'var(--color-background-primary)', border: '0.5px solid var(--color-border-tertiary)', borderLeft: '3px solid var(--var-under)', borderRadius: 'var(--border-radius-lg)', padding: '16px 18px' }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--var-under)', marginBottom: 2 }}>Top 5 Savings</div>
+          <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 12 }}>total: −{fmt$(totalSaved)}</div>
+          {top5Under.map((x, i) => {
+            const dPct = isMoney(x.r.est) && (x.r.est as number) > 0 ? Math.abs(x.delta) / (x.r.est as number) * 100 : 0;
+            return (
+              <div key={x.r.trade} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', borderTop: '0.5px solid var(--color-border-tertiary)', fontSize: 12.5 }}>
+                <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)', minWidth: 16, textAlign: 'right' }}>#{i + 1}</span>
+                <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{x.r.trade}</span>
+                <span style={{ color: 'var(--var-under)', fontVariantNumeric: 'tabular-nums', fontWeight: 500 }}>−{fmt$(Math.abs(x.delta))}</span>
+                <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', fontVariantNumeric: 'tabular-nums' }}>{dPct.toFixed(0)}%</span>
+              </div>
+            );
+          })}
+        </div>
+        {/* Top 5 overruns */}
+        <div style={{ background: 'var(--color-background-primary)', border: '0.5px solid var(--color-border-tertiary)', borderLeft: '3px solid var(--var-over)', borderRadius: 'var(--border-radius-lg)', padding: '16px 18px' }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--var-over)', marginBottom: 2 }}>Top 5 Overruns</div>
+          <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 12 }}>total: +{fmt$(totalOver)}</div>
+          {top5Over.map((x, i) => {
+            const dPct = isMoney(x.r.est) && (x.r.est as number) > 0 ? x.delta / (x.r.est as number) * 100 : 0;
+            return (
+              <div key={x.r.trade} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', borderTop: '0.5px solid var(--color-border-tertiary)', fontSize: 12.5 }}>
+                <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)', minWidth: 16, textAlign: 'right' }}>#{i + 1}</span>
+                <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{x.r.trade}</span>
+                <span style={{ color: 'var(--var-over)', fontVariantNumeric: 'tabular-nums', fontWeight: 500 }}>+{fmt$(x.delta)}</span>
+                <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', fontVariantNumeric: 'tabular-nums' }}>{dPct.toFixed(0)}%</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Full trade variance table */}
+      <div style={{ background: 'var(--color-background-primary)', border: '0.5px solid var(--color-border-tertiary)', borderRadius: 'var(--border-radius-lg)', padding: '18px 20px', marginBottom: '1.25rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
+          <h2 style={{ margin: 0, fontSize: 13, fontWeight: 500 }}>
+            All {trades.length} trades · ranked by $ variance
+          </h2>
+          <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--color-text-tertiary)' }}>bar width = % delta vs estimated · click row → drawer</span>
+        </div>
+        {/* Legend */}
+        <div style={{ display: 'flex', gap: 16, marginBottom: 12, fontSize: 11, color: 'var(--color-text-secondary)', alignItems: 'center' }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><span style={{ width: 10, height: 10, borderRadius: 2, background: 'var(--var-under)', display: 'inline-block' }} /> Under budget</span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><span style={{ width: 10, height: 10, borderRadius: 2, background: 'var(--var-over)', display: 'inline-block' }} /> Over budget</span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><span style={{ width: 10, height: 10, borderRadius: 2, background: 'var(--info-bg)', border: '0.5px solid var(--info-fg)', display: 'inline-block' }} /> Estimate-only</span>
+        </div>
+
+        {/* Under section */}
+        <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--var-under)', padding: '8px 12px 4px', marginTop: 4 }}>
+          Under budget · sorted by $ saved · {underTrades.length} trades
+        </div>
+        {underTrades.map(x => <VarianceRow key={x.r.trade} r={x.r} delta={x.delta} side="under" />)}
+
+        {/* Carry-forward / middle section */}
+        <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--color-text-tertiary)', padding: '12px 12px 4px', marginTop: 4 }}>
+          Carry-forward · included · NA · {cfTrades.length} trades
+        </div>
+        {cfTrades.map(r => {
+          let pill: ReactNode = null;
+          if (r.est === 'INC' || r.fin === 'INC' || r.newv === 'INC') {
+            pill = <span style={{ fontSize: 10, padding: '1px 7px', borderRadius: 999, background: 'var(--color-background-secondary)', border: '0.5px solid var(--color-border-secondary)', color: 'var(--color-text-secondary)' }}>Included</span>;
+          } else if (r.newv === 'NA') {
+            pill = <span style={{ fontSize: 10, padding: '1px 7px', borderRadius: 999, border: '0.5px dashed var(--color-border-secondary)', color: 'var(--color-text-tertiary)' }}>NA</span>;
+          } else {
+            pill = <span style={{ fontSize: 10, padding: '1px 7px', borderRadius: 999, background: 'var(--info-bg)', color: 'var(--info-fg)', border: '0.5px solid var(--info-fg)' }}>estimate-only · no bid yet</span>;
+          }
+          return (
+            <div
+              key={r.trade}
+              onClick={() => setDrawerTrade(r)}
+              style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 12px', borderBottom: '0.5px solid var(--color-border-tertiary)', cursor: 'pointer', fontSize: 12.5 }}
+              onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-background-secondary)')}
+              onMouseLeave={e => (e.currentTarget.style.background = '')}
+            >
+              <span style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0, flex: 1 }}>{r.trade}</span>
+              {pill}
+              {isMoney(r.est) && <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', whiteSpace: 'nowrap' }}>est {fmt$(r.est)} → carries forward</span>}
+              {r.manual && <ManualBadge />}
+            </div>
+          );
+        })}
+
+        {/* Over section */}
+        <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--var-over)', padding: '12px 12px 4px', marginTop: 4 }}>
+          Over budget · sorted by $ overrun · {overTrades.length} trades
+        </div>
+        {overTrades.map(x => <VarianceRow key={x.r.trade} r={x.r} delta={x.delta} side="over" />)}
+      </div>
+
+      {/* Footer */}
+      <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', textAlign: 'center', lineHeight: 1.7 }}>
+        Live from ClickUp · 60-second cache · click any row to see bid history
+        <span style={{ display: 'block' }}>Sort order: biggest savings on top → carry-forward / Included / NA in the middle → biggest overruns at bottom</span>
+      </div>
+
+      <Drawer open={drawerTrade !== null} trade={drawerTrade} onClose={closeDrawer} />
+    </div>
+  );
+}
+
+// ──────────────────────────────────────────────────────────────
+// TreemapView
+// ──────────────────────────────────────────────────────────────
+function TreemapView({ onBack }: { onBack: () => void }) {
+  const { project } = BUDGET_SAMPLE;
+  const trades = project.trades;
+  const bs = computeStats(trades);
+
+  // Numeric newv trades
+  const numericTrades = trades.filter(r => isMoney(r.newv)).map(r => ({ r, val: r.newv as number }));
+  numericTrades.sort((a, b) => b.val - a.val);
+  const total = numericTrades.reduce((s, x) => s + x.val, 0);
+  const nonNumericCount = trades.filter(r => !isMoney(r.newv)).length;
+
+  const biggestTile = numericTrades[0];
+  const top5Sum = numericTrades.slice(0, 5).reduce((s, x) => s + x.val, 0);
+  const top5Pct = total > 0 ? (top5Sum / total * 100) : 0;
+
+  function deltaPct(r: BudgetTrade): number | null {
+    if (!isMoney(r.est) || !isMoney(r.newv)) return null;
+    if ((r.est as number) === 0) return null;
+    return ((r.newv as number) - (r.est as number)) / (r.est as number) * 100;
+  }
+
+  function tileColor(r: BudgetTrade): string {
+    if (r.est === 'INC' || r.fin === 'INC' || r.newv === 'INC') {
+      return 'repeating-linear-gradient(45deg, var(--color-background-secondary) 0px, var(--color-background-secondary) 4px, var(--color-border-secondary) 4px, var(--color-border-secondary) 6px)';
+    }
+    if (!isMoney(r.est)) return 'var(--info-bg)';
+    const dp = deltaPct(r);
+    if (dp === null) return 'var(--info-bg)';
+    if (dp <= -30) return '#1a4510';
+    if (dp <= -10) return 'var(--good-bg)';
+    if (dp < 10) return 'var(--color-background-secondary)';
+    if (dp < 30) return '#fde8e8';
+    return '#7f1d1d';
+  }
+
+  // Variance bucket counts
+  const buckets = [
+    { label: 'Saved ≥30%', count: 0, color: '#1a4510' },
+    { label: 'Saved 10–30%', count: 0, color: 'var(--good-bg)' },
+    { label: 'Saved 1–10%', count: 0, color: '#d1fae5' },
+    { label: 'On estimate ±1%', count: 0, color: 'var(--color-background-secondary)' },
+    { label: 'Over 1–10%', count: 0, color: '#fee2e2' },
+    { label: 'Over 10–30%', count: 0, color: '#fca5a5' },
+    { label: 'Over ≥30%', count: 0, color: '#7f1d1d' },
+    { label: 'Estimate-only', count: 0, color: 'var(--info-bg)' },
+    { label: 'Included', count: 0, color: 'var(--color-background-secondary)' },
+    { label: 'NA', count: 0, color: 'transparent' },
+  ];
+  for (const r of trades) {
+    if (r.est === 'INC' || r.fin === 'INC' || r.newv === 'INC') { buckets[8].count++; continue; }
+    if (r.newv === 'NA' || r.est === 'NA') { buckets[9].count++; continue; }
+    const dp = deltaPct(r);
+    if (dp === null) { buckets[7].count++; continue; }
+    if (dp <= -30) buckets[0].count++;
+    else if (dp <= -10) buckets[1].count++;
+    else if (dp < -1) buckets[2].count++;
+    else if (dp <= 1) buckets[3].count++;
+    else if (dp < 10) buckets[4].count++;
+    else if (dp < 30) buckets[5].count++;
+    else buckets[6].count++;
+  }
+
+  return (
+    <div>
+      {/* Breadcrumb */}
+      <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginBottom: 12, display: 'flex', gap: 6, alignItems: 'center' }}>
+        <button onClick={onBack} style={{ background: 'none', border: 'none', color: 'var(--color-text-info)', cursor: 'pointer', padding: 0, fontSize: 12, fontFamily: 'inherit' }}>Portfolio</button>
+        <i className="ti ti-chevron-right" style={{ fontSize: 14, opacity: 0.6 }} />
+        <span>800 Brady Ave · Budget</span>
+      </div>
+
+      <ProjectHeroCard onBack={onBack} />
+
+      {/* 4-KPI strip */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, marginBottom: '1.25rem' }}>
+        <KpiCard label="New Budget total" value={fmt$(bs.newv)} sub="sum of all numeric newv" icon="ti-wallet" tone="good" />
+        <KpiCard label="Biggest single tile" value={biggestTile ? biggestTile.r.trade.slice(0, 14) : '—'} sub={biggestTile ? fmt$(biggestTile.val) : '—'} icon="ti-maximize" />
+        <KpiCard label="Top 5 = % of total" value={top5Pct.toFixed(0) + '%'} sub="sum of top 5 newv / total" icon="ti-chart-pie" tone="amber" />
+        <KpiCard label="Non-numeric tiles" value={String(nonNumericCount)} sub="INC + NA + no newv" icon="ti-category-2" tone="info" />
+      </div>
+
+      {/* Treemap section */}
+      <div style={{ background: 'var(--color-background-primary)', border: '0.5px solid var(--color-border-tertiary)', borderRadius: 'var(--border-radius-lg)', padding: '18px 20px', marginBottom: '1.25rem' }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 10 }}>
+          <h2 style={{ margin: 0, fontSize: 13, fontWeight: 500 }}>Spend treemap · 800 Brady</h2>
+          <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginLeft: 'auto' }}>area = New Budget · color = % variance vs estimated · hover for details</span>
+        </div>
+        {/* Color legend */}
+        <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 10, fontSize: 10.5, color: 'var(--color-text-secondary)', alignItems: 'center' }}>
+          {[
+            { label: 'Saved ≥30%', color: '#1a4510' },
+            { label: 'Saved 10–30%', color: 'var(--good-bg)' },
+            { label: 'On estimate', color: 'var(--color-background-tertiary)' },
+            { label: 'Over 10–30%', color: '#fca5a5' },
+            { label: 'Over ≥30%', color: '#7f1d1d' },
+            { label: 'Estimate-only', color: 'var(--info-bg)' },
+          ].map(b => (
+            <span key={b.label} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+              <span style={{ width: 10, height: 10, borderRadius: 2, background: b.color, border: '0.5px solid rgba(0,0,0,0.1)', display: 'inline-block', flexShrink: 0 }} />
+              {b.label}
+            </span>
+          ))}
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+            <span style={{ width: 10, height: 10, borderRadius: 2, background: 'repeating-linear-gradient(45deg, #ddd 0px, #ddd 3px, #fff 3px, #fff 5px)', display: 'inline-block', flexShrink: 0 }} />
+            Included/rolled-up
+          </span>
+        </div>
+
+        {/* Treemap tiles */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2, background: 'var(--color-background-secondary)', padding: 2, borderRadius: 6 }}>
+          {numericTrades.map(({ r, val }) => {
+            const flexBasis = Math.max(4, (val / total) * 100);
+            const isLarge = flexBasis > 8;
+            const dp = deltaPct(r);
+            const dpStr = dp !== null ? (dp < 0 ? `−${Math.abs(dp).toFixed(1)}%` : `+${dp.toFixed(1)}%`) : 'est-only';
+            const bg = tileColor(r);
+            const isGradient = bg.startsWith('repeating');
+            return (
+              <div
+                key={r.trade}
+                title={`${r.trade}\nNew Budget: ${fmt$(val)}\n${dp !== null ? `Δ vs est: ${dpStr}` : 'Estimate-only'}`}
+                style={{
+                  flexBasis: `max(4%, ${flexBasis}%)`,
+                  flexGrow: val,
+                  flexShrink: 0,
+                  minHeight: isLarge ? 80 : 40,
+                  background: isGradient ? undefined : bg,
+                  backgroundImage: isGradient ? bg : undefined,
+                  borderRadius: 4,
+                  padding: isLarge ? '8px 10px' : '4px 6px',
+                  overflow: 'hidden',
+                  cursor: 'default',
+                  border: '0.5px solid rgba(0,0,0,0.07)',
+                }}
+              >
+                <div style={{ fontSize: isLarge ? 11.5 : 9.5, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: bg === '#1a4510' || bg === '#7f1d1d' ? '#fff' : 'var(--color-text-primary)' }}>
+                  {r.trade}
+                </div>
+                {isLarge && (
+                  <div style={{ fontSize: 10.5, marginTop: 2, color: bg === '#1a4510' || bg === '#7f1d1d' ? 'rgba(255,255,255,0.8)' : 'var(--color-text-secondary)', fontVariantNumeric: 'tabular-nums' }}>
+                    {fmt$(val)}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Top 8 by $ value */}
+      <div style={{ background: 'var(--color-background-primary)', border: '0.5px solid var(--color-border-tertiary)', borderRadius: 'var(--border-radius-lg)', padding: '18px 20px', marginBottom: '1.25rem' }}>
+        <h2 style={{ margin: '0 0 12px', fontSize: 13, fontWeight: 500 }}>Top 8 by $ value</h2>
+        {numericTrades.slice(0, 8).map((x, i) => {
+          const pctOfTotal = total > 0 ? (x.val / total * 100) : 0;
+          const dp = deltaPct(x.r);
+          return (
+            <div key={x.r.trade} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0', borderTop: '0.5px solid var(--color-border-tertiary)', fontSize: 12.5 }}>
+              <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)', minWidth: 18, textAlign: 'right' }}>#{i + 1}</span>
+              <span style={{ flex: 1, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{x.r.trade}</span>
+              <span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}>{fmt$(x.val)}</span>
+              <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', fontVariantNumeric: 'tabular-nums', minWidth: 40, textAlign: 'right' }}>{pctOfTotal.toFixed(1)}%</span>
+              {dp !== null && (
+                <span style={{ fontSize: 11, fontVariantNumeric: 'tabular-nums', color: dp < 0 ? 'var(--var-under)' : dp > 0 ? 'var(--var-over)' : 'var(--color-text-tertiary)', minWidth: 48, textAlign: 'right' }}>
+                  {dp < 0 ? '−' : dp > 0 ? '+' : ''}{Math.abs(dp).toFixed(1)}%
+                </span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Variance buckets summary */}
+      <div style={{ background: 'var(--color-background-primary)', border: '0.5px solid var(--color-border-tertiary)', borderRadius: 'var(--border-radius-lg)', padding: '18px 20px', marginBottom: '1.25rem' }}>
+        <h2 style={{ margin: '0 0 12px', fontSize: 13, fontWeight: 500 }}>Variance buckets</h2>
+        {buckets.map(b => (
+          <div key={b.label} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', borderTop: '0.5px solid var(--color-border-tertiary)', fontSize: 12.5 }}>
+            <span style={{ width: 10, height: 10, borderRadius: 2, background: b.color, border: '0.5px solid rgba(0,0,0,0.1)', display: 'inline-block', flexShrink: 0 }} />
+            <span style={{ flex: 1, color: 'var(--color-text-secondary)' }}>{b.label}</span>
+            <span style={{ fontWeight: 600, fontSize: 13 }}>{b.count}</span>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', textAlign: 'center', lineHeight: 1.7 }}>
+        Live from ClickUp · 60-second cache
+        <span style={{ display: 'block' }}>Tile area is proportional to New Budget value; largest tiles anchored top-left</span>
+      </div>
+    </div>
+  );
+}
+
+// ──────────────────────────────────────────────────────────────
+// CategoriesView
+// ──────────────────────────────────────────────────────────────
+const WORK_PACKAGES = [
+  {
+    id: 'earthwork', icon: 'ti-bulldozer', label: 'Earthwork & Structure',
+    caption: 'foundation · superstructure · soil management · steel · concrete inspection',
+    trades: ['Foundation', 'Structure', 'Soil · Trucking', 'Steel', 'Concrete LAB inspector', 'Monitoring · vibration'],
+  },
+  {
+    id: 'mep', icon: 'ti-bolt', label: 'MEP',
+    caption: 'plumbing · sprinkler · electric · HVAC · fire alarm · low voltage · watermain',
+    trades: ['Plumbing · sprinkler', 'Pipe insualtion', 'Electric', 'Lighting Material', 'Fire Alarm', 'Low Voltage', 'Watermain', 'HVAC', 'Ptac units', 'Fire Stopping'],
+  },
+  {
+    id: 'envelope', icon: 'ti-building-arch', label: 'Envelope & Cladding',
+    caption: 'framing · drywall · windows · doors · roofing · stucco',
+    trades: ['Framing Exterior / Interior', 'Sheetrock', 'Tape / paint', 'Trimming · Doors', 'Insulation Exterior walls / interior', 'Windows', 'Main doors', 'Stucco', 'Roofing'],
+  },
+  {
+    id: 'vertical', icon: 'ti-elevator', label: 'Vertical Transport & Equipment',
+    caption: 'elevator · hoist · scaffold · chutes · garage door',
+    trades: ['Elevator', 'Hoist', 'Scaffold / Shed', 'Chutes / Compactors', 'Garage Door'],
+  },
+  {
+    id: 'finishes', icon: 'ti-paint', label: 'Finishes & Fixtures',
+    caption: 'tiles · plumbing fixtures · bathtubs · kitchens · appliances · BPP',
+    trades: ['Tiles', 'Tiles Installation', 'Plumbing Fixtures', 'Bathtubs', 'Kitchens', 'Apt appliances', 'BPP'],
+  },
+  {
+    id: 'site', icon: 'ti-fence', label: 'Site & Logistics',
+    caption: 'security · fence · garbage · parking · bike room · green roof',
+    trades: ['Live Security', 'Fence', 'Garbage Removal', 'Parking stops and marking', 'Bike room', 'Green roof'],
+  },
+  {
+    id: 'safety', icon: 'ti-shield', label: 'Safety & Inspections',
+    caption: 'superintendent · site safety · special inspector · surveyor · DOT · bathrooms · fire extinguishers',
+    trades: ['Superintendent', 'Site safety coordination', 'Site Safety Plan', 'Special inspector', 'Survey', 'DOT meeting', 'Bathrooms', 'fire extignitures'],
+  },
+  {
+    id: 'fees', icon: 'ti-receipt', label: 'Fees & Allowances',
+    caption: 'GC fee · signs · mailbox',
+    trades: ['GC Fee', 'Signs', 'Mailbox'],
+  },
+];
+
+function CategoriesView({ onBack }: { onBack: () => void }) {
+  const { project } = BUDGET_SAMPLE;
+  const trades = project.trades;
+  const [openPkg, setOpenPkg] = useState<string | null>(null);
+  const [allOpen, setAllOpen] = useState(false);
+
+  const tradeByName = new Map(trades.map(r => [r.trade, r]));
+
+  // Build package stats
+  type PkgStats = {
+    id: string; icon: string; label: string; caption: string;
+    pkgTrades: BudgetTrade[];
+    estTotal: number; newvTotal: number;
+    under: number; over: number; eo: number; inc: number; na: number;
+  };
+
+  const pkgStats: PkgStats[] = WORK_PACKAGES.map(wp => {
+    const pkgTrades = wp.trades.map(name => tradeByName.get(name)).filter(Boolean) as BudgetTrade[];
+    let estTotal = 0, newvTotal = 0;
+    let under = 0, over = 0, eo = 0, inc = 0, na = 0;
+    for (const r of pkgTrades) {
+      if (isMoney(r.est)) estTotal += r.est;
+      if (isMoney(r.newv)) newvTotal += r.newv;
+      if (r.est === 'INC' || r.fin === 'INC' || r.newv === 'INC') inc++;
+      else if (r.newv === 'NA' || r.est === 'NA') na++;
+      else if (isMoney(r.est) && isMoney(r.newv)) {
+        if ((r.newv as number) < (r.est as number)) under++;
+        else if ((r.newv as number) > (r.est as number)) over++;
+      } else eo++;
+    }
+    return { id: wp.id, icon: wp.icon, label: wp.label, caption: wp.caption, pkgTrades, estTotal, newvTotal, under, over, eo, inc, na };
+  });
+
+  // Sort by newvTotal desc
+  pkgStats.sort((a, b) => b.newvTotal - a.newvTotal);
+
+  const maxEstTotal = Math.max(...pkgStats.map(p => p.estTotal), 1);
+
+  const bs = computeStats(trades);
+  const netDelta = bs.newv - bs.est;
+  const netPct = bs.est > 0 ? (netDelta / bs.est * 100) : 0;
+
+  function togglePkg(id: string) {
+    if (allOpen) { setAllOpen(false); setOpenPkg(id); return; }
+    setOpenPkg(prev => prev === id ? null : id);
+  }
+
+  return (
+    <div>
+      {/* Breadcrumb */}
+      <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginBottom: 12, display: 'flex', gap: 6, alignItems: 'center' }}>
+        <button onClick={onBack} style={{ background: 'none', border: 'none', color: 'var(--color-text-info)', cursor: 'pointer', padding: 0, fontSize: 12, fontFamily: 'inherit' }}>Portfolio</button>
+        <i className="ti ti-chevron-right" style={{ fontSize: 14, opacity: 0.6 }} />
+        <span>800 Brady Ave · Budget</span>
+      </div>
+
+      <ProjectHeroCard onBack={onBack} />
+
+      {/* 3-step KPI flow */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 0, marginBottom: '1.25rem', flexWrap: 'wrap' }}>
+        {[
+          { label: 'TOTAL ESTIMATED', value: fmt$(bs.est), sub: 'baseline · all numeric trades', tone: 'default' as Tone },
+          null,
+          { label: 'NEW BUDGET', value: fmt$(bs.newv), sub: 'auto-rule + manual overrides', tone: 'good' as Tone },
+          null,
+          { label: 'NET Δ VS ESTIMATED', value: (netDelta < 0 ? '−' : netDelta > 0 ? '+' : '') + fmt$(Math.abs(netDelta)), sub: netPct.toFixed(1) + '% vs estimated', tone: (netDelta < 0 ? 'good' : netDelta > 0 ? 'danger' : 'default') as Tone },
+        ].map((item, i) => {
+          if (item === null) return <div key={i} style={{ fontSize: 20, color: 'var(--color-text-tertiary)', padding: '0 10px' }}>→</div>;
+          const { v: vColor } = toneColors[item.tone];
+          return (
+            <div key={i} style={{ background: 'var(--color-background-secondary)', borderRadius: 'var(--border-radius-md)', padding: '12px 16px', flex: 1, minWidth: 160 }}>
+              <div style={{ fontSize: 9.5, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--color-text-tertiary)', marginBottom: 4 }}>{item.label}</div>
+              <div style={{ fontSize: 24, fontWeight: 500, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.015em', color: vColor }}>{item.value}</div>
+              <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 2 }}>{item.sub}</div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Controls */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+        <button
+          onClick={() => { setAllOpen(true); setOpenPkg(null); }}
+          style={{ height: 28, padding: '0 11px', borderRadius: 'var(--border-radius-md)', border: '0.5px solid var(--color-border-secondary)', fontSize: 12, background: 'var(--color-background-primary)', cursor: 'pointer', fontFamily: 'inherit', color: 'var(--color-text-primary)' }}
+        >
+          Expand all
+        </button>
+        <button
+          onClick={() => { setAllOpen(false); setOpenPkg(null); }}
+          style={{ height: 28, padding: '0 11px', borderRadius: 'var(--border-radius-md)', border: '0.5px solid var(--color-border-secondary)', fontSize: 12, background: 'var(--color-background-primary)', cursor: 'pointer', fontFamily: 'inherit', color: 'var(--color-text-primary)' }}
+        >
+          Collapse all
+        </button>
+        <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--color-text-tertiary)' }}>8 work-packages · sorted by New Budget desc</span>
+      </div>
+
+      {/* Package cards */}
+      {pkgStats.map(pkg => {
+        const isOpen = allOpen || openPkg === pkg.id;
+        const delta = pkg.newvTotal - pkg.estTotal;
+        const deltaPctVal = pkg.estTotal > 0 ? (delta / pkg.estTotal * 100) : 0;
+        const estBarW = pkg.estTotal > 0 ? (pkg.estTotal / maxEstTotal * 100) : 0;
+        const newvBarW = pkg.newvTotal > 0 ? (pkg.newvTotal / maxEstTotal * 100) : 0;
+        const barColor = delta < 0 ? 'var(--var-under)' : delta > 0 ? 'var(--var-over)' : 'var(--color-border-secondary)';
+
+        return (
+          <div key={pkg.id} style={{ background: 'var(--color-background-primary)', border: '0.5px solid var(--color-border-tertiary)', borderRadius: 'var(--border-radius-lg)', padding: '16px 18px', marginBottom: 10 }}>
+            {/* Header */}
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 6 }}>
+              <i className={`ti ${pkg.icon}`} style={{ fontSize: 16, marginTop: 1, color: 'var(--color-text-secondary)' }} />
+              <div style={{ flex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 13.5, fontWeight: 500 }}>{pkg.label}</span>
+                  <span style={{ fontSize: 10, padding: '1px 7px', borderRadius: 999, background: 'var(--color-background-secondary)', border: '0.5px solid var(--color-border-secondary)', color: 'var(--color-text-tertiary)' }}>{pkg.pkgTrades.length} trades</span>
+                  {delta !== 0 && (
+                    <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 999, background: delta < 0 ? 'var(--good-bg)' : 'var(--danger-bg, #fde8e8)', color: delta < 0 ? 'var(--var-under)' : 'var(--var-over)', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
+                      {delta < 0 ? '↘ −' : '↗ +'}{fmt$(Math.abs(delta))} · {Math.abs(deltaPctVal).toFixed(1)}%
+                    </span>
+                  )}
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 3 }}>{pkg.caption}</div>
+              </div>
+            </div>
+
+            {/* Bars */}
+            <div style={{ marginBottom: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)', minWidth: 80 }}>ESTIMATED</span>
+                <div style={{ flex: 1, height: 6, background: 'var(--color-background-secondary)', borderRadius: 3, overflow: 'hidden' }}>
+                  <div style={{ width: `${estBarW}%`, height: '100%', background: 'var(--color-border-secondary)', borderRadius: 3 }} />
+                </div>
+                <span style={{ fontSize: 11.5, fontVariantNumeric: 'tabular-nums', minWidth: 72, textAlign: 'right', color: 'var(--color-text-secondary)' }}>{fmt$(pkg.estTotal)}</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)', minWidth: 80 }}>NEW BUDGET</span>
+                <div style={{ flex: 1, height: 6, background: 'var(--color-background-secondary)', borderRadius: 3, overflow: 'hidden' }}>
+                  <div style={{ width: `${newvBarW}%`, height: '100%', background: barColor, borderRadius: 3 }} />
+                </div>
+                <span style={{ fontSize: 11.5, fontVariantNumeric: 'tabular-nums', minWidth: 72, textAlign: 'right', color: 'var(--color-text-primary)', fontWeight: 600 }}>{fmt$(pkg.newvTotal)}</span>
+              </div>
+            </div>
+
+            {/* Count line */}
+            <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 8 }}>
+              {pkg.under} under · {pkg.over} over · {pkg.eo} estimate-only · {pkg.inc} Included · {pkg.na} NA
+            </div>
+
+            {/* Toggle */}
+            <button
+              onClick={() => togglePkg(pkg.id)}
+              style={{ background: 'none', border: 'none', padding: 0, fontSize: 11.5, color: 'var(--color-text-info)', cursor: 'pointer', fontFamily: 'inherit' }}
+            >
+              {isOpen ? `Hide ↑` : `Show ${pkg.pkgTrades.length} trades ↓`}
+            </button>
+
+            {/* Expanded trade list */}
+            {isOpen && (
+              <div style={{ marginTop: 10, borderTop: '0.5px solid var(--color-border-tertiary)', paddingTop: 8 }}>
+                {pkg.pkgTrades.map(r => (
+                  <div key={r.trade} style={{ display: 'grid', gridTemplateColumns: '1fr 110px 110px 120px', alignItems: 'center', gap: 8, padding: '6px 0', borderBottom: '0.5px solid var(--color-border-tertiary)', fontSize: 12 }}>
+                    <span style={{ fontWeight: 500 }}>
+                      {r.trade}
+                      {r.manual && <ManualBadge />}
+                    </span>
+                    <span style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}><MoneyToken v={r.est} dim={!isMoney(r.est)} /></span>
+                    <span style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}><MoneyToken v={r.newv} bold dim={!isMoney(r.newv)} /></span>
+                    <VarBar r={r} />
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })}
+
+      <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', textAlign: 'center', lineHeight: 1.7, marginTop: 8 }}>
+        Live from ClickUp · 60-second cache · click any category to expand its trade list
+        <span style={{ display: 'block' }}>Work-package mapping is heuristic — Sol can re-map a trade in ClickUp via the &apos;Cost Package&apos; custom field</span>
+      </div>
+    </div>
+  );
+}
+
+// ──────────────────────────────────────────────────────────────
+// MAIN
+// ──────────────────────────────────────────────────────────────
+type BudgetMode = 'table' | 'variance' | 'treemap' | 'categories';
+type BudgetTableView = 'overview' | 'detailed' | 'matrix';
+
+export function BudgetDashboard() {
+  const [mode, setMode] = useState<BudgetMode>('table');
+  const [tableView, setTableView] = useState<BudgetTableView>('overview');
+  const [drawerTrade, setDrawerTrade] = useState<BudgetTrade | null>(null);
+  const [search, setSearch] = useState('');
+  const closeDrawer = useCallback(() => setDrawerTrade(null), []);
+
+  const titleMap: Record<BudgetMode, string> = {
+    table: 'Budget Dashboard',
+    variance: 'Budget · Variance Ranking',
+    treemap: 'Budget · Spend Treemap',
+    categories: 'Budget · Category Rollup',
+  };
+
+  const subtitleMap: Record<BudgetMode, string> = {
+    table: '43 active projects · live from ClickUp',
+    variance: `800 Brady · ${BUDGET_SAMPLE.project.trades.length} trades · sorted by $ delta`,
+    treemap: `800 Brady · ${BUDGET_SAMPLE.project.trades.length} trades · area = New Budget · color = Δ vs estimated`,
+    categories: `800 Brady · ${BUDGET_SAMPLE.project.trades.length} trades grouped into 8 work-packages`,
+  };
+
+  const MODE_TABS: { id: BudgetMode; icon: string; label: string }[] = [
+    { id: 'table',      icon: 'ti-grid-dots',   label: 'Table' },
+    { id: 'variance',   icon: 'ti-chart-bar',   label: 'Variance' },
+    { id: 'treemap',    icon: 'ti-layout-grid', label: 'Treemap' },
+    { id: 'categories', icon: 'ti-list-tree',   label: 'Categories' },
+  ];
+
+  const TABLE_TABS: { id: BudgetTableView; icon: string; label: string }[] = [
+    { id: 'overview', icon: 'ti-grid-dots',    label: 'Overview' },
     { id: 'detailed', icon: 'ti-list-details', label: 'Detailed' },
-    { id: 'matrix', icon: 'ti-table', label: 'Matrix' },
+    { id: 'matrix',   icon: 'ti-table',        label: 'Matrix' },
   ];
 
   return (
     <div className="dashboard-shell">
-      {/* Header */}
       <LogoHeader
-        title="Budget Dashboard"
-        subtitleOverride="43 active projects"
+        title={titleMap[mode]}
+        subtitleOverride={subtitleMap[mode]}
         syncedAt={BUDGET_SAMPLE.syncedAt}
       />
 
       {/* Filter bar */}
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: '1.25rem' }}>
-        <input
-          type="search"
-          placeholder="Search projects, trades…"
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          style={{
-            flex: 1, minWidth: 160, maxWidth: 220,
-            height: 32, padding: '0 10px',
-            border: '0.5px solid var(--color-border-secondary)',
-            borderRadius: 'var(--border-radius-md)',
-            background: 'var(--color-background-primary)',
-            color: 'var(--color-text-primary)',
-            fontFamily: 'inherit', fontSize: 13,
-          }}
-        />
-        <select
-          style={{
-            height: 32, padding: '0 10px',
-            border: '0.5px solid var(--color-border-secondary)',
-            borderRadius: 'var(--border-radius-md)',
-            background: 'var(--color-background-primary)',
-            color: 'var(--color-text-primary)',
-            fontFamily: 'inherit', fontSize: 13,
-            minWidth: 220, maxWidth: 300, fontWeight: 500,
-          }}
-          defaultValue="__all"
-        >
+        {/* Search */}
+        <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+          <i className="ti ti-search" style={{ position: 'absolute', left: 8, fontSize: 13, color: 'var(--color-text-tertiary)', pointerEvents: 'none' }} />
+          <input
+            type="search"
+            placeholder={mode === 'table' ? 'Search projects, trades…' : 'Search trades…'}
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            style={{
+              height: 32, paddingLeft: 26, paddingRight: 8,
+              border: '0.5px solid var(--color-border-secondary)',
+              borderRadius: 'var(--border-radius-md)',
+              background: 'var(--color-background-primary)',
+              color: 'var(--color-text-primary)',
+              fontFamily: 'inherit', fontSize: 13, width: 200, outline: 'none',
+            }}
+          />
+        </div>
+
+        {/* Portfolio dropdown */}
+        <select style={{ height: 32, padding: '0 10px', border: '0.5px solid var(--color-border-secondary)', borderRadius: 'var(--border-radius-md)', background: 'var(--color-background-primary)', color: 'var(--color-text-primary)', fontFamily: 'inherit', fontSize: 13, minWidth: 200, fontWeight: 500 }} defaultValue="__all">
           <option value="__all">All projects (43)</option>
-          <option value="800brady">800 Brady Ave</option>
+          <option value="800brady">★ 800 Brady Ave</option>
         </select>
 
-        {/* View toggle */}
-        <div style={{ display: 'flex', gap: 4, padding: 4, background: 'var(--color-background-secondary)', borderRadius: 'var(--border-radius-md)', marginLeft: 'auto' }}>
-          {TAB_META.map(tab => (
+        {/* Primary mode tabs */}
+        <div style={{ display: 'flex', gap: 4, padding: 4, background: 'var(--color-background-secondary)', borderRadius: 'var(--border-radius-md)' }}>
+          {MODE_TABS.map(tab => (
             <button
               key={tab.id}
               type="button"
-              onClick={() => setView(tab.id)}
+              onClick={() => setMode(tab.id)}
               style={{
-                padding: '8px 16px', fontSize: 13,
-                borderRadius: 'var(--border-radius-md)',
-                cursor: 'pointer', userSelect: 'none',
-                border: view === tab.id ? '0.5px solid var(--color-border-secondary)' : '0.5px solid transparent',
-                background: view === tab.id ? 'var(--color-background-primary)' : 'transparent',
-                color: view === tab.id ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
-                fontFamily: 'inherit',
-                display: 'inline-flex', alignItems: 'center', gap: 4,
-                fontWeight: view === tab.id ? 500 : 400,
+                padding: '6px 14px', fontSize: 13, borderRadius: 'var(--border-radius-md)',
+                cursor: 'pointer', border: mode === tab.id ? '0.5px solid var(--color-border-secondary)' : '0.5px solid transparent',
+                background: mode === tab.id ? 'var(--color-background-primary)' : 'transparent',
+                color: mode === tab.id ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
+                fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 4,
+                fontWeight: mode === tab.id ? 500 : 400,
               }}
             >
-              <i className={`ti ${tab.icon}`} style={{ fontSize: 14, verticalAlign: -2 }} />
+              <i className={`ti ${tab.icon}`} style={{ fontSize: 14 }} />
               {tab.label}
             </button>
           ))}
         </div>
+
+        {/* Size tabs — only in Table mode */}
+        {mode === 'table' && (
+          <div style={{ display: 'flex', gap: 4, padding: 4, background: 'var(--color-background-secondary)', borderRadius: 'var(--border-radius-md)', marginLeft: 'auto' }}>
+            {TABLE_TABS.map(tab => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setTableView(tab.id)}
+                style={{
+                  padding: '6px 14px', fontSize: 13, borderRadius: 'var(--border-radius-md)',
+                  cursor: 'pointer', border: tableView === tab.id ? '0.5px solid var(--color-border-secondary)' : '0.5px solid transparent',
+                  background: tableView === tab.id ? 'var(--color-background-primary)' : 'transparent',
+                  color: tableView === tab.id ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
+                  fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 4,
+                  fontWeight: tableView === tab.id ? 500 : 400,
+                }}
+              >
+                <i className={`ti ${tab.icon}`} style={{ fontSize: 14 }} />
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* Views */}
-      {view === 'overview' && (
-        <OverviewView onGoBrady={() => setView('detailed')} />
-      )}
-      {view === 'detailed' && (
-        <DetailedView
-          onGoOverview={() => setView('overview')}
-          onTradeClick={setDrawerTrade}
-        />
-      )}
-      {view === 'matrix' && (
-        <MatrixView onGoDetailed={() => setView('detailed')} />
-      )}
+      {/* Mode content */}
+      {mode === 'table' && tableView === 'overview' && <OverviewView onGoBrady={() => setMode('variance')} />}
+      {mode === 'table' && tableView === 'detailed' && <DetailedView onGoOverview={() => setTableView('overview')} onTradeClick={setDrawerTrade} />}
+      {mode === 'table' && tableView === 'matrix' && <MatrixView onGoDetailed={() => setTableView('detailed')} />}
+      {mode === 'variance'   && <VarianceView   onBack={() => setMode('table')} />}
+      {mode === 'treemap'    && <TreemapView    onBack={() => setMode('table')} />}
+      {mode === 'categories' && <CategoriesView onBack={() => setMode('table')} />}
 
       {/* Footer */}
       <div style={{ marginTop: '1.5rem', textAlign: 'center', padding: '14px 0 6px', fontSize: 11.5, color: 'var(--color-text-tertiary)', lineHeight: 1.6 }}>
@@ -837,7 +1547,6 @@ export function BudgetDashboard() {
         </span>
       </div>
 
-      {/* Drawer */}
       <Drawer open={drawerTrade !== null} trade={drawerTrade} onClose={closeDrawer} />
     </div>
   );
