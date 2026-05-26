@@ -5,6 +5,7 @@ export interface BidSub {
   amount: number | null;
   status: BidStatus;
   flag?: string;
+  url?: string;
 }
 
 export interface BidTrade {
