@@ -77,57 +77,6 @@ function getCurrencyByName(task: ClickUpTask, name: string): number | null {
   return Number.isFinite(n) && n >= 0 ? n : null;
 }
 
-// ── Link field trade fallback ─────────────────────────────────────────────
-
-// Extracts the trade name from the "🔗 Link" SharePoint URL (field b0da1f9e).
-// URL pattern: .../Bids/{Trade Folder}/{Sub Name}
-// Returns the second-to-last decoded path segment, or null if not parseable.
-function extractTradeFromLink(task: ClickUpTask): string | null {
-  const f = task.custom_fields?.find(cf => cf.id === 'b0da1f9e');
-  if (!f || typeof f.value !== 'string' || !f.value) return null;
-  try {
-    const url = new URL(f.value);
-    const segments = url.pathname.split('/').map(s => decodeURIComponent(s)).filter(Boolean);
-    const bidsIdx = segments.findLastIndex(s => s.toLowerCase() === 'bids');
-    if (bidsIdx !== -1 && bidsIdx + 1 < segments.length - 1) {
-      return segments[bidsIdx + 1] || null;
-    }
-    if (segments.length >= 2) return segments[segments.length - 2] || null;
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-// ── Trade dropdown helpers (field ID is global/shared across all lists) ───
-
-type TradeOption = { name: string; orderindex: number };
-
-// Extracts the orderindex→name map from the "Trade" dropdown field on any task
-// in the list. All tasks share the same field schema so we only need one.
-function buildTradeOptionMap(tasks: ClickUpTask[]): Map<number, string> {
-  const map = new Map<number, string>();
-  for (const task of tasks) {
-    const f = getFieldById(task, F.TRADE);
-    if (!f?.type_config?.options) continue;
-    for (const opt of f.type_config.options as TradeOption[]) {
-      map.set(opt.orderindex, opt.name);
-    }
-    break;
-  }
-  return map;
-}
-
-// Returns the trade name for a single task using the option map.
-// The Trade field stores the selected option's orderindex as a number.
-function resolveTradeForTask(task: ClickUpTask, optionMap: Map<number, string>): string | null {
-  const f = getFieldById(task, F.TRADE);
-  if (!f || f.value == null) return null;
-  const numVal = Number(f.value);
-  if (!Number.isFinite(numVal)) return null;
-  return optionMap.get(numVal) ?? null;
-}
-
 // ── Transforms ────────────────────────────────────────────────────────────
 
 export function transformBiddingTasks(
@@ -175,18 +124,17 @@ export function transformBiddingTasks(
 
 // Transforms tasks from a per-project "02. Bidding" list.
 //
-// Schema (confirmed from live ClickUp data):
-//   • One task = one subcontractor bidding on one trade
-//   • task.name             = subcontractor company name
-//   • task.status.status    = bidding stage (e.g. "not started", "bid recieved",
-//                             "followed up", "awarded", "no bid / declined")
-//   • Field F.TRADE         = "Trade" drop_down — orderindex resolves to trade name
-//                             (same field ID as the central Budget-Bidding DB)
-//   • Field "Bid/Contracted Amount" (currency) = the sub's bid/contract amount
+// Confirmed schema (live ClickUp data, May 2026):
+//   • The list uses a parent/subtask hierarchy:
+//       – Root tasks  (task.parent = null,       task_type = "Trade")   → one row per trade
+//       – Subtasks    (task.parent = trade ID,   task_type = "Contact") → one row per sub bid
+//   • Trade name        = parent task.name (e.g. "Plumbing & Sprinkler")
+//   • Sub name          = subtask.name    (e.g. "Quality Piping")
+//   • Bidding status    = task.status.status (native ClickUp status, lowercase)
+//   • Bid amount        = custom field "Bid/Contracted Amount" (currency, by name)
 //
-// The function groups tasks by trade, then assembles up to 5 subs per row and
-// computes the lowest bid as MIN(bid amounts for that trade).
-// Tasks whose Trade field is unset are skipped with a console.warn.
+// The Trade dropdown field (F.TRADE / f3cef4fb) is NOT set on subtasks in these lists.
+// getTasksInList must be called with includeSubtasks=true to receive the sub rows.
 export function transformBiddingTasksByName(
   tasks: ClickUpTask[],
   projectName: string,
@@ -195,22 +143,37 @@ export function transformBiddingTasksByName(
   coordInitials: string,
   coordName: string,
 ): BiddingProject {
-  const tradeOptionMap = buildTradeOptionMap(tasks);
-
-  // Group bid tasks by trade name, preserving insertion order.
-  const byTrade = new Map<string, ClickUpTask[]>();
+  // Build a map of trade parent task ID → trade name, preserving list order.
+  const parentIdToName = new Map<string, string>();
   for (const task of tasks) {
-    const tradeName = resolveTradeForTask(task, tradeOptionMap) ?? extractTradeFromLink(task);
+    if (!task.parent) {
+      parentIdToName.set(task.id, task.name.trim());
+    }
+  }
+
+  // Pre-populate trade buckets in parent-task order so the matrix row order
+  // matches the order trades appear in ClickUp.
+  const byTrade = new Map<string, ClickUpTask[]>();
+  for (const tradeName of parentIdToName.values()) {
+    byTrade.set(tradeName, []);
+  }
+
+  // Assign each subtask to its trade bucket.
+  for (const task of tasks) {
+    if (!task.parent) continue; // skip root trade rows
+    const tradeName = parentIdToName.get(task.parent);
     if (!tradeName) {
-      console.warn(`[bidding] task "${task.name}" (${task.id}) has no Trade set — skipping`);
+      // Parent is outside this list (e.g. tasks nested deeper than expected) — skip.
+      console.warn(`[bidding] subtask "${task.name}" (${task.id}) parent=${task.parent} not in list — skipping`);
       continue;
     }
-    if (!byTrade.has(tradeName)) byTrade.set(tradeName, []);
     byTrade.get(tradeName)!.push(task);
   }
 
   const trades: BidTrade[] = [];
   for (const [tradeName, bidTasks] of byTrade) {
+    if (bidTasks.length === 0) continue; // omit trades with no subs yet
+
     const subs: BidSub[] = bidTasks.slice(0, 5).map(task => ({
       name: task.name.trim(),
       amount: getCurrencyByName(task, 'Bid/Contracted Amount'),
