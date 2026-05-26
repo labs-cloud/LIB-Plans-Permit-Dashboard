@@ -6,6 +6,7 @@ export interface BudgetTrade {
   fin: MoneyVal;
   newv: MoneyVal;
   manual?: boolean;
+  costType?: 'hard' | 'soft';
 }
 
 export interface BudgetProject {

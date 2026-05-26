@@ -64,7 +64,7 @@ function fmtFull$(v: MoneyVal): string {
 // ──────────────────────────────────────────────────────────────
 function computeStats(trades: BudgetTrade[]) {
   let est = 0, fin = 0, newv = 0;
-  let withBids = 0, eo = 0, inc = 0, na = 0, manual = 0;
+  let withBids = 0, eo = 0, inc = 0, na = 0;
   for (const r of trades) {
     if (isMoney(r.est)) est += r.est;
     if (isMoney(r.fin)) fin += r.fin;
@@ -73,9 +73,34 @@ function computeStats(trades: BudgetTrade[]) {
     if (isMoney(r.est) && !isMoney(r.fin) && r.newv !== 'INC' && r.newv !== 'NA') eo++;
     if (r.est === 'INC' || r.fin === 'INC' || r.newv === 'INC') inc++;
     if (r.est === 'NA' || r.newv === 'NA') na++;
-    if (r.manual) manual++;
   }
-  return { est, fin, newv, withBids, eo, inc, na, manual, count: trades.length };
+  return { est, fin, newv, withBids, eo, inc, na, count: trades.length };
+}
+
+// Construction-sequence sort order — trades are displayed in this order.
+// Trades not listed here sort to the end alphabetically.
+const TRADE_PHASE_ORDER: readonly string[] = [
+  'Special Inspector', 'Superintendent', 'MEP Shop Drawings', 'Surveyor',
+  'Construction Fence', 'Site safety coordination',
+  'Demolition',
+  'Excavation', 'Structure', 'Bricks / CMU', 'Steel',
+  'Framing', 'Windows', 'Roofing', 'Scaffolding / Shed',
+  'Plumbing & Sprinkler', 'Watermain', 'HVAC', 'PTAC Units',
+  'Electrical', 'Fire Alarm', 'Low Voltage',
+  'Tile Supply', 'Kitchens', 'Plumbing Fixtures Bathtubs',
+  'Signage', 'Garbage Chutes', 'Garage Door',
+  'Lighting Material',
+];
+
+function sortByPhase(trades: BudgetTrade[]): BudgetTrade[] {
+  return [...trades].sort((a, b) => {
+    const ai = TRADE_PHASE_ORDER.indexOf(a.trade);
+    const bi = TRADE_PHASE_ORDER.indexOf(b.trade);
+    const ar = ai === -1 ? 9999 : ai;
+    const br = bi === -1 ? 9999 : bi;
+    if (ar !== br) return ar - br;
+    return a.trade.localeCompare(b.trade);
+  });
 }
 
 // ──────────────────────────────────────────────────────────────
@@ -210,23 +235,6 @@ function SideCard({ title, icon, children }: { title: string; icon: string; chil
 }
 
 // ──────────────────────────────────────────────────────────────
-// ManualBadge — shared
-// ──────────────────────────────────────────────────────────────
-function ManualBadge() {
-  return (
-    <span style={{
-      display: 'inline-flex', alignItems: 'center', gap: 3,
-      marginLeft: 8, padding: '1px 6px', borderRadius: 999,
-      background: 'var(--warn-bg)', color: 'var(--warn-fg)',
-      fontSize: 9, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase',
-      border: '1px solid rgba(186,117,23,0.35)',
-    }}>
-      <i className="ti ti-settings-2" style={{ fontSize: 9 }} /> Manual
-    </span>
-  );
-}
-
-// ──────────────────────────────────────────────────────────────
 // drawer
 // ──────────────────────────────────────────────────────────────
 function Drawer({
@@ -298,14 +306,6 @@ function Drawer({
                   </div>
                 );
               })()}
-              {trade.manual && (
-                <>
-                  <h4 style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--color-text-tertiary)', margin: '16px 0 8px' }}>Note</h4>
-                  <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', lineHeight: 1.55 }}>
-                    This row has a <strong style={{ color: 'var(--warn-fg)' }}>manual override</strong> — the auto-rule (finalized → use finalized; no bid → carry-forward estimated) does not apply. The New Budget value was set directly by Sol Klein.
-                  </div>
-                </>
-              )}
               <h4 style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--color-text-tertiary)', margin: '16px 0 8px' }}>Bid history</h4>
               <div style={{ color: 'var(--color-text-tertiary)', fontStyle: 'italic', padding: '18px 0', textAlign: 'center', fontSize: 12 }}>
                 Full bid history available in ClickUp
@@ -573,8 +573,8 @@ function DetailedView({
     position: 'sticky', top: 0, zIndex: 3,
     background: 'var(--color-background-secondary)',
     padding: '10px 12px',
-    fontSize: 9.5, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase',
-    color: 'var(--color-text-tertiary)',
+    fontSize: 9.5, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase',
+    color: 'var(--color-text-secondary)',
     borderBottom: '0.5px solid var(--color-border-tertiary)',
     whiteSpace: 'nowrap',
   };
@@ -594,24 +594,36 @@ function DetailedView({
     const fmtFull = (v: number): string =>
       '$' + v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-    const rows = filteredTrades.map((r, ti) => {
-      const rowBg = ti % 2 === 0 ? '#fff' : '#fafaf8';
-      const rd = (isMoney(r.newv) && isMoney(r.est)) ? (r.newv - r.est) : null;
-      const rdp = (rd !== null && isMoney(r.est) && r.est > 0) ? (rd / r.est * 100) : null;
-      const varColor = rd === null ? '#aaa' : rd < 0 ? '#1F7A38' : rd > 0 ? '#A82828' : '#555';
-      const varText = rd === null ? '–'
-        : (rd < 0 ? '−' : rd > 0 ? '+' : '') + fmtNum(Math.abs(rd))
-          + (rdp !== null ? ` (${rdp < 0 ? '−' : '+'}${Math.abs(rdp).toFixed(1)}%)` : '');
-      return `<tr>
-        <td style="padding:8px 12px;border-bottom:0.5px solid #f0f0ec;font-weight:600;font-size:11px;background:${rowBg};">
-          ${r.trade}${r.manual ? ' <span style="font-size:8px;background:#FEF3C7;color:#854F0B;border:1px solid rgba(186,117,23,.35);border-radius:3px;padding:1px 4px;font-weight:700;letter-spacing:.05em;">MANUAL</span>' : ''}
-        </td>
-        <td style="padding:8px 12px;border-bottom:0.5px solid #f0f0ec;text-align:right;font-size:11px;background:${rowBg};color:${r.est === null ? '#aaa' : '#1a1a1a'};">${fmtNum(r.est)}</td>
-        <td style="padding:8px 12px;border-bottom:0.5px solid #f0f0ec;text-align:right;font-size:11px;background:${rowBg};color:${r.fin === null ? '#aaa' : '#1B7CB0'};">${fmtNum(r.fin)}</td>
-        <td style="padding:8px 12px;border-bottom:0.5px solid #f0f0ec;text-align:right;font-size:11px;font-weight:700;background:${rowBg};color:#1F7A38;">${fmtNum(r.newv)}</td>
-        <td style="padding:8px 12px;border-bottom:0.5px solid #f0f0ec;text-align:right;font-size:11px;font-weight:600;background:${rowBg};color:${varColor};">${varText}</td>
-      </tr>`;
-    }).join('');
+    const printTrades = sortByPhase(filteredTrades);
+    const hardTrades = printTrades.filter(r => r.costType !== 'soft');
+    const softTrades = printTrades.filter(r => r.costType === 'soft');
+    const hasBothGroups = hardTrades.length > 0 && softTrades.length > 0;
+
+    const renderPrintRows = (trades: BudgetTrade[], startIdx: number) =>
+      trades.map((r, ti) => {
+        const rowBg = (startIdx + ti) % 2 === 0 ? '#fff' : '#fafaf8';
+        const rd = (isMoney(r.newv) && isMoney(r.est)) ? (r.newv - r.est) : null;
+        const rdp = (rd !== null && isMoney(r.est) && r.est > 0) ? (rd / r.est * 100) : null;
+        const varColor = rd === null ? '#aaa' : rd < 0 ? '#1F7A38' : rd > 0 ? '#A82828' : '#555';
+        const varText = rd === null ? '–'
+          : (rd < 0 ? '−' : rd > 0 ? '+' : '') + fmtNum(Math.abs(rd))
+            + (rdp !== null ? ` (${rdp < 0 ? '−' : '+'}${Math.abs(rdp).toFixed(1)}%)` : '');
+        return `<tr>
+          <td style="padding:7px 14px;border-bottom:0.5px solid #f0f0ec;font-weight:500;font-size:11.5px;background:${rowBg};">${r.trade}</td>
+          <td style="padding:7px 14px;border-bottom:0.5px solid #f0f0ec;text-align:right;font-size:11px;background:${rowBg};color:${r.est === null ? '#aaa' : '#1a1a1a'};font-variant-numeric:tabular-nums;">${fmtNum(r.est)}</td>
+          <td style="padding:7px 14px;border-bottom:0.5px solid #f0f0ec;text-align:right;font-size:11px;background:${rowBg};color:${r.fin === null ? '#bbb' : '#1B7CB0'};font-variant-numeric:tabular-nums;">${fmtNum(r.fin)}</td>
+          <td style="padding:7px 14px;border-bottom:0.5px solid #f0f0ec;text-align:right;font-size:11px;font-weight:700;background:${rowBg};color:#1F7A38;font-variant-numeric:tabular-nums;">${fmtNum(r.newv)}</td>
+          <td style="padding:7px 14px;border-bottom:0.5px solid #f0f0ec;text-align:right;font-size:11px;font-weight:600;background:${rowBg};color:${varColor};font-variant-numeric:tabular-nums;">${varText}</td>
+        </tr>`;
+      }).join('');
+
+    const sectionHeader = (label: string) =>
+      `<tr><td colspan="5" style="padding:8px 14px 4px;font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#888;background:#f5f5f2;border-bottom:0.5px solid #e8e8e4;">${label}</td></tr>`;
+
+    const bodyRows = hasBothGroups
+      ? sectionHeader('Hard Costs') + renderPrintRows(hardTrades, 0)
+        + sectionHeader('Soft Costs') + renderPrintRows(softTrades, hardTrades.length)
+      : renderPrintRows(printTrades, 0);
 
     const html = `<!DOCTYPE html>
 <html>
@@ -620,26 +632,28 @@ function DetailedView({
   <title>Budget Outlook · ${project.name}</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #1a1a1a; background: #fff; padding: 24px 28px; }
-    @page { size: landscape; margin: 10mm 12mm; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #1a1a1a; background: #fff; padding: 28px 32px; }
+    @page { size: landscape; margin: 12mm 14mm; }
     @media print { body { padding: 0; } }
-    .header { display: flex; align-items: center; gap: 18px; border-bottom: 3px solid #F47832; padding-bottom: 14px; margin-bottom: 16px; }
-    .logo-crop { width: 60px; height: 60px; overflow: hidden; position: relative; flex-shrink: 0; }
-    .logo-img { position: absolute; width: 224px; height: auto; left: -18px; top: -1px; }
-    .header-text h1 { font-size: 17px; font-weight: 700; letter-spacing: -0.01em; }
-    .header-text p { font-size: 11px; color: #888; margin-top: 3px; }
-    .kpi-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-bottom: 14px; }
-    .kpi { background: #f8f8f6; border: 0.5px solid #e8e8e4; border-radius: 8px; padding: 9px 14px; }
-    .kpi-val { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
-    .kpi-label { font-size: 9px; color: #888; margin-top: 2px; text-transform: uppercase; letter-spacing: 0.05em; }
-    table { width: 100%; border-collapse: collapse; }
-    th { padding: 8px 12px; font-size: 9px; letter-spacing: 0.07em; text-transform: uppercase; color: #888; background: #f5f5f2; border-bottom: 1px solid #e8e8e4; font-weight: 600; }
+    .header { display: flex; align-items: center; gap: 20px; border-bottom: 3px solid #F47832; padding-bottom: 16px; margin-bottom: 20px; }
+    .logo-crop { width: 62px; height: 67px; overflow: hidden; position: relative; flex-shrink: 0; }
+    .logo-img { position: absolute; width: 232px; height: auto; left: -19px; top: -1px; }
+    .header-main { flex: 1; }
+    .header-main h1 { font-size: 19px; font-weight: 700; letter-spacing: -0.015em; }
+    .header-main p { font-size: 12px; color: #888; margin-top: 4px; }
+    .header-kpis { display: flex; gap: 24px; }
+    .hkpi { text-align: right; }
+    .hkpi-val { font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .hkpi-label { font-size: 9px; color: #999; text-transform: uppercase; letter-spacing: 0.05em; margin-top: 1px; }
+    .legend { display: flex; gap: 18px; margin-bottom: 14px; font-size: 10px; color: #666; padding: 8px 14px; background: #fafaf8; border-radius: 6px; border: 0.5px solid #e8e8e4; }
+    table { width: 100%; border-collapse: collapse; border-radius: 8px; overflow: hidden; border: 0.5px solid #e8e8e4; }
+    th { padding: 9px 14px; font-size: 9px; letter-spacing: 0.07em; text-transform: uppercase; color: #555; background: #f0f0ec; border-bottom: 1px solid #e0e0dc; font-weight: 700; }
     th:first-child { text-align: left; }
     th:not(:first-child) { text-align: right; }
-    .total-row td { background: #f5fdf7 !important; font-weight: 700; font-size: 11px; border-top: 2px solid #b2dfdb; padding: 9px 12px; text-align: right; }
+    .total-row td { background: #edf7f0 !important; font-weight: 700; font-size: 11.5px; border-top: 2px solid #93c9a7; padding: 10px 14px; text-align: right; }
     .total-row td:first-child { text-align: left; }
-    .footer { margin-top: 14px; font-size: 9.5px; color: #bbb; display: flex; justify-content: space-between; }
-    .legend { display: flex; gap: 14px; margin-bottom: 12px; font-size: 9.5px; color: #888; }
+    .footer { margin-top: 18px; font-size: 9.5px; color: #bbb; display: flex; justify-content: space-between; align-items: flex-end; }
+    .footer-brand { font-weight: 600; color: #F47832; }
   </style>
 </head>
 <body>
@@ -647,23 +661,22 @@ function DetailedView({
     <div class="logo-crop">
       <img class="logo-img" src="/lib_brand/lead_it_builders_logo.png" alt="Lead It Builders" />
     </div>
-    <div class="header-text">
+    <div class="header-main">
       <h1>Budget Outlook Report · ${project.name}</h1>
-      <p>${project.location || project.id} · Generated ${date}</p>
+      <p>${project.location ? project.location + ' · ' : ''}Generated ${date}</p>
+    </div>
+    <div class="header-kpis">
+      <div class="hkpi"><div class="hkpi-val">${fmtFull(bs.est)}</div><div class="hkpi-label">Estimated</div></div>
+      <div class="hkpi"><div class="hkpi-val" style="color:#1F7A38;">${fmtFull(bs.newv)}</div><div class="hkpi-label">New Budget</div></div>
+      <div class="hkpi"><div class="hkpi-val" style="color:${delta < 0 ? '#1F7A38' : '#A82828'};">${(delta < 0 ? '−' : '+') + fmtFull(Math.abs(delta))}</div><div class="hkpi-label">Δ vs Est (${deltaPct < 0 ? '−' : '+'}${Math.abs(deltaPct).toFixed(1)}%)</div></div>
+      <div class="hkpi"><div class="hkpi-val" style="color:#1B7CB0;">${bs.withBids}</div><div class="hkpi-label">Bids in</div></div>
     </div>
   </div>
-  <div class="kpi-grid">
-    <div class="kpi"><div class="kpi-val">${bs.count}</div><div class="kpi-label">Total trades</div></div>
-    <div class="kpi"><div class="kpi-val">${fmtFull(bs.est)}</div><div class="kpi-label">Estimated total</div></div>
-    <div class="kpi"><div class="kpi-val" style="color:#1F7A38;">${fmtFull(bs.newv)}</div><div class="kpi-label">New Budget</div></div>
-    <div class="kpi"><div class="kpi-val" style="color:${delta < 0 ? '#1F7A38' : '#A82828'};">${(delta < 0 ? '−' : '+') + fmtFull(Math.abs(delta))}</div><div class="kpi-label">Δ vs Estimated (${deltaPct < 0 ? '−' : '+'}${Math.abs(deltaPct).toFixed(1)}%)</div></div>
-    <div class="kpi"><div class="kpi-val" style="color:#1B7CB0;">${bs.withBids}</div><div class="kpi-label">Bids in</div></div>
-  </div>
   <div class="legend">
-    <span><strong style="color:#1F7A38;">Green</strong> = under estimate</span>
-    <span><strong style="color:#A82828;">Red</strong> = over estimate</span>
-    <span><strong style="color:#1B7CB0;">Blue</strong> = bid/contract received</span>
-    <span><strong style="color:#854F0B;">MANUAL</strong> = auto-rule bypassed</span>
+    <span><strong style="color:#1F7A38;">Green</strong> = under estimate · New Budget &lt; Estimated</span>
+    <span><strong style="color:#A82828;">Red</strong> = over estimate · New Budget &gt; Estimated</span>
+    <span><strong style="color:#1B7CB0;">Blue</strong> = bid or contract received</span>
+    <span><strong>–</strong> = not yet received</span>
   </div>
   <table>
     <thead>
@@ -676,28 +689,28 @@ function DetailedView({
       </tr>
     </thead>
     <tbody>
-      ${rows}
+      ${bodyRows}
       <tr class="total-row">
-        <td>Total</td>
+        <td>Total · ${bs.count} trades</td>
         <td>${fmtFull(bs.est)}</td>
-        <td>${fmtFull(bs.fin)}</td>
+        <td>${bs.withBids > 0 ? fmtFull(bs.fin) : '–'}</td>
         <td style="color:#1F7A38;">${fmtFull(bs.newv)}</td>
         <td style="color:${delta < 0 ? '#1F7A38' : '#A82828'};">${(delta < 0 ? '−' : '+') + fmtFull(Math.abs(delta))} (${deltaPct < 0 ? '−' : '+'}${Math.abs(deltaPct).toFixed(1)}%)</td>
       </tr>
     </tbody>
   </table>
   <div class="footer">
-    <span>Lead It Builders · Budget Outlook · ${date}</span>
-    <span>New Budget = Finalized if available, otherwise Estimated carry-forward</span>
+    <span><span class="footer-brand">Lead It Builders</span> · Budget Outlook Report · ${date}</span>
+    <span>Live from ClickUp · New Budget = Finalized if available, otherwise Estimated carry-forward</span>
   </div>
   <script>window.onload = function() { window.print(); };<\/script>
 </body>
 </html>`;
 
-    const w = window.open('', '_blank');
-    if (!w) return;
-    w.document.write(html);
-    w.document.close();
+    const blob = new Blob([html], { type: 'text/html' });
+    const blobUrl = URL.createObjectURL(blob);
+    window.open(blobUrl, '_blank');
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
   }
 
   function handleShareLink() {
@@ -775,7 +788,7 @@ function DetailedView({
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', gap: 10, marginBottom: '1.25rem' }}>
         <KpiCard label="Total Estimated" value={fmt$(bs.est)} sub="baseline · all trades" icon="ti-clipboard-list" />
         <KpiCard label="Lowest received" value={fmt$(bs.fin)} sub="finalized + lowest in hand" icon="ti-target" tone="info" />
-        <KpiCard label="New Budget" value={fmt$(bs.newv)} sub="auto-rule + manual overrides" icon="ti-wallet" tone="good" />
+        <KpiCard label="New Budget" value={fmt$(bs.newv)} sub="finalized or carry-forward" icon="ti-wallet" tone="good" />
         <KpiCard label="Δ vs Estimated" value={(d < 0 ? '−' : d > 0 ? '+' : '') + fmt$(Math.abs(d))} sub={dp.toFixed(1) + '% vs estimate'} icon="ti-arrow-bounce" tone="amber" />
         <KpiCard label="Trades with bids in" value={String(bs.withBids)} sub="have a Finalized/lowest" icon="ti-checks" />
         <KpiCard label="Estimate-only" value={String(bs.eo)} sub="no bids yet · carry-forward" icon="ti-hourglass-low" />
@@ -793,7 +806,7 @@ function DetailedView({
           <h2 style={{ margin: '0 0 14px', fontSize: 13, fontWeight: 500, display: 'flex', alignItems: 'center', gap: 8 }}>
             <i className="ti ti-table" /> Per-trade budget
             <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--color-text-tertiary)', fontWeight: 400 }}>
-              click a row → bid history drawer · &quot;Manual&quot; = auto-rule overridden
+              click a row to see bid history
             </span>
           </h2>
           <div style={{ maxHeight: 680, overflowY: 'auto', background: 'var(--color-background-primary)', borderRadius: 8, border: '0.5px solid var(--color-border-tertiary)' }}>
@@ -805,40 +818,53 @@ function DetailedView({
               </colgroup>
               <thead>
                 <tr>
-                  <th style={{ ...th, textAlign: 'left' }}>Hard cost</th>
+                  <th style={{ ...th, textAlign: 'left' }}>Trade</th>
                   <th style={{ ...th, textAlign: 'right' }}>Estimated Budget</th>
-                  <th style={{ ...th, textAlign: 'right' }}>Finalized / lowest bid</th>
+                  <th style={{ ...th, textAlign: 'right' }}>Finalized / Lowest Bid</th>
                   <th style={{ ...th, textAlign: 'right' }}>New Budget</th>
                   <th style={{ ...th, textAlign: 'center' }}>Variance vs Estimated</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredTrades.map((r, idx) => (
-                  <tr
-                    key={idx}
-                    style={{ cursor: 'pointer' }}
-                    onClick={() => onTradeClick(r)}
-                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-background-secondary)')}
-                    onMouseLeave={e => (e.currentTarget.style.background = '')}
-                  >
-                    <td style={{ padding: '10px 12px', borderBottom: '0.5px solid var(--color-border-tertiary)', verticalAlign: 'middle', fontSize: 13, fontWeight: 500 }}>
-                      {r.trade}
-                      {r.manual && <ManualBadge />}
-                    </td>
-                    <td style={{ padding: '10px 12px', borderBottom: '0.5px solid var(--color-border-tertiary)', textAlign: 'right', verticalAlign: 'middle', fontVariantNumeric: 'tabular-nums', fontSize: 13 }}>
-                      <MoneyToken v={r.est} dim={!isMoney(r.est)} />
-                    </td>
-                    <td style={{ padding: '10px 12px', borderBottom: '0.5px solid var(--color-border-tertiary)', textAlign: 'right', verticalAlign: 'middle', fontVariantNumeric: 'tabular-nums', fontSize: 13 }}>
-                      <MoneyToken v={r.fin} dim={!isMoney(r.fin)} />
-                    </td>
-                    <td style={{ padding: '10px 12px', borderBottom: '0.5px solid var(--color-border-tertiary)', textAlign: 'right', verticalAlign: 'middle', fontVariantNumeric: 'tabular-nums', fontSize: 13 }}>
-                      <MoneyToken v={r.newv} bold dim={!isMoney(r.newv)} />
-                    </td>
-                    <td style={{ padding: '10px 12px', borderBottom: '0.5px solid var(--color-border-tertiary)', verticalAlign: 'middle' }}>
-                      <VarBar r={r} />
-                    </td>
-                  </tr>
-                ))}
+                {(() => {
+                  const sorted = sortByPhase(filteredTrades);
+                  const hard = sorted.filter(r => r.costType !== 'soft');
+                  const soft = sorted.filter(r => r.costType === 'soft');
+                  const hasBoth = hard.length > 0 && soft.length > 0;
+                  const sectionHdr = (label: string) => (
+                    <tr key={`hdr-${label}`}>
+                      <td colSpan={5} style={{ padding: '6px 12px 3px', fontSize: 9.5, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--color-text-tertiary)', background: 'var(--color-background-secondary)', borderBottom: '0.5px solid var(--color-border-tertiary)' }}>
+                        {label}
+                      </td>
+                    </tr>
+                  );
+                  const renderRow = (r: BudgetTrade, idx: number) => (
+                    <tr
+                      key={idx}
+                      style={{ cursor: 'pointer' }}
+                      onClick={() => onTradeClick(r)}
+                      onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-background-secondary)')}
+                      onMouseLeave={e => (e.currentTarget.style.background = '')}
+                    >
+                      <td style={{ padding: '10px 12px', borderBottom: '0.5px solid var(--color-border-tertiary)', verticalAlign: 'middle', fontSize: 13, fontWeight: 500 }}>{r.trade}</td>
+                      <td style={{ padding: '10px 12px', borderBottom: '0.5px solid var(--color-border-tertiary)', textAlign: 'right', verticalAlign: 'middle', fontVariantNumeric: 'tabular-nums', fontSize: 13 }}>
+                        <MoneyToken v={r.est} dim={!isMoney(r.est)} />
+                      </td>
+                      <td style={{ padding: '10px 12px', borderBottom: '0.5px solid var(--color-border-tertiary)', textAlign: 'right', verticalAlign: 'middle', fontVariantNumeric: 'tabular-nums', fontSize: 13 }}>
+                        <MoneyToken v={r.fin} dim={!isMoney(r.fin)} />
+                      </td>
+                      <td style={{ padding: '10px 12px', borderBottom: '0.5px solid var(--color-border-tertiary)', textAlign: 'right', verticalAlign: 'middle', fontVariantNumeric: 'tabular-nums', fontSize: 13 }}>
+                        <MoneyToken v={r.newv} bold dim={!isMoney(r.newv)} />
+                      </td>
+                      <td style={{ padding: '10px 12px', borderBottom: '0.5px solid var(--color-border-tertiary)', verticalAlign: 'middle' }}>
+                        <VarBar r={r} />
+                      </td>
+                    </tr>
+                  );
+                  return hasBoth
+                    ? [sectionHdr('Hard Costs'), ...hard.map(renderRow), sectionHdr('Soft Costs'), ...soft.map(renderRow)]
+                    : sorted.map(renderRow);
+                })()}
               </tbody>
               <tfoot>
                 <tr>
@@ -892,7 +918,6 @@ function DetailedView({
               { label: 'Estimate-only', val: bs.eo },
               { label: '"Included"', val: bs.inc, icon: 'ti-package' },
               { label: '"NA"', val: bs.na, icon: 'ti-ban' },
-              { label: 'Manual overrides', val: bs.manual, icon: 'ti-edit' },
             ].map(({ label, val, icon }, i) => (
               <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '9px 0', fontSize: 13, borderTop: i === 0 ? 'none' : '0.5px solid var(--color-border-tertiary)' }}>
                 <span style={{ color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -909,12 +934,6 @@ function DetailedView({
               <div style={{ padding: '4px 0' }}><b style={{ color: 'var(--color-text-primary)' }}>Finalized exists</b> → New = Finalized</div>
               <div style={{ padding: '4px 0' }}><b style={{ color: 'var(--color-text-primary)' }}>No bid yet</b> → New = Estimated (carry-forward)</div>
               <div style={{ padding: '4px 0' }}><b style={{ color: 'var(--color-text-primary)' }}>Included / NA</b> → mirrors that token</div>
-              <div style={{ marginTop: 8, paddingTop: 8, borderTop: '0.5px solid var(--color-border-tertiary)', fontSize: 11.5 }}>
-                3 documented exceptions — rule does NOT auto-apply: Structure, Site safety coordination, Lighting Material. Flagged with{' '}
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, padding: '1px 6px', borderRadius: 999, background: 'var(--warn-bg)', color: 'var(--warn-fg)', fontSize: 9, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', border: '1px solid rgba(186,117,23,0.35)' }}>
-                  <i className="ti ti-edit" style={{ fontSize: 9 }} /> Manual
-                </span>.
-              </div>
             </div>
           </SideCard>
         </div>
@@ -980,7 +999,6 @@ function VarianceView({ onBack, search }: { onBack: () => void; search?: string 
       >
         <div style={{ fontSize: 12.5, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {r.trade}
-          {r.manual && <ManualBadge />}
         </div>
         {/* bar */}
         <div style={{ position: 'relative', height: 14 }}>
@@ -1105,7 +1123,6 @@ function VarianceView({ onBack, search }: { onBack: () => void; search?: string 
               <span style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0, flex: 1 }}>{r.trade}</span>
               {pill}
               {isMoney(r.est) && <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', whiteSpace: 'nowrap' }}>est {fmt$(r.est)} → carries forward</span>}
-              {r.manual && <ManualBadge />}
             </div>
           );
         })}
@@ -1429,7 +1446,7 @@ function CategoriesView({ onBack, search }: { onBack: () => void; search?: strin
         {[
           { label: 'TOTAL ESTIMATED', value: fmt$(bs.est), sub: 'baseline · all numeric trades', tone: 'default' as Tone },
           null,
-          { label: 'NEW BUDGET', value: fmt$(bs.newv), sub: 'auto-rule + manual overrides', tone: 'good' as Tone },
+          { label: 'NEW BUDGET', value: fmt$(bs.newv), sub: 'finalized or carry-forward', tone: 'good' as Tone },
           null,
           { label: 'NET Δ VS ESTIMATED', value: (netDelta < 0 ? '−' : netDelta > 0 ? '+' : '') + fmt$(Math.abs(netDelta)), sub: netPct.toFixed(1) + '% vs estimated', tone: (netDelta < 0 ? 'good' : netDelta > 0 ? 'danger' : 'default') as Tone },
         ].map((item, i) => {
@@ -1528,7 +1545,6 @@ function CategoriesView({ onBack, search }: { onBack: () => void; search?: strin
                   <div key={r.trade} style={{ display: 'grid', gridTemplateColumns: '1fr 110px 110px 120px', alignItems: 'center', gap: 8, padding: '6px 0', borderBottom: '0.5px solid var(--color-border-tertiary)', fontSize: 12 }}>
                     <span style={{ fontWeight: 500 }}>
                       {r.trade}
-                      {r.manual && <ManualBadge />}
                     </span>
                     <span style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}><MoneyToken v={r.est} dim={!isMoney(r.est)} /></span>
                     <span style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}><MoneyToken v={r.newv} bold dim={!isMoney(r.newv)} /></span>
@@ -1812,7 +1828,7 @@ export function BudgetDashboard({ projectId }: { projectId?: string } = {}) {
       <div style={{ marginTop: '1.5rem', textAlign: 'center', padding: '14px 0 6px', fontSize: 11.5, color: 'var(--color-text-tertiary)', lineHeight: 1.6 }}>
         Live from ClickUp · 60-second cache · click any trade row to open in ClickUp
         <span style={{ display: 'block', marginTop: 4, fontSize: 11 }}>
-          Variance bar = New − Estimated · &quot;Manual&quot; = auto-rule overridden
+          Variance bar = New Budget − Estimated
         </span>
       </div>
 
