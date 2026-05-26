@@ -1,6 +1,7 @@
 'use client';
 
-import { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import useSWR from 'swr';
 import { LogoHeader } from './LogoHeader';
 import type { BidStatus, BidSub, BidTrade, BiddingPayload, BiddingPortfolioPayload } from '@/lib/bidding-types';
@@ -2578,87 +2579,287 @@ function SubsView({ search = '' }: { search?: string }) {
   );
 }
 
+// ─── Portfolio matrix view ─────────────────────────────────────────────────────
+
+function PortfolioMatrixView({
+  portfolioData,
+  onNavigateToProject,
+  search,
+}: {
+  portfolioData: BiddingPortfolioPayload;
+  onNavigateToProject: (id: string) => void;
+  search: string;
+}) {
+  const projects = portfolioData.projects;
+
+  const projectTradeMap = useMemo(() => {
+    const map = new Map<string, Map<string, BidTrade>>();
+    for (const proj of projects) {
+      const tm = new Map<string, BidTrade>();
+      for (const t of proj.trades) tm.set(t.trade, t);
+      map.set(proj.name, tm);
+    }
+    return map;
+  }, [projects]);
+
+  const allTradeNames = useMemo(() => {
+    const names = new Set<string>();
+    for (const [, tm] of projectTradeMap) for (const n of tm.keys()) names.add(n);
+    const sorted = [...names].sort();
+    if (!search.trim()) return sorted;
+    const q = search.toLowerCase();
+    return sorted.filter((n) => n.toLowerCase().includes(q));
+  }, [projectTradeMap, search]);
+
+  return (
+    <SectionCard title="Portfolio bidding matrix — all projects" icon="ti-table">
+      <div style={{ overflowX: 'auto' }} className="matrix-scroll">
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+          <colgroup>
+            <col style={{ minWidth: 200 }} />
+            {projects.map((_, i) => (
+              <col key={i} style={{ minWidth: 130 }} />
+            ))}
+          </colgroup>
+          <thead>
+            <tr>
+              <th
+                style={{
+                  textAlign: 'left',
+                  padding: '8px 12px',
+                  fontSize: 10,
+                  letterSpacing: '0.06em',
+                  textTransform: 'uppercase',
+                  color: 'var(--color-text-tertiary)',
+                  fontWeight: 600,
+                  background: 'var(--color-background-secondary)',
+                  border: '0.5px solid var(--color-border-tertiary)',
+                  position: 'sticky',
+                  left: 0,
+                  zIndex: 2,
+                }}
+              >
+                Trade
+              </th>
+              {projects.map((proj) => (
+                <th
+                  key={proj.name}
+                  title={`View ${proj.name}`}
+                  onClick={() => onNavigateToProject(proj.name)}
+                  style={{
+                    textAlign: 'center',
+                    padding: '7px 8px',
+                    fontSize: 10,
+                    color: 'var(--color-text-primary)',
+                    fontWeight: 600,
+                    background: 'var(--color-background-secondary)',
+                    border: '0.5px solid var(--color-border-tertiary)',
+                    whiteSpace: 'nowrap',
+                    cursor: 'pointer',
+                    letterSpacing: '0.02em',
+                    maxWidth: 130,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                  }}
+                >
+                  {proj.name}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {allTradeNames.length === 0 ? (
+              <tr>
+                <td
+                  colSpan={projects.length + 1}
+                  style={{
+                    padding: 24,
+                    textAlign: 'center',
+                    color: 'var(--color-text-tertiary)',
+                    fontSize: 12,
+                  }}
+                >
+                  {search ? 'No trades match your search.' : 'No bidding data yet.'}
+                </td>
+              </tr>
+            ) : (
+              allTradeNames.map((tradeName, ti) => (
+                <tr key={ti}>
+                  <td
+                    style={{
+                      padding: '7px 12px',
+                      border: '0.5px solid var(--color-border-tertiary)',
+                      fontWeight: 500,
+                      background: 'var(--color-background-primary)',
+                      position: 'sticky',
+                      left: 0,
+                      zIndex: 1,
+                    }}
+                  >
+                    {tradeName}
+                  </td>
+                  {projects.map((proj) => {
+                    const trade = projectTradeMap.get(proj.name)?.get(tradeName);
+                    const ts = trade ? tradeStatus(trade) : null;
+                    const m = ts ? STATUS_META[ts] : null;
+                    return (
+                      <td
+                        key={proj.name}
+                        style={{
+                          padding: '6px 8px',
+                          border: '0.5px solid var(--color-border-tertiary)',
+                          textAlign: 'center',
+                          background: m ? m.bg : undefined,
+                        }}
+                      >
+                        {ts ? (
+                          <StatusPill status={ts} small />
+                        ) : (
+                          <span style={{ color: 'var(--color-text-tertiary)', fontSize: 11 }}>—</span>
+                        )}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    </SectionCard>
+  );
+}
+
 // ─── Main BiddingDashboard ─────────────────────────────────────────────────────
 
-type View = 'overview' | 'detailed' | 'matrix' | 'pipeline' | 'followups' | 'spreads' | 'subs';
+type ProjectTab = 'matrix' | 'pipeline' | 'followups' | 'subs';
 
-const VIEW_TABS: { id: View; label: string; icon: string }[] = [
-  { id: 'overview',  label: 'Overview',   icon: 'ti-layout-dashboard' },
-  { id: 'detailed',  label: 'Detailed',   icon: 'ti-table-options' },
-  { id: 'matrix',    label: 'Matrix',     icon: 'ti-layout-grid' },
-  { id: 'pipeline',  label: 'Pipeline',   icon: 'ti-git-branch' },
-  { id: 'followups', label: 'Follow-ups', icon: 'ti-message-2' },
-  { id: 'spreads',   label: 'Spreads',    icon: 'ti-chart-bar' },
-  { id: 'subs',      label: 'Subs',       icon: 'ti-users' },
+const PROJECT_TABS: { id: ProjectTab; label: string; icon: string }[] = [
+  { id: 'matrix',    label: 'Trade Matrix', icon: 'ti-table-options' },
+  { id: 'pipeline',  label: 'Pipeline',     icon: 'ti-git-branch' },
+  { id: 'followups', label: 'Follow-ups',   icon: 'ti-message-2' },
+  { id: 'subs',      label: 'Subs',         icon: 'ti-users' },
 ];
 
-export function BiddingDashboard() {
-  const [view, setView] = useState<View>('overview');
-  const [selectedProject, setSelectedProject] = useState<string>('');
+export function BiddingDashboard({ projectId }: { projectId?: string } = {}) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const tab = ((searchParams?.get('tab') ?? 'matrix') as ProjectTab);
   const [search, setSearch] = useState('');
 
-  // SWR URL includes projectId once the user (or the first-load effect) has picked a project.
-  // Changing selectedProject changes the key, which triggers a re-fetch.
-  const swrUrl = selectedProject
-    ? `/api/bidding?projectId=${encodeURIComponent(selectedProject)}`
-    : '/api/bidding';
+  const navigateToProject = useCallback(
+    (id: string) => router.push(`/bidding/${encodeURIComponent(id)}`),
+    [router],
+  );
+  const navigateToPortfolio = useCallback(() => router.push('/bidding'), [router]);
+  const setTab = useCallback(
+    (newTab: ProjectTab) => {
+      if (!projectId) return;
+      const params = new URLSearchParams(searchParams?.toString() ?? '');
+      params.set('tab', newTab);
+      router.push(`/bidding/${encodeURIComponent(projectId)}?${params.toString()}`);
+    },
+    [router, projectId, searchParams],
+  );
 
-  const { data, isLoading } = useSWR<BiddingPayload>(swrUrl, fetcher, {
-    refreshInterval: 300_000,
-    revalidateOnFocus: false,
-    dedupingInterval: 60_000,
-  });
+  // Portfolio data — only fetched in portfolio mode
+  const { data: portfolioData, isLoading: portfolioLoading } = useSWR<BiddingPortfolioPayload>(
+    projectId ? null : '/api/bidding/portfolio',
+    portfolioFetcher,
+    { refreshInterval: 300_000, revalidateOnFocus: false, dedupingInterval: 60_000 },
+  );
 
-  // When the initial (no-param) fetch returns, lock in the first real project so subsequent
-  // project-picker changes produce a stable URL key change rather than replacing stale data.
-  useEffect(() => {
-    if (data && !selectedProject) {
-      const first = data.portfolioProjects.find(p => p.isReal) ?? data.portfolioProjects[0];
-      if (first) setSelectedProject(first.name);
-    }
-  }, [data, selectedProject]);
+  // Per-project data — only fetched in project mode
+  const { data: projectData, isLoading: projectLoading } = useSWR<BiddingPayload>(
+    projectId ? `/api/bidding?projectId=${encodeURIComponent(projectId)}` : null,
+    fetcher,
+    { refreshInterval: 300_000, revalidateOnFocus: false, dedupingInterval: 60_000 },
+  );
+
+  const isLoading = projectId ? projectLoading : portfolioLoading;
+
+  const syncedAt = projectId
+    ? (projectData?.syncedAt ?? null)
+    : (portfolioData?.syncedAt ?? null);
 
   const subtitle = useMemo(() => {
-    if (!data) return 'Loading…';
-    const { project, portfolioProjects } = data;
-    const fnlCount = project.trades.filter(t => t.subs.some(s => s.status === 'fnl')).length;
-    return `${project.trades.length} trades · ${fnlCount} finalized · ${portfolioProjects.length} projects in portfolio`;
-  }, [data]);
+    if (projectId) {
+      if (!projectData) return 'Loading…';
+      const fnlCount = projectData.project.trades.filter((t) =>
+        t.subs.some((s) => s.status === 'fnl'),
+      ).length;
+      return `${projectData.project.trades.length} trades · ${fnlCount} finalized`;
+    }
+    if (!portfolioData) return 'Loading…';
+    return `${portfolioData.projects.length} projects · all bidding lists`;
+  }, [projectId, projectData, portfolioData]);
 
-  if (isLoading || !data) {
+  // Project names for the picker — populated from whichever payload is available
+  const allProjectNames = useMemo(() => {
+    if (projectData) return projectData.portfolioProjects.map((p) => p.name);
+    if (portfolioData) return portfolioData.projects.map((p) => p.name);
+    return [];
+  }, [projectData, portfolioData]);
+
+  // Loading skeleton
+  if (isLoading || (projectId ? !projectData : !portfolioData)) {
     return (
       <>
         <LogoHeader title="Bidding Dashboard" subtitleOverride="Loading from ClickUp…" syncedAt={null} />
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 240, color: 'var(--color-text-tertiary)', fontSize: 13 }}>
-          <i className="ti ti-loader" style={{ fontSize: 20, marginRight: 8, animation: 'lib-spin 1s linear infinite' }} />
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            height: 240,
+            color: 'var(--color-text-tertiary)',
+            fontSize: 13,
+          }}
+        >
+          <i
+            className="ti ti-loader"
+            style={{ fontSize: 20, marginRight: 8, animation: 'lib-spin 1s linear infinite' }}
+          />
           Loading bidding data…
         </div>
       </>
     );
   }
 
-  if (data.warning) {
+  // No-token warning (portfolio mode)
+  if (!projectId && portfolioData!.source === 'empty') {
     return (
       <>
-        <LogoHeader title="Bidding Dashboard" subtitleOverride={data.warning} syncedAt={null} />
-        <div style={{ padding: '32px 24px', color: 'var(--color-text-secondary)', fontSize: 13, lineHeight: 1.6 }}>
-          <strong>No data available.</strong> {data.warning}
+        <LogoHeader title="Bidding Dashboard" subtitleOverride="No ClickUp token" syncedAt={null} />
+        <div style={{ padding: '32px 24px', color: 'var(--color-text-secondary)', fontSize: 13 }}>
+          <strong>No data available.</strong> Add <code>CLICKUP_API_TOKEN</code> to{' '}
+          <code>.env.local</code> to load live data.
         </div>
       </>
     );
   }
 
-  const { portfolioProjects } = data;
+  // No-token warning (project mode)
+  if (projectId && projectData!.warning) {
+    return (
+      <>
+        <LogoHeader title="Bidding Dashboard" subtitleOverride={projectData!.warning} syncedAt={null} />
+        <div style={{ padding: '32px 24px', color: 'var(--color-text-secondary)', fontSize: 13 }}>
+          <strong>No data available.</strong> {projectData!.warning}
+        </div>
+      </>
+    );
+  }
 
   return (
-    <BiddingCtx.Provider value={data}>
+    <>
       <LogoHeader
         title="Bidding Dashboard"
         subtitleOverride={subtitle}
-        syncedAt={data.syncedAt || null}
+        syncedAt={syncedAt}
       />
 
-      {/* Filter bar */}
+      {/* Filter / navigation bar */}
       <div
         style={{
           display: 'flex',
@@ -2669,7 +2870,7 @@ export function BiddingDashboard() {
         }}
         className="filter-bar"
       >
-        {/* Search */}
+        {/* Search input */}
         <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
           <i
             className="ti ti-search"
@@ -2702,13 +2903,12 @@ export function BiddingDashboard() {
           />
         </div>
 
-        {/* Project picker */}
+        {/* Project picker — "★ All projects" is always first */}
         <select
-          value={selectedProject}
+          value={projectId ?? ''}
           onChange={(e) => {
-            setSelectedProject(e.target.value);
-            const proj = portfolioProjects.find((p) => p.name === e.target.value);
-            if (proj?.isReal) setView('detailed');
+            if (!e.target.value) navigateToPortfolio();
+            else navigateToProject(e.target.value);
           }}
           style={{
             height: 32,
@@ -2719,59 +2919,67 @@ export function BiddingDashboard() {
             color: 'var(--color-text-primary)',
             fontSize: 12.5,
             fontFamily: 'inherit',
-            minWidth: 200,
+            minWidth: 220,
           }}
         >
-          {portfolioProjects.map((p) => (
-            <option key={p.name} value={p.name}>
-              {p.isReal ? '★ ' : ''}
-              {p.name}{p.location ? ` · ${p.location}` : ''}
+          <option value="">★ All projects</option>
+          {allProjectNames.map((name) => (
+            <option key={name} value={name}>
+              {name}
             </option>
           ))}
         </select>
 
-        {/* View tab strip */}
-        <div
-          className="view-toggle"
-          style={{
-            display: 'flex',
-            gap: 4,
-            padding: 4,
-            background: 'var(--color-background-secondary)',
-            borderRadius: 'var(--border-radius-md)',
-            marginLeft: 'auto',
-          }}
-        >
-          {VIEW_TABS.map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              className={`tab${view === tab.id ? ' active' : ''}`}
-              onClick={() => setView(tab.id)}
-            >
-              <i className={`ti ${tab.icon}`} style={{ fontSize: 13, marginRight: 5 }} />
-              {tab.label}
-            </button>
-          ))}
-        </div>
+        {/* Tab strip — per-project mode only */}
+        {projectId && (
+          <div
+            className="view-toggle"
+            style={{
+              display: 'flex',
+              gap: 4,
+              padding: 4,
+              background: 'var(--color-background-secondary)',
+              borderRadius: 'var(--border-radius-md)',
+              marginLeft: 'auto',
+            }}
+          >
+            {PROJECT_TABS.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                className={`tab${tab === t.id ? ' active' : ''}`}
+                onClick={() => setTab(t.id)}
+              >
+                <i className={`ti ${t.icon}`} style={{ fontSize: 13, marginRight: 5 }} />
+                {t.label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* View content */}
-      {view === 'overview' && <OverviewView onGoDetailed={() => setView('detailed')} />}
-      {view === 'detailed' && <DetailedView onBack={() => setView('overview')} search={search} />}
-      {view === 'matrix' && (
-        <MatrixView
-          onBack={() => setView('overview')}
-          onGoDetailed={() => setView('detailed')}
+      {/* Content — portfolio mode */}
+      {!projectId && (
+        <PortfolioMatrixView
+          portfolioData={portfolioData!}
+          onNavigateToProject={navigateToProject}
           search={search}
         />
       )}
-      {view === 'pipeline' && <PipelineView search={search} />}
-      {view === 'followups' && <FollowUpsView search={search} />}
-      {view === 'spreads' && <SpreadsView search={search} />}
-      {view === 'subs' && <SubsView search={search} />}
 
-      {/* Footer — two lines */}
+      {/* Content — per-project mode */}
+      {projectId && projectData && (
+        <BiddingCtx.Provider value={projectData}>
+          {tab === 'matrix' && (
+            <DetailedView onBack={navigateToPortfolio} search={search} />
+          )}
+          {tab === 'pipeline' && <PipelineView search={search} />}
+          {tab === 'followups' && <FollowUpsView search={search} />}
+          {tab === 'subs' && <SubsView search={search} />}
+        </BiddingCtx.Provider>
+      )}
+
+      {/* Footer */}
       <div
         style={{
           fontSize: 11,
@@ -2782,12 +2990,12 @@ export function BiddingDashboard() {
         }}
       >
         <div>
-          Live from ClickUp · 60-second cache · click any project, trade row, or sub cell to open in ClickUp
+          Live from ClickUp · 60-second cache · click any trade row or sub cell to open in ClickUp
         </div>
         <div>
-          Color = bidding status from the 8-color PDF palette · variance bar = New − Estimated · &quot;Manual&quot; = auto-rule overridden
+          Color = bidding status from the 8-color PDF palette
         </div>
       </div>
-    </BiddingCtx.Provider>
+    </>
   );
 }
