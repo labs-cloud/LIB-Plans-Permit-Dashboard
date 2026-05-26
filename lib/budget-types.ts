@@ -7,6 +7,14 @@ export interface BudgetTrade {
   newv: MoneyVal;
   manual?: boolean;
   costType?: 'hard' | 'soft';
+  /** Workflow status from task.status.status ("to budget", "open for bidding", etc.) */
+  status?: string;
+  /** ClickUp task ID — used to build deep-links. */
+  taskId?: string;
+  /** True when this trade row was kept after deduplication of (costType, tradeName) pairs. */
+  hasDuplicate?: boolean;
+  /** ClickUp URLs of the duplicate tasks that were dropped during dedup. */
+  duplicateTaskUrls?: string[];
 }
 
 export interface BudgetProject {
