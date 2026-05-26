@@ -659,7 +659,7 @@ function DetailedView({
 <body>
   <div class="header">
     <div class="logo-crop">
-      <img class="logo-img" src="/lib_brand/lead_it_builders_logo.png" alt="Lead It Builders" />
+      <img class="logo-img" src="${window.location.origin}/lib_brand/lead_it_builders_logo.png" alt="Lead It Builders" />
     </div>
     <div class="header-main">
       <h1>Budget Outlook Report · ${project.name}</h1>
