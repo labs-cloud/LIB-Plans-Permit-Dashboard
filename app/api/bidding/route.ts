@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
 import { unstable_cache } from 'next/cache';
-import { hasClickUpToken, getTasksInList } from '@/lib/clickup';
-import { transformBiddingTasks } from '@/lib/bidding-transforms';
+import { hasClickUpToken, getFoldersInSpace, getListsInFolder, getTasksInList } from '@/lib/clickup';
+import { transformBiddingTasks, transformBiddingTasksByName } from '@/lib/bidding-transforms';
 import type { BiddingPayload, BiddingProject, PortfolioProjectStub } from '@/lib/bidding-types';
+import type { ClickUpList } from '@/lib/clickup';
 import { CLICKUP, CACHE_TTL_SECONDS } from '@/lib/constants';
 import { BIDDING_CACHE_TAG } from '@/lib/cache';
 
@@ -27,6 +28,17 @@ function getFieldText(task: { custom_fields?: Array<{ id: string; value?: unknow
   return typeof f.value === 'string' ? f.value.trim() || null : null;
 }
 
+// Finds the "02. Bidding" list within a folder's lists.
+// Accepts "02. Bidding", "02 Bidding", or bare "Bidding" (case-insensitive).
+function findBiddingList(lists: ClickUpList[]): ClickUpList | undefined {
+  const candidates = ['02. bidding', '02 bidding', 'bidding'];
+  for (const candidate of candidates) {
+    const found = lists.find(l => l.name.toLowerCase() === candidate);
+    if (found) return found;
+  }
+  return undefined;
+}
+
 async function buildBiddingPayload(projectId: string | null): Promise<BiddingPayload> {
   if (!hasClickUpToken()) {
     return {
@@ -38,42 +50,56 @@ async function buildBiddingPayload(projectId: string | null): Promise<BiddingPay
     };
   }
 
-  // Fetch portfolio (Master Projects Board) and all trade rows (Budget-Bidding Database) in parallel.
-  // includeClosed=true so AWARDED (completed) trade tasks are included.
-  const [portfolioTasks, allTradeTasks] = await Promise.all([
-    getTasksInList(CLICKUP.MASTER_PROJECTS_BOARD_LIST_ID),
-    getTasksInList(CLICKUP.BUDGET_BIDDING_DB_LIST_ID, true),
-  ]);
+  // Fetch all project folders from the Active Projects space.
+  // Folder name = project name (verbatim — no shortening).
+  const folders = await getFoldersInSpace(CLICKUP.ACTIVE_PROJECTS_SPACE_ID);
 
-  const portfolioProjects: PortfolioProjectStub[] = portfolioTasks.map(t => ({
-    name: t.name,
+  const portfolioProjects: PortfolioProjectStub[] = folders.map(f => ({
+    name: f.name,
     location: '',
     isReal: true,
   }));
 
-  // Resolve the target project name from the query param, defaulting to the first portfolio entry.
-  const targetName = projectId
-    ? (portfolioTasks.find(t => t.name === projectId)?.name ?? portfolioTasks[0]?.name)
-    : portfolioTasks[0]?.name;
+  // Resolve the target folder: match by name, default to first folder.
+  const targetFolder = projectId
+    ? (folders.find(f => f.name === projectId) ?? folders[0])
+    : folders[0];
 
-  if (!targetName) {
+  if (!targetFolder) {
     return { project: EMPTY_PROJECT, portfolioProjects, syncedAt: Date.now(), source: 'live' };
   }
 
-  // Filter Budget-Bidding Database rows for this project via the Project ID short-text field.
+  const targetName = targetFolder.name;
+
+  // Find "02. Bidding" list in the target folder.
+  const lists = await getListsInFolder(targetFolder.id);
+  const biddingList = findBiddingList(lists);
+
+  if (biddingList) {
+    // Per-project path: field IDs vary per list, so look up by field name.
+    const tasks = await getTasksInList(biddingList.id, true);
+    const project = transformBiddingTasksByName(tasks, targetName, '', targetName, '', '');
+    return { project, portfolioProjects, syncedAt: Date.now(), source: 'live' };
+  }
+
+  // Fallback: read from the central Budget-Bidding Database list.
+  // Fires when a folder has no "02. Bidding" list (pre-migration projects).
+  console.warn(
+    `[bidding] No "02. Bidding" list found in folder "${targetName}" (id=${targetFolder.id}). ` +
+    `Falling back to central list ${CLICKUP.BUDGET_BIDDING_DB_LIST_ID}.`,
+  );
+  const allTradeTasks = await getTasksInList(CLICKUP.BUDGET_BIDDING_DB_LIST_ID, true);
   const projectTrades = allTradeTasks.filter(task =>
     getFieldText(task, F.PROJECT_ID) === targetName,
   );
-
   const project = transformBiddingTasks(projectTrades, targetName, '', targetName, '', '');
-
   return { project, portfolioProjects, syncedAt: Date.now(), source: 'live' };
 }
 
-// Cache keyed on projectId so each project gets its own 60s TTL entry.
+// Cache keyed on projectId so each project gets its own 60 s TTL entry.
 const getCachedBiddingPayload = unstable_cache(
   buildBiddingPayload,
-  ['lib-bidding:v3'],
+  ['lib-bidding:v4'],
   { revalidate: CACHE_TTL_SECONDS, tags: [BIDDING_CACHE_TAG] },
 );
 
