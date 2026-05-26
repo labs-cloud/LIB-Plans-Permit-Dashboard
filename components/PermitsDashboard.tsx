@@ -75,20 +75,57 @@ export function PermitsDashboard({ initial, initialError }: Props) {
     [payload?.projects],
   );
 
+  // All projects for the picker — uses permitsSummary so it's always populated
+  // even when no "04. Permits" list exists for a project.
+  const pickerProjects = useMemo<PickerProject[]>(() => {
+    return (payload?.projects ?? [])
+      .map((p) => ({
+        folderId: p.folderId,
+        name: p.name,
+        totals: {
+          total: p.permitsSummary.total,
+          active: p.permitsSummary.active,
+          expiring: p.permitsSummary.expiring,
+          expired: p.permitsSummary.expired,
+        },
+      }))
+      .sort((a, b) => {
+        const score = (t: PickerProject['totals']) =>
+          t.expired * 1000 + t.expiring * 10 + t.active;
+        return score(b.totals) - score(a.totals);
+      });
+  }, [payload?.projects]);
+
+  const filteredPickerProjects = useMemo(() => {
+    if (!projectSearch.trim()) return pickerProjects;
+    const q = projectSearch.toLowerCase();
+    return pickerProjects.filter((p) => p.name.toLowerCase().includes(q));
+  }, [pickerProjects, projectSearch]);
+
+  // Detailed permit data (only projects that have actual permit rows in ClickUp)
   const projectGroups = useMemo(
     () => buildDetailedGroups(payload?.projects ?? []),
     [payload?.projects],
   );
 
-  const filteredProjectGroups = useMemo(() => {
-    if (!projectSearch.trim()) return projectGroups;
-    const q = projectSearch.toLowerCase();
-    return projectGroups.filter((g) => g.name.toLowerCase().includes(q));
-  }, [projectGroups, projectSearch]);
-
-  const selectedProject = selectedFolderId
-    ? projectGroups.find((g) => g.folderId === selectedFolderId) ?? null
-    : null;
+  // Selected project detail — falls back to a minimal group if no permit rows exist
+  const selectedProject = useMemo<DetailedProjectGroup | null>(() => {
+    if (!selectedFolderId) return null;
+    const fromGroups = projectGroups.find((g) => g.folderId === selectedFolderId);
+    if (fromGroups) return fromGroups;
+    const proj = payload?.projects?.find((p) => p.folderId === selectedFolderId);
+    if (!proj) return null;
+    return {
+      folderId: proj.folderId,
+      name: proj.name,
+      phaseLabel: proj.phaseLabel,
+      coord: proj.coord,
+      permitsListId: proj.permitsListId,
+      permits: [],
+      totals: { total: 0, active: 0, expiring: 0, expired: 0 },
+      earliestExpiration: null,
+    };
+  }, [selectedFolderId, projectGroups, payload?.projects]);
 
   const permits = payload?.permits;
 
@@ -187,8 +224,8 @@ export function PermitsDashboard({ initial, initialError }: Props) {
         {/* ── Project picker (overview) ───────────────── */}
         {view === 'overview' && (
           <ProjectPicker
-            groups={filteredProjectGroups}
-            allGroups={projectGroups}
+            projects={filteredPickerProjects}
+            allProjects={pickerProjects}
             search={projectSearch}
             onSearch={setProjectSearch}
             selectedFolderId={selectedFolderId}
@@ -196,7 +233,7 @@ export function PermitsDashboard({ initial, initialError }: Props) {
           />
         )}
 
-        {view === 'overview' && selectedProject && (
+        {view === 'overview' && selectedFolderId && selectedProject && (
           <ProjectPermitsDetail
             group={selectedProject}
             onClose={() => setSelectedFolderId(null)}
@@ -376,27 +413,35 @@ export function PermitsDashboard({ initial, initialError }: Props) {
 
 // ─── ProjectPicker ─────────────────────────────────────────────────────────
 
+interface PickerProject {
+  folderId: string;
+  name: string;
+  totals: { total: number; active: number; expiring: number; expired: number };
+}
+
 function ProjectPicker({
-  groups,
-  allGroups,
+  projects,
+  allProjects,
   search,
   onSearch,
   selectedFolderId,
   onSelect,
 }: {
-  groups: DetailedProjectGroup[];
-  allGroups: DetailedProjectGroup[];
+  projects: PickerProject[];
+  allProjects: PickerProject[];
   search: string;
   onSearch: (v: string) => void;
   selectedFolderId: string | null;
   onSelect: (id: string) => void;
 }) {
-  const hasUrgent = allGroups.some((g) => g.totals.expired > 0 || g.totals.expiring > 0);
+  const urgentCount = allProjects.filter(
+    (p) => p.totals.expired > 0 || p.totals.expiring > 0,
+  ).length;
 
   return (
     <div style={{
       margin: '0 0 16px',
-      border: '0.5px solid var(--color-border-tertiary)',
+      border: '0.5px solid var(--color-border-secondary)',
       borderRadius: 'var(--border-radius-lg)',
       overflow: 'hidden',
     }}>
@@ -407,12 +452,15 @@ function ProjectPicker({
         background: 'var(--color-background-secondary)',
         borderBottom: '0.5px solid var(--color-border-tertiary)',
       }}>
-        <i className="ti ti-building-skyscraper" style={{ fontSize: 14, color: 'var(--color-text-tertiary)' }} />
-        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-secondary)', flex: 1 }}>
-          Projects · {allGroups.length} with permits
-          {hasUrgent && (
+        <i className="ti ti-building-skyscraper" style={{ fontSize: 14, color: 'var(--color-text-secondary)' }} />
+        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)', flex: 1 }}>
+          Select a project
+          <span style={{ marginLeft: 6, fontWeight: 400, color: 'var(--color-text-tertiary)' }}>
+            · {allProjects.length} project{allProjects.length === 1 ? '' : 's'}
+          </span>
+          {urgentCount > 0 && (
             <span style={{ marginLeft: 8, fontSize: 10, color: 'var(--danger-strong)', fontWeight: 700 }}>
-              · attention needed
+              · {urgentCount} need attention
             </span>
           )}
         </span>
@@ -423,7 +471,7 @@ function ProjectPicker({
             type="search"
             value={search}
             onChange={(e) => onSearch(e.target.value)}
-            placeholder="Search projects…"
+            placeholder="Search address…"
             style={{
               paddingLeft: 28, paddingRight: 10, paddingTop: 5, paddingBottom: 5,
               fontSize: 12, border: '0.5px solid var(--color-border-secondary)',
@@ -435,20 +483,21 @@ function ProjectPicker({
       </div>
 
       {/* Project rows */}
-      <div style={{ maxHeight: 220, overflowY: 'auto' }}>
-        {groups.length === 0 ? (
+      <div style={{ maxHeight: 240, overflowY: 'auto' }}>
+        {projects.length === 0 ? (
           <div style={{ padding: '1rem', textAlign: 'center', color: 'var(--color-text-tertiary)', fontSize: 12 }}>
-            No projects match.
+            No projects match "{search}".
           </div>
         ) : (
-          groups.map((g) => {
-            const isSelected = g.folderId === selectedFolderId;
-            const isHot = g.totals.expired > 0 || g.totals.expiring > 0;
+          projects.map((p) => {
+            const isSelected = p.folderId === selectedFolderId;
+            const isHot = p.totals.expired > 0 || p.totals.expiring > 0;
+            const hasPermits = p.totals.total > 0;
             return (
               <button
-                key={g.folderId}
+                key={p.folderId}
                 type="button"
-                onClick={() => onSelect(g.folderId)}
+                onClick={() => onSelect(p.folderId)}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 10,
                   width: '100%', padding: '9px 14px',
@@ -461,23 +510,29 @@ function ProjectPicker({
                 onMouseEnter={(e) => { if (!isSelected) (e.currentTarget as HTMLElement).style.background = 'var(--color-background-secondary)'; }}
                 onMouseLeave={(e) => { if (!isSelected) (e.currentTarget as HTMLElement).style.background = 'var(--color-background-primary)'; }}
               >
+                <i className="ti ti-map-pin" style={{ fontSize: 12, color: isHot ? 'var(--danger-strong)' : 'var(--color-text-tertiary)', flexShrink: 0 }} />
                 <span style={{ flex: 1, fontSize: 13, fontWeight: isHot ? 600 : 400, color: 'var(--color-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {g.name}
+                  {p.name}
                 </span>
                 <span style={{ display: 'flex', gap: 5, flexShrink: 0 }}>
-                  {g.totals.expired > 0 && (
+                  {p.totals.expired > 0 && (
                     <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 7px', borderRadius: 999, background: 'var(--danger-bg)', color: 'var(--danger-strong)' }}>
-                      {g.totals.expired} expired
+                      {p.totals.expired} expired
                     </span>
                   )}
-                  {g.totals.expiring > 0 && (
+                  {p.totals.expiring > 0 && (
                     <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 7px', borderRadius: 999, background: 'var(--warn-bg)', color: 'var(--warn-strong)' }}>
-                      {g.totals.expiring} expiring
+                      {p.totals.expiring} expiring
                     </span>
                   )}
-                  {g.totals.expired === 0 && g.totals.expiring === 0 && (
+                  {hasPermits && p.totals.expired === 0 && p.totals.expiring === 0 && (
                     <span style={{ fontSize: 10, fontWeight: 500, padding: '1px 7px', borderRadius: 999, background: 'var(--good-bg)', color: 'var(--good-strong)' }}>
-                      {g.totals.active} active
+                      {p.totals.active} active
+                    </span>
+                  )}
+                  {!hasPermits && (
+                    <span style={{ fontSize: 10, fontWeight: 400, color: 'var(--color-text-tertiary)' }}>
+                      no permits
                     </span>
                   )}
                 </span>
