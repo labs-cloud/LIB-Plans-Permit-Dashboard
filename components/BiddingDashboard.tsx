@@ -957,7 +957,6 @@ const FILTER_CHIPS: { key: FilterKey; label: string }[] = [
 function DetailedView({ onBack, search = '' }: { onBack: () => void; search?: string }) {
   const { project } = useBidding();
   const trades = project.trades;
-
   const [filter, setFilter] = useState<FilterKey>('all');
   const [drawer, setDrawer] = useState<DrawerPayload | null>(null);
 
@@ -1033,6 +1032,99 @@ function DetailedView({ onBack, search = '' }: { onBack: () => void; search?: st
     [trades],
   );
 
+  function handlePrint() {
+    const date = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+    const rows = trades.map(trade => {
+      const subs5 = Array.from({ length: 5 }, (_, i) => trade.subs[i] ?? null);
+      const cells = subs5.map(sub => {
+        if (!sub) return '<td style="padding:5px 8px;border:0.5px solid #e0e0e0;text-align:center;color:#aaa;font-size:10px;">—</td>';
+        const isLow = sub.amount !== null && sub.amount === trade.low;
+        const nameBg = isLow ? '#e8f5e9' : '#f8f8f8';
+        const nameFg = isLow ? '#2e7d32' : '#1a1a1a';
+        const nameBorder = isLow ? '#81c784' : '#e0e0e0';
+        const amtFg = isLow ? '#2e7d32' : '#666';
+        const amtWeight = isLow ? '600' : '400';
+        const amt = sub.amount !== null ? '$' + Math.round(sub.amount / 1000) + 'K' : '—';
+        return `<td style="padding:4px 6px;border:0.5px solid #e0e0e0;vertical-align:top;">
+          <div style="background:${nameBg};color:${nameFg};border:1px solid ${nameBorder};border-radius:4px 4px 0 0;border-bottom:none;padding:4px 6px;font-size:10px;text-align:center;font-weight:500;">${sub.name}</div>
+          <div style="background:${isLow ? '#e8f5e9' : 'transparent'};color:${amtFg};border:1px solid ${isLow ? '#81c784' : '#e0e0e0'};border-top:none;border-radius:0 0 4px 4px;padding:3px 6px;font-size:10px;text-align:right;font-weight:${amtWeight};">${amt}</div>
+        </td>`;
+      }).join('');
+      const lowStr = trade.low !== null ? '$' + (trade.low / 1000).toFixed(0) + 'K' : '—';
+      return `<tr>
+        <td style="padding:7px 10px;border:0.5px solid #e0e0e0;font-weight:500;font-size:11.5px;">
+          ${trade.trade}
+          <div style="font-size:9px;color:#999;margin-top:2px;">${trade.subs.length} sub${trade.subs.length !== 1 ? 's' : ''}</div>
+        </td>
+        ${cells}
+        <td style="padding:7px 10px;border:0.5px solid #e0e0e0;text-align:right;font-weight:600;color:#2e7d32;font-size:11px;">${lowStr}</td>
+      </tr>`;
+    }).join('');
+
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Bidding Report · ${project.name}</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #1a1a1a; background: #fff; padding: 24px; }
+    @page { size: landscape; margin: 16mm; }
+    @media print { body { padding: 0; } }
+    .header { display: flex; align-items: center; gap: 16px; border-bottom: 3px solid #F47832; padding-bottom: 14px; margin-bottom: 18px; }
+    .logo-crop { width: 72px; height: 78px; overflow: hidden; position: relative; flex-shrink: 0; }
+    .logo-img { position: absolute; width: 270px; height: auto; left: -22px; top: -1px; }
+    .header-text h1 { font-size: 18px; font-weight: 600; }
+    .header-text p { font-size: 11px; color: #888; margin-top: 2px; }
+    .meta { display: flex; gap: 24px; margin-bottom: 16px; flex-wrap: wrap; }
+    .kpi { background: #f8f8f8; border: 0.5px solid #e8e8e8; border-radius: 8px; padding: 10px 16px; min-width: 110px; }
+    .kpi-val { font-size: 22px; font-weight: 700; }
+    .kpi-label { font-size: 10px; color: #888; margin-top: 2px; }
+    table { width: 100%; border-collapse: collapse; font-size: 11px; }
+    th { text-align: center; padding: 7px 8px; font-size: 9px; letter-spacing: 0.06em; text-transform: uppercase; color: #888; background: #f5f5f5; border: 0.5px solid #e0e0e0; font-weight: 600; }
+    th:first-child { text-align: left; }
+    th:last-child { text-align: right; }
+    .footer { margin-top: 16px; font-size: 10px; color: #bbb; text-align: right; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="logo-crop">
+      <img class="logo-img" src="/lib_brand/lead_it_builders_logo.png" alt="Lead It Builders" />
+    </div>
+    <div class="header-text">
+      <h1>Bidding Report · ${project.name}</h1>
+      <p>${project.location || project.id} · Generated ${date}</p>
+    </div>
+  </div>
+  <div class="meta">
+    <div class="kpi"><div class="kpi-val">${kpis.total}</div><div class="kpi-label">Total trades</div></div>
+    <div class="kpi"><div class="kpi-val" style="color:#2e7d32;">${kpis.fnlCount}</div><div class="kpi-label">Finalized</div></div>
+    <div class="kpi"><div class="kpi-val" style="color:#e65100;">${kpis.outCount}</div><div class="kpi-label">Out for bid</div></div>
+    <div class="kpi"><div class="kpi-val" style="color:#c62828;">${kpis.hldCount}</div><div class="kpi-label">On hold</div></div>
+    <div class="kpi"><div class="kpi-val" style="color:#2e7d32;">$${(runningLowTotal / 1e6).toFixed(2)}M</div><div class="kpi-label">Lowest running</div></div>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Trade</th>
+        <th>Sub 1</th><th>Sub 2</th><th>Sub 3</th><th>Sub 4</th><th>Sub 5</th>
+        <th>Lowest Bid</th>
+      </tr>
+    </thead>
+    <tbody>${rows}</tbody>
+  </table>
+  <div class="footer">Lead It Builders · Bidding Dashboard · ${date}</div>
+  <script>window.onload = function() { window.print(); };<\/script>
+</body>
+</html>`;
+
+    const w = window.open('', '_blank');
+    if (!w) return;
+    w.document.write(html);
+    w.document.close();
+  }
+
   return (
     <>
       {/* Breadcrumb */}
@@ -1065,6 +1157,27 @@ function DetailedView({ onBack, search = '' }: { onBack: () => void; search?: st
         <strong style={{ color: 'var(--color-text-primary)' }}>
           {project.name} · Bidding
         </strong>
+        <span style={{ flex: 1 }} />
+        <button
+          type="button"
+          onClick={handlePrint}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 5,
+            padding: '4px 10px',
+            borderRadius: 'var(--border-radius-md)',
+            border: '0.5px solid var(--color-border-secondary)',
+            background: 'var(--color-background-secondary)',
+            color: 'var(--color-text-secondary)',
+            fontSize: 11,
+            cursor: 'pointer',
+            fontFamily: 'inherit',
+          }}
+        >
+          <i className="ti ti-printer" style={{ fontSize: 13 }} />
+          Print report
+        </button>
       </div>
 
       {/* Project header */}
