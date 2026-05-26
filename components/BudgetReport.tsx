@@ -125,11 +125,11 @@ export function BudgetReport({ projectId }: { projectId: string }) {
             marginBottom: 20,
           }}
         >
-          <div style={{ width: 64, height: 64, overflow: 'hidden', position: 'relative', flexShrink: 0 }}>
+          <div style={{ width: 60, height: 65, overflow: 'hidden', position: 'relative', flexShrink: 0 }}>
             <img
               src="/lib_brand/lead_it_builders_logo.png"
               alt="Lead It Builders"
-              style={{ position: 'absolute', width: 240, left: -19, top: -1 }}
+              style={{ position: 'absolute', width: 225, height: 'auto', left: -19, top: -1, maxWidth: 'none' }}
             />
           </div>
 
@@ -148,7 +148,7 @@ export function BudgetReport({ projectId }: { projectId: string }) {
           {/* Live indicator + actions */}
           <div className="no-print" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <button
-              onClick={() => mutate()}
+              onClick={async () => { await fetch('/api/refresh', { method: 'POST' }); mutate(); }}
               title="Refresh from ClickUp"
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: 4,
