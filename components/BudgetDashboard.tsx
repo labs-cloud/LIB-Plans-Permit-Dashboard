@@ -1596,9 +1596,11 @@ export function BudgetDashboard({ projectId }: { projectId?: string } = {}) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const tab = (searchParams?.get('tab') ?? 'table') as ProjectTab;
+  const isEmbed = searchParams?.get('embed') === '1';
   const [search, setSearch] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [drawerTrade, setDrawerTrade] = useState<BudgetTrade | null>(null);
+  const [embedCopied, setEmbedCopied] = useState(false);
   const closeDrawer = useCallback(() => setDrawerTrade(null), []);
 
   const navigateToProject = useCallback(
@@ -1667,7 +1669,7 @@ export function BudgetDashboard({ projectId }: { projectId?: string } = {}) {
   if (isLoading || (projectId ? !projectData : !portfolioData)) {
     return (
       <div className="dashboard-shell">
-        <LogoHeader title="Budget Dashboard" subtitleOverride="Loading from ClickUp…" syncedAt={null} />
+        {!isEmbed && <LogoHeader title="Budget Dashboard" subtitleOverride="Loading from ClickUp…" syncedAt={null} />}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 240, color: 'var(--color-text-tertiary)', fontSize: 13 }}>
           <i className="ti ti-loader" style={{ fontSize: 20, marginRight: 8, animation: 'lib-spin 1s linear infinite' }} />
           Loading budget data…
@@ -1680,7 +1682,7 @@ export function BudgetDashboard({ projectId }: { projectId?: string } = {}) {
   if (!projectId && portfolioData!.source === 'empty') {
     return (
       <div className="dashboard-shell">
-        <LogoHeader title="Budget Dashboard" subtitleOverride="No ClickUp token" syncedAt={null} />
+        {!isEmbed && <LogoHeader title="Budget Dashboard" subtitleOverride="No ClickUp token" syncedAt={null} />}
         <div style={{ padding: '32px 24px', color: 'var(--color-text-secondary)', fontSize: 13, lineHeight: 1.6 }}>
           <strong>No data available.</strong> Add <code>CLICKUP_API_TOKEN</code> to{' '}
           <code>.env.local</code> to load live data.
@@ -1693,7 +1695,7 @@ export function BudgetDashboard({ projectId }: { projectId?: string } = {}) {
   if (projectId && projectData!.warning) {
     return (
       <div className="dashboard-shell">
-        <LogoHeader title="Budget Dashboard" subtitleOverride={projectData!.warning} syncedAt={null} />
+        {!isEmbed && <LogoHeader title="Budget Dashboard" subtitleOverride={projectData!.warning} syncedAt={null} />}
         <div style={{ padding: '32px 24px', color: 'var(--color-text-secondary)', fontSize: 13, lineHeight: 1.6 }}>
           <strong>No data available.</strong> {projectData!.warning}
         </div>
@@ -1703,11 +1705,13 @@ export function BudgetDashboard({ projectId }: { projectId?: string } = {}) {
 
   return (
     <div className="dashboard-shell">
-      <LogoHeader
-        title="Budget Dashboard"
-        subtitleOverride={subtitle}
-        syncedAt={syncedAt}
-      />
+      {!isEmbed && (
+        <LogoHeader
+          title="Budget Dashboard"
+          subtitleOverride={subtitle}
+          syncedAt={syncedAt}
+        />
+      )}
 
       {/* Filter / navigation bar */}
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: '1.25rem' }}>
@@ -1762,26 +1766,66 @@ export function BudgetDashboard({ projectId }: { projectId?: string } = {}) {
         </div>
 
         {/* Project picker */}
-        <select
-          value={projectId ?? ''}
-          onChange={(e) => {
-            if (!e.target.value) navigateToPortfolio();
-            else navigateToProject(e.target.value);
-          }}
-          style={{
+        {isEmbed && projectId ? (
+          <span style={{
             height: 32, padding: '0 10px',
             border: '0.5px solid var(--color-border-secondary)',
             borderRadius: 'var(--border-radius-md)',
-            background: 'var(--color-background-primary)',
+            background: 'var(--color-background-secondary)',
             color: 'var(--color-text-primary)',
             fontFamily: 'inherit', fontSize: 13, minWidth: 200, fontWeight: 500,
-          }}
-        >
-          <option value="">★ All projects</option>
-          {allProjectNames.map(name => (
-            <option key={name} value={name}>{name}</option>
-          ))}
-        </select>
+            display: 'inline-flex', alignItems: 'center',
+          }}>
+            {projectId}
+          </span>
+        ) : (
+          <select
+            value={projectId ?? ''}
+            onChange={(e) => {
+              if (!e.target.value) navigateToPortfolio();
+              else navigateToProject(e.target.value);
+            }}
+            style={{
+              height: 32, padding: '0 10px',
+              border: '0.5px solid var(--color-border-secondary)',
+              borderRadius: 'var(--border-radius-md)',
+              background: 'var(--color-background-primary)',
+              color: 'var(--color-text-primary)',
+              fontFamily: 'inherit', fontSize: 13, minWidth: 200, fontWeight: 500,
+            }}
+          >
+            <option value="">★ All projects</option>
+            {allProjectNames.map(name => (
+              <option key={name} value={name}>{name}</option>
+            ))}
+          </select>
+        )}
+
+        {/* Copy embed link — per-project, non-embed mode only */}
+        {!isEmbed && projectId && (
+          <button
+            type="button"
+            onClick={() => {
+              const url = `${window.location.origin}/budget/${encodeURIComponent(projectId)}?embed=1`;
+              navigator.clipboard.writeText(url).then(() => {
+                setEmbedCopied(true);
+                setTimeout(() => setEmbedCopied(false), 2000);
+              });
+            }}
+            style={{
+              height: 32, padding: '0 12px',
+              border: '0.5px solid var(--color-border-secondary)',
+              borderRadius: 'var(--border-radius-md)',
+              background: embedCopied ? 'var(--color-background-secondary)' : 'var(--color-background-primary)',
+              color: embedCopied ? 'var(--good-strong)' : 'var(--color-text-secondary)',
+              fontFamily: 'inherit', fontSize: 13, cursor: 'pointer',
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+            }}
+          >
+            <i className={`ti ${embedCopied ? 'ti-check' : 'ti-link'}`} style={{ fontSize: 14 }} />
+            {embedCopied ? 'Copied!' : 'Copy embed link'}
+          </button>
+        )}
 
         {/* Tab strip — per-project mode only */}
         {projectId && (

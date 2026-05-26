@@ -50,6 +50,7 @@ export function PermitsDashboard({ initial, initialError }: Props) {
   const payload = initial;
   const router = useRouter();
   const searchParams = useSearchParams();
+  const isEmbed = searchParams?.get('embed') === '1';
   const searchParamsRef = useRef(searchParams);
   searchParamsRef.current = searchParams;
 
@@ -142,24 +143,26 @@ export function PermitsDashboard({ initial, initialError }: Props) {
         borderRadius: 'var(--border-radius-lg)',
       }}
     >
-      <LogoHeader
-        title="Permits Dashboard"
-        subtitleOverride={(() => {
-          const active = permits?.active ?? 0;
-          const projects = permits?.activeProjects ?? 0;
-          const expiring = permits?.expiring30d ?? 0;
-          const expired = permits?.expired ?? 0;
-          const tail =
-            expired > 0
-              ? `${expired} expired · ${expiring} expiring 30d`
-              : `${expiring} expiring in 30d`;
-          return `${active} active permits across ${projects} project${
-            projects === 1 ? '' : 's'
-          } · ${tail}`;
-        })()}
-        syncedAt={payload?.syncedAt ?? null}
-        warning={warning}
-      />
+      {!isEmbed && (
+        <LogoHeader
+          title="Permits Dashboard"
+          subtitleOverride={(() => {
+            const active = permits?.active ?? 0;
+            const projects = permits?.activeProjects ?? 0;
+            const expiring = permits?.expiring30d ?? 0;
+            const expired = permits?.expired ?? 0;
+            const tail =
+              expired > 0
+                ? `${expired} expired · ${expiring} expiring 30d`
+                : `${expiring} expiring in 30d`;
+            return `${active} active permits across ${projects} project${
+              projects === 1 ? '' : 's'
+            } · ${tail}`;
+          })()}
+          syncedAt={payload?.syncedAt ?? null}
+          warning={warning}
+        />
+      )}
 
       <div className="permits-panel">
         <div className="permits-panel-h">
