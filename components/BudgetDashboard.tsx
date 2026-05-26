@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useState, type ReactNode } from 'react';
 import useSWR from 'swr';
 import Link from 'next/link';
 import { LogoHeader } from '@/components/LogoHeader';
@@ -1451,13 +1451,6 @@ export function BudgetDashboard() {
     dedupingInterval: 60_000,
   });
 
-  // Lock in the first real project after the initial load.
-  useEffect(() => {
-    if (data && !selectedProject) {
-      const first = data.portfolioProjects.find(p => p.real) ?? data.portfolioProjects[0];
-      if (first) setSelectedProject(first.name);
-    }
-  }, [data, selectedProject]);
 
   if (isLoading || !data) {
     return (
@@ -1548,6 +1541,7 @@ export function BudgetDashboard() {
           value={selectedProject}
           onChange={e => setSelectedProject(e.target.value)}
         >
+          <option value="">All projects</option>
           {portfolioProjects.filter(p => p.real).map(p => (
             <option key={p.name} value={p.name}>★ {p.name}</option>
           ))}
