@@ -37,3 +37,9 @@ export interface BiddingPayload {
   source?: 'live' | 'empty';
   warning?: string;
 }
+
+export interface BiddingPortfolioPayload {
+  projects: BiddingProject[];
+  syncedAt: number;
+  source?: 'live' | 'empty';
+}
