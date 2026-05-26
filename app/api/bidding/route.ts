@@ -76,8 +76,9 @@ async function buildBiddingPayload(projectId: string | null): Promise<BiddingPay
   const biddingList = findBiddingList(lists);
 
   if (biddingList) {
-    // Per-project path: field IDs vary per list, so look up by field name.
-    const tasks = await getTasksInList(biddingList.id, true);
+    // Per-project path: must include subtasks — the list uses a parent/subtask
+    // hierarchy where root tasks = trade rows, subtasks = sub bid rows.
+    const tasks = await getTasksInList(biddingList.id, true, true);
     const project = transformBiddingTasksByName(tasks, targetName, '', targetName, '', '');
     return { project, portfolioProjects, syncedAt: Date.now(), source: 'live' };
   }
@@ -99,7 +100,7 @@ async function buildBiddingPayload(projectId: string | null): Promise<BiddingPay
 // Cache keyed on projectId so each project gets its own 60 s TTL entry.
 const getCachedBiddingPayload = unstable_cache(
   buildBiddingPayload,
-  ['lib-bidding:v4'],
+  ['lib-bidding:v5'],
   { revalidate: CACHE_TTL_SECONDS, tags: [BIDDING_CACHE_TAG] },
 );
 

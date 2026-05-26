@@ -51,8 +51,7 @@ async function buildPortfolioPayload(): Promise<BiddingPortfolioPayload> {
   // Fetch all project folders from the Active Projects space.
   const folders = await getFoldersInSpace(CLICKUP.ACTIVE_PROJECTS_SPACE_ID);
 
-  // Take the first 8 folders for the portfolio matrix.
-  const targetFolders = folders.slice(0, 8);
+  const targetFolders = folders;
 
   if (targetFolders.length === 0) {
     return { projects: [], syncedAt: Date.now(), source: 'live' };
@@ -66,8 +65,9 @@ async function buildPortfolioPayload(): Promise<BiddingPortfolioPayload> {
       const biddingList = findBiddingList(lists);
 
       if (biddingList) {
-        // Per-project path: field IDs vary per list, so look up by field name.
-        const tasks = await getTasksInList(biddingList.id, true);
+        // Per-project path: must include subtasks — the list uses a parent/subtask
+        // hierarchy where root tasks = trade rows, subtasks = sub bid rows.
+        const tasks = await getTasksInList(biddingList.id, true, true);
         return transformBiddingTasksByName(tasks, folderName, '', folderName, '', '');
       }
 
@@ -101,7 +101,7 @@ async function buildPortfolioPayload(): Promise<BiddingPortfolioPayload> {
 // Cache keyed on a fixed key (no per-project variation) with 60 s TTL.
 const getCachedPortfolioPayload = unstable_cache(
   buildPortfolioPayload,
-  ['lib-bidding-portfolio:v4'],
+  ['lib-bidding-portfolio:v5'],
   { revalidate: CACHE_TTL_SECONDS, tags: [BIDDING_CACHE_TAG] },
 );
 
