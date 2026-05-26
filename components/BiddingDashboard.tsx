@@ -49,14 +49,14 @@ type StatusMeta = {
 };
 
 const STATUS_META: Record<BidStatus, StatusMeta> = {
-  ntb: { label: 'Not bidding', icon: 'ti-ban',        bg: 'var(--bid-ntb-bg)', fg: 'var(--bid-ntb-fg)', ring: 'var(--bid-ntb-ring)', strong: 'var(--bid-ntb-strong)' },
-  snt: { label: 'Sent',        icon: 'ti-send',        bg: 'var(--bid-snt-bg)', fg: 'var(--bid-snt-fg)', ring: 'var(--bid-snt-ring)', strong: 'var(--bid-snt-strong)' },
-  rec: { label: 'Received',    icon: 'ti-checks',      bg: 'var(--bid-rec-bg)', fg: 'var(--bid-rec-fg)', ring: 'var(--bid-rec-ring)', strong: 'var(--bid-rec-strong)' },
-  hld: { label: 'Hold',        icon: 'ti-hand-stop',   bg: 'var(--bid-hld-bg)', fg: 'var(--bid-hld-fg)', ring: 'var(--bid-hld-ring)', strong: 'var(--bid-hld-strong)' },
-  fnl: { label: 'Finalized',   icon: 'ti-trophy',      bg: 'var(--bid-fnl-bg)', fg: 'var(--bid-fnl-fg)', ring: 'var(--bid-fnl-ring)', strong: 'var(--bid-fnl-strong)' },
-  fu1: { label: 'FU·W1 (14d ago)', icon: 'ti-message-2', bg: 'var(--bid-fu1-bg)', fg: 'var(--bid-fu1-fg)', ring: 'var(--bid-fu1-ring)', strong: 'var(--bid-fu1-strong)' },
-  fu2: { label: 'FU·W2 (7d ago)',  icon: 'ti-message-2', bg: 'var(--bid-fu2-bg)', fg: 'var(--bid-fu2-fg)', ring: 'var(--bid-fu2-ring)', strong: 'var(--bid-fu2-strong)' },
-  fu3: { label: 'FU·W3 (0d ago)',  icon: 'ti-message-2', bg: 'var(--bid-fu3-bg)', fg: 'var(--bid-fu3-fg)', ring: 'var(--bid-fu3-ring)', strong: 'var(--bid-fu3-strong)' },
+  ntb: { label: 'To Send',       icon: 'ti-ban',        bg: 'var(--bid-ntb-bg)', fg: 'var(--bid-ntb-fg)', ring: 'var(--bid-ntb-ring)', strong: 'var(--bid-ntb-strong)' },
+  snt: { label: 'RFP Sent',      icon: 'ti-send',       bg: 'var(--bid-snt-bg)', fg: 'var(--bid-snt-fg)', ring: 'var(--bid-snt-ring)', strong: 'var(--bid-snt-strong)' },
+  rec: { label: 'Bid Received',  icon: 'ti-checks',     bg: 'var(--bid-rec-bg)', fg: 'var(--bid-rec-fg)', ring: 'var(--bid-rec-ring)', strong: 'var(--bid-rec-strong)' },
+  hld: { label: 'Rejected',      icon: 'ti-hand-stop',  bg: 'var(--bid-hld-bg)', fg: 'var(--bid-hld-fg)', ring: 'var(--bid-hld-ring)', strong: 'var(--bid-hld-strong)' },
+  fnl: { label: 'Awarded',       icon: 'ti-trophy',     bg: 'var(--bid-fnl-bg)', fg: 'var(--bid-fnl-fg)', ring: 'var(--bid-fnl-ring)', strong: 'var(--bid-fnl-strong)' },
+  fu1: { label: 'Followed Up · W1 (14d ago)', icon: 'ti-message-2', bg: 'var(--bid-fu1-bg)', fg: 'var(--bid-fu1-fg)', ring: 'var(--bid-fu1-ring)', strong: 'var(--bid-fu1-strong)' },
+  fu2: { label: 'Followed Up · W2 (7d ago)',  icon: 'ti-message-2', bg: 'var(--bid-fu2-bg)', fg: 'var(--bid-fu2-fg)', ring: 'var(--bid-fu2-ring)', strong: 'var(--bid-fu2-strong)' },
+  fu3: { label: 'Followed Up · W3 (0d ago)',  icon: 'ti-message-2', bg: 'var(--bid-fu3-bg)', fg: 'var(--bid-fu3-fg)', ring: 'var(--bid-fu3-ring)', strong: 'var(--bid-fu3-strong)' },
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -463,31 +463,33 @@ function Drawer({ payload, onClose }: { payload: DrawerPayload; onClose: () => v
                   )}
                 </div>
               </div>
-              <div>
-                <div
-                  style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4 }}
-                >
-                  OPEN IN CLICKUP
+              {payload.sub.url && (
+                <div>
+                  <div
+                    style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4 }}
+                  >
+                    OPEN IN CLICKUP
+                  </div>
+                  <a
+                    href={payload.sub.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      fontSize: 12,
+                      color: 'var(--color-text-info)',
+                      padding: '6px 12px',
+                      border: '0.5px solid var(--color-border-secondary)',
+                      borderRadius: 6,
+                    }}
+                  >
+                    <i className="ti ti-external-link" style={{ fontSize: 14 }} />
+                    Open task in ClickUp
+                  </a>
                 </div>
-                <a
-                  href="#"
-                  target="_blank"
-                  rel="noopener"
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 6,
-                    fontSize: 12,
-                    color: 'var(--color-text-info)',
-                    padding: '6px 12px',
-                    border: '0.5px solid var(--color-border-secondary)',
-                    borderRadius: 6,
-                  }}
-                >
-                  <i className="ti ti-external-link" style={{ fontSize: 14 }} />
-                  Open task
-                </a>
-              </div>
+              )}
             </>
           ) : (
             <>
@@ -948,11 +950,11 @@ type FilterKey = 'all' | BidStatus | 'fu';
 
 const FILTER_CHIPS: { key: FilterKey; label: string }[] = [
   { key: 'all', label: 'All' },
-  { key: 'snt', label: 'Sent' },
-  { key: 'rec', label: 'Received' },
-  { key: 'hld', label: 'Hold' },
-  { key: 'fnl', label: 'Finalized' },
-  { key: 'fu', label: 'Follow-up' },
+  { key: 'snt', label: 'RFP Sent' },
+  { key: 'rec', label: 'Bid Received' },
+  { key: 'hld', label: 'Rejected' },
+  { key: 'fnl', label: 'Awarded' },
+  { key: 'fu', label: 'Followed Up' },
 ];
 
 function DetailedView({ onBack, search = '' }: { onBack: () => void; search?: string }) {
@@ -1036,14 +1038,14 @@ function DetailedView({ onBack, search = '' }: { onBack: () => void; search?: st
 
   // Status color palette for print (hardcoded hex — CSS vars don't work in popup windows)
   const PRINT_STATUS: Record<BidStatus, { bg: string; fg: string; ring: string; label: string }> = {
-    ntb: { bg: '#E8E6E1', fg: '#3F3D38', ring: '#9C9A92', label: 'Not bidding' },
-    snt: { bg: '#7DD3F2', fg: '#053A5F', ring: '#1B7CB0', label: 'Sent' },
-    rec: { bg: '#FFE74A', fg: '#3D2D00', ring: '#9C7A00', label: 'Received' },
-    hld: { bg: '#F47B7B', fg: '#3E0707', ring: '#A82828', label: 'Hold' },
-    fnl: { bg: '#7DD68F', fg: '#0D3E18', ring: '#1F7A38', label: 'Finalized' },
-    fu1: { bg: '#C8A7E6', fg: '#33124F', ring: '#6B3A95', label: 'FU · W1' },
-    fu2: { bg: '#F8CEAC', fg: '#4A2308', ring: '#A85F18', label: 'FU · W2' },
-    fu3: { bg: '#F5C8DD', fg: '#5A1338', ring: '#A8336E', label: 'FU · W3' },
+    ntb: { bg: '#E8E6E1', fg: '#3F3D38', ring: '#9C9A92', label: 'To Send' },
+    snt: { bg: '#7DD3F2', fg: '#053A5F', ring: '#1B7CB0', label: 'RFP Sent' },
+    rec: { bg: '#FFE74A', fg: '#3D2D00', ring: '#9C7A00', label: 'Bid Received' },
+    hld: { bg: '#F47B7B', fg: '#3E0707', ring: '#A82828', label: 'Rejected' },
+    fnl: { bg: '#7DD68F', fg: '#0D3E18', ring: '#1F7A38', label: 'Awarded' },
+    fu1: { bg: '#C8A7E6', fg: '#33124F', ring: '#6B3A95', label: 'Followed Up · W1' },
+    fu2: { bg: '#F8CEAC', fg: '#4A2308', ring: '#A85F18', label: 'Followed Up · W2' },
+    fu3: { bg: '#F5C8DD', fg: '#5A1338', ring: '#A8336E', label: 'Followed Up · W3' },
   };
 
   function handlePrint() {
@@ -1513,7 +1515,12 @@ function DetailedView({ onBack, search = '' }: { onBack: () => void; search?: st
             </thead>
             <tbody>
               {filteredTrades.map((trade, ti) => {
-                const subs5: (BidSub | null)[] = Array.from({ length: 5 }, (_, i) => trade.subs[i] ?? null);
+                const visibleSubs = filter === 'all'
+                  ? trade.subs
+                  : filter === 'fu'
+                    ? trade.subs.filter(s => s.status === 'fu1' || s.status === 'fu2' || s.status === 'fu3')
+                    : trade.subs.filter(s => s.status === filter);
+                const subs5: (BidSub | null)[] = Array.from({ length: 5 }, (_, i) => visibleSubs[i] ?? null);
                 const isZebra = ti % 2 === 1;
                 const lowestZebraColor = isZebra
                   ? 'rgba(220,234,247,1)'
