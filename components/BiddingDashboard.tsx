@@ -960,6 +960,7 @@ function DetailedView({ onBack, search = '' }: { onBack: () => void; search?: st
   const trades = project.trades;
   const [filter, setFilter] = useState<FilterKey>('all');
   const [drawer, setDrawer] = useState<DrawerPayload | null>(null);
+  const [shareCopied, setShareCopied] = useState(false);
 
   const kpis = useMemo(() => {
     const fnlCount = trades.filter((t) => t.subs.some((s) => s.status === 'fnl')).length;
@@ -1033,34 +1034,53 @@ function DetailedView({ onBack, search = '' }: { onBack: () => void; search?: st
     [trades],
   );
 
+  // Status color palette for print (hardcoded hex — CSS vars don't work in popup windows)
+  const PRINT_STATUS: Record<BidStatus, { bg: string; fg: string; ring: string; label: string }> = {
+    ntb: { bg: '#E8E6E1', fg: '#3F3D38', ring: '#9C9A92', label: 'Not bidding' },
+    snt: { bg: '#7DD3F2', fg: '#053A5F', ring: '#1B7CB0', label: 'Sent' },
+    rec: { bg: '#FFE74A', fg: '#3D2D00', ring: '#9C7A00', label: 'Received' },
+    hld: { bg: '#F47B7B', fg: '#3E0707', ring: '#A82828', label: 'Hold' },
+    fnl: { bg: '#7DD68F', fg: '#0D3E18', ring: '#1F7A38', label: 'Finalized' },
+    fu1: { bg: '#C8A7E6', fg: '#33124F', ring: '#6B3A95', label: 'FU · W1' },
+    fu2: { bg: '#F8CEAC', fg: '#4A2308', ring: '#A85F18', label: 'FU · W2' },
+    fu3: { bg: '#F5C8DD', fg: '#5A1338', ring: '#A8336E', label: 'FU · W3' },
+  };
+
   function handlePrint() {
     const date = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-    const rows = trades.map(trade => {
+    const rows = trades.map((trade, ti) => {
       const subs5 = Array.from({ length: 5 }, (_, i) => trade.subs[i] ?? null);
+      const rowBg = ti % 2 === 0 ? '#fff' : '#fafaf8';
       const cells = subs5.map(sub => {
-        if (!sub) return '<td style="padding:5px 8px;border:0.5px solid #e0e0e0;text-align:center;color:#aaa;font-size:10px;">—</td>';
+        if (!sub) return `<td style="padding:6px 8px;border-bottom:0.5px solid #f0f0ec;text-align:center;color:#ccc;font-size:10px;background:${rowBg};">—</td>`;
+        const s = PRINT_STATUS[sub.status as BidStatus] ?? PRINT_STATUS.ntb;
         const isLow = sub.amount !== null && sub.amount === trade.low;
-        const nameBg = isLow ? '#e8f5e9' : '#f8f8f8';
-        const nameFg = isLow ? '#2e7d32' : '#1a1a1a';
-        const nameBorder = isLow ? '#81c784' : '#e0e0e0';
-        const amtFg = isLow ? '#2e7d32' : '#666';
-        const amtWeight = isLow ? '600' : '400';
-        const amt = sub.amount !== null ? '$' + Math.round(sub.amount / 1000) + 'K' : '—';
-        return `<td style="padding:4px 6px;border:0.5px solid #e0e0e0;vertical-align:top;">
-          <div style="background:${nameBg};color:${nameFg};border:1px solid ${nameBorder};border-radius:4px 4px 0 0;border-bottom:none;padding:4px 6px;font-size:10px;text-align:center;font-weight:500;">${sub.name}</div>
-          <div style="background:${isLow ? '#e8f5e9' : 'transparent'};color:${amtFg};border:1px solid ${isLow ? '#81c784' : '#e0e0e0'};border-top:none;border-radius:0 0 4px 4px;padding:3px 6px;font-size:10px;text-align:right;font-weight:${amtWeight};">${amt}</div>
+        const amt = sub.amount !== null ? (sub.amount >= 1000000 ? '$' + (sub.amount / 1e6).toFixed(2) + 'M' : '$' + Math.round(sub.amount / 1000) + 'K') : '—';
+        return `<td style="padding:5px 6px;border-bottom:0.5px solid #f0f0ec;vertical-align:top;background:${rowBg};">
+          <div style="background:${s.bg};color:${s.fg};border:1px solid ${s.ring};border-radius:4px 4px 0 0;border-bottom:none;padding:3px 6px;font-size:9.5px;text-align:center;font-weight:${isLow ? 700 : 500};line-height:1.3;">${sub.name}</div>
+          <div style="background:${isLow ? '#e8f5e9' : '#f8f8f6'};color:${isLow ? '#1F7A38' : '#555'};border:1px solid ${isLow ? '#81c784' : '#e0e0dc'};border-top:none;border-radius:0 0 4px 4px;padding:2px 6px;font-size:9.5px;text-align:right;font-weight:${isLow ? 700 : 400};">${amt}</div>
         </td>`;
       }).join('');
-      const lowStr = trade.low !== null ? '$' + (trade.low / 1000).toFixed(0) + 'K' : '—';
+      const lowStr = trade.low !== null
+        ? (trade.low >= 1000000 ? '$' + (trade.low / 1e6).toFixed(2) + 'M' : '$' + Math.round(trade.low / 1000) + 'K')
+        : '—';
       return `<tr>
-        <td style="padding:7px 10px;border:0.5px solid #e0e0e0;font-weight:500;font-size:11.5px;">
+        <td style="padding:8px 12px;border-bottom:0.5px solid #f0f0ec;font-weight:600;font-size:11px;background:${rowBg};">
           ${trade.trade}
-          <div style="font-size:9px;color:#999;margin-top:2px;">${trade.subs.length} sub${trade.subs.length !== 1 ? 's' : ''}</div>
+          <div style="font-size:9px;color:#aaa;margin-top:1px;">${trade.subs.length} sub${trade.subs.length !== 1 ? 's' : ''}</div>
         </td>
         ${cells}
-        <td style="padding:7px 10px;border:0.5px solid #e0e0e0;text-align:right;font-weight:600;color:#2e7d32;font-size:11px;">${lowStr}</td>
+        <td style="padding:8px 12px;border-bottom:0.5px solid #f0f0ec;text-align:right;font-weight:700;color:${trade.low !== null ? '#1F7A38' : '#aaa'};font-size:11px;background:${rowBg};">${lowStr}</td>
       </tr>`;
     }).join('');
+
+    const totalStr = runningLowTotal >= 1000000
+      ? '$' + (runningLowTotal / 1e6).toFixed(2) + 'M'
+      : '$' + Math.round(runningLowTotal / 1000) + 'K';
+
+    const legendHtml = (Object.entries(PRINT_STATUS) as [BidStatus, typeof PRINT_STATUS[BidStatus]][])
+      .map(([, s]) => `<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:4px;background:${s.bg};color:${s.fg};border:1px solid ${s.ring};font-size:9px;font-weight:500;">${s.label}</span>`)
+      .join('');
 
     const html = `<!DOCTYPE html>
 <html>
@@ -1068,24 +1088,27 @@ function DetailedView({ onBack, search = '' }: { onBack: () => void; search?: st
   <meta charset="utf-8">
   <title>Bidding Report · ${project.name}</title>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #1a1a1a; background: #fff; padding: 24px; }
-    @page { size: landscape; margin: 16mm; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #1a1a1a; background: #fff; padding: 24px 28px; }
+    @page { size: landscape; margin: 10mm 12mm; }
     @media print { body { padding: 0; } }
-    .header { display: flex; align-items: center; gap: 16px; border-bottom: 3px solid #F47832; padding-bottom: 14px; margin-bottom: 18px; }
-    .logo-crop { width: 72px; height: 78px; overflow: hidden; position: relative; flex-shrink: 0; }
-    .logo-img { position: absolute; width: 270px; height: auto; left: -22px; top: -1px; }
-    .header-text h1 { font-size: 18px; font-weight: 600; }
-    .header-text p { font-size: 11px; color: #888; margin-top: 2px; }
-    .meta { display: flex; gap: 24px; margin-bottom: 16px; flex-wrap: wrap; }
-    .kpi { background: #f8f8f8; border: 0.5px solid #e8e8e8; border-radius: 8px; padding: 10px 16px; min-width: 110px; }
-    .kpi-val { font-size: 22px; font-weight: 700; }
-    .kpi-label { font-size: 10px; color: #888; margin-top: 2px; }
-    table { width: 100%; border-collapse: collapse; font-size: 11px; }
-    th { text-align: center; padding: 7px 8px; font-size: 9px; letter-spacing: 0.06em; text-transform: uppercase; color: #888; background: #f5f5f5; border: 0.5px solid #e0e0e0; font-weight: 600; }
+    .header { display: flex; align-items: center; gap: 18px; border-bottom: 3px solid #F47832; padding-bottom: 14px; margin-bottom: 16px; }
+    .logo-crop { width: 60px; height: 60px; overflow: hidden; position: relative; flex-shrink: 0; }
+    .logo-img { position: absolute; width: 224px; height: auto; left: -18px; top: -1px; }
+    .header-text h1 { font-size: 17px; font-weight: 700; letter-spacing: -0.01em; }
+    .header-text p { font-size: 11px; color: #888; margin-top: 3px; }
+    .kpi-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-bottom: 14px; }
+    .kpi { background: #f8f8f6; border: 0.5px solid #e8e8e4; border-radius: 8px; padding: 9px 14px; }
+    .kpi-val { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .kpi-label { font-size: 9px; color: #888; margin-top: 2px; text-transform: uppercase; letter-spacing: 0.05em; }
+    .legend { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+    table { width: 100%; border-collapse: collapse; }
+    th { padding: 8px 10px; font-size: 9px; letter-spacing: 0.07em; text-transform: uppercase; color: #888; background: #f5f5f2; border-bottom: 1px solid #e8e8e4; font-weight: 600; }
     th:first-child { text-align: left; }
+    th:nth-child(n+2):nth-last-child(n+2) { text-align: center; }
     th:last-child { text-align: right; }
-    .footer { margin-top: 16px; font-size: 10px; color: #bbb; text-align: right; }
+    .total-row td { background: #f5fdf7 !important; font-weight: 700; font-size: 11px; border-top: 2px solid #b2dfdb; padding: 9px 12px; }
+    .footer { margin-top: 14px; font-size: 9.5px; color: #bbb; display: flex; justify-content: space-between; }
   </style>
 </head>
 <body>
@@ -1098,13 +1121,14 @@ function DetailedView({ onBack, search = '' }: { onBack: () => void; search?: st
       <p>${project.location || project.id} · Generated ${date}</p>
     </div>
   </div>
-  <div class="meta">
+  <div class="kpi-grid">
     <div class="kpi"><div class="kpi-val">${kpis.total}</div><div class="kpi-label">Total trades</div></div>
-    <div class="kpi"><div class="kpi-val" style="color:#2e7d32;">${kpis.fnlCount}</div><div class="kpi-label">Finalized</div></div>
-    <div class="kpi"><div class="kpi-val" style="color:#e65100;">${kpis.outCount}</div><div class="kpi-label">Out for bid</div></div>
-    <div class="kpi"><div class="kpi-val" style="color:#c62828;">${kpis.hldCount}</div><div class="kpi-label">On hold</div></div>
-    <div class="kpi"><div class="kpi-val" style="color:#2e7d32;">$${(runningLowTotal / 1e6).toFixed(2)}M</div><div class="kpi-label">Lowest running</div></div>
+    <div class="kpi"><div class="kpi-val" style="color:#1F7A38;">${kpis.fnlCount}</div><div class="kpi-label">Finalized</div></div>
+    <div class="kpi"><div class="kpi-val" style="color:#9C7A00;">${kpis.outCount}</div><div class="kpi-label">Out for bid</div></div>
+    <div class="kpi"><div class="kpi-val" style="color:#A82828;">${kpis.hldCount}</div><div class="kpi-label">On hold</div></div>
+    <div class="kpi"><div class="kpi-val" style="color:#1F7A38;">${totalStr}</div><div class="kpi-label">Lowest running</div></div>
   </div>
+  <div class="legend">${legendHtml}</div>
   <table>
     <thead>
       <tr>
@@ -1113,9 +1137,18 @@ function DetailedView({ onBack, search = '' }: { onBack: () => void; search?: st
         <th>Lowest Bid</th>
       </tr>
     </thead>
-    <tbody>${rows}</tbody>
+    <tbody>
+      ${rows}
+      <tr class="total-row">
+        <td colspan="6">Total — lowest column — running</td>
+        <td style="text-align:right;color:#1F7A38;">${totalStr}</td>
+      </tr>
+    </tbody>
   </table>
-  <div class="footer">Lead It Builders · Bidding Dashboard · ${date}</div>
+  <div class="footer">
+    <span>Lead It Builders · Bidding Dashboard · ${date}</span>
+    <span>Color = bidding status from the 8-color palette · lowest bid highlighted in green</span>
+  </div>
   <script>window.onload = function() { window.print(); };<\/script>
 </body>
 </html>`;
@@ -1124,6 +1157,14 @@ function DetailedView({ onBack, search = '' }: { onBack: () => void; search?: st
     if (!w) return;
     w.document.write(html);
     w.document.close();
+  }
+
+  function handleShareLink() {
+    const url = `${window.location.origin}/bidding/${encodeURIComponent(project.name)}/report`;
+    navigator.clipboard.writeText(url).then(() => {
+      setShareCopied(true);
+      setTimeout(() => setShareCopied(false), 2500);
+    });
   }
 
   return (
@@ -1159,26 +1200,51 @@ function DetailedView({ onBack, search = '' }: { onBack: () => void; search?: st
           {project.name} · Bidding
         </strong>
         <span style={{ flex: 1 }} />
-        <button
-          type="button"
-          onClick={handlePrint}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 5,
-            padding: '4px 10px',
-            borderRadius: 'var(--border-radius-md)',
-            border: '0.5px solid var(--color-border-secondary)',
-            background: 'var(--color-background-secondary)',
-            color: 'var(--color-text-secondary)',
-            fontSize: 11,
-            cursor: 'pointer',
-            fontFamily: 'inherit',
-          }}
-        >
-          <i className="ti ti-printer" style={{ fontSize: 13 }} />
-          Print report
-        </button>
+
+        {/* Print / Share button group */}
+        <div style={{ display: 'inline-flex', borderRadius: 'var(--border-radius-md)', overflow: 'hidden', border: '0.5px solid var(--color-border-secondary)' }}>
+          <button
+            type="button"
+            onClick={handlePrint}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 5,
+              padding: '4px 10px',
+              background: 'var(--color-background-secondary)',
+              color: 'var(--color-text-secondary)',
+              fontSize: 11,
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              border: 'none',
+              borderRight: '0.5px solid var(--color-border-secondary)',
+            }}
+          >
+            <i className="ti ti-printer" style={{ fontSize: 13 }} />
+            Print
+          </button>
+          <button
+            type="button"
+            onClick={handleShareLink}
+            title="Copy live report link to clipboard"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 5,
+              padding: '4px 10px',
+              background: shareCopied ? 'var(--bid-fnl-bg)' : 'var(--color-background-secondary)',
+              color: shareCopied ? 'var(--bid-fnl-fg)' : 'var(--color-text-secondary)',
+              fontSize: 11,
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              border: 'none',
+              transition: 'background 0.2s, color 0.2s',
+            }}
+          >
+            <i className={`ti ${shareCopied ? 'ti-check' : 'ti-link'}`} style={{ fontSize: 13 }} />
+            {shareCopied ? 'Copied!' : 'Share'}
+          </button>
+        </div>
       </div>
 
       {/* Project header */}
