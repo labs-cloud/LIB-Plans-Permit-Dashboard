@@ -137,31 +137,38 @@ function KpiCard({
   value,
   icon,
   tone,
+  onClick,
+  active,
 }: {
   label: string;
   caption: string;
   value: string | number;
   icon: string;
   tone: KpiTone;
+  onClick?: () => void;
+  active?: boolean;
 }) {
   const ts = TONE_STYLES[tone];
   return (
     <div
+      onClick={onClick}
       style={{
-        background: 'var(--color-background-secondary)',
-        border: '0.5px solid transparent',
+        background: active ? 'var(--color-background-secondary)' : 'var(--color-background-secondary)',
+        border: active ? '1.5px solid var(--lib-softblack)' : '0.5px solid transparent',
         borderRadius: 'var(--border-radius-md)',
         padding: '14px 16px',
         display: 'flex',
         alignItems: 'center',
         gap: 10,
-        transition: 'border-color 0.15s',
+        transition: 'border-color 0.15s, box-shadow 0.15s',
+        cursor: onClick ? 'pointer' : 'default',
+        boxShadow: active ? '0 0 0 3px rgba(0,0,0,0.06)' : 'none',
       }}
       onMouseEnter={(e) => {
-        (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--color-border-secondary)';
+        if (onClick) (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--color-border-secondary)';
       }}
       onMouseLeave={(e) => {
-        (e.currentTarget as HTMLDivElement).style.borderColor = 'transparent';
+        if (!active) (e.currentTarget as HTMLDivElement).style.borderColor = 'transparent';
       }}
     >
       <div style={{ flex: 1, minWidth: 0 }}>
@@ -946,7 +953,7 @@ function OverviewView({ onGoDetailed }: { onGoDetailed: () => void }) {
 
 // ─── Detailed view ────────────────────────────────────────────────────────────
 
-type FilterKey = 'all' | BidStatus | 'fu';
+type FilterKey = 'all' | BidStatus | 'fu' | 'out';
 
 const FILTER_CHIPS: { key: FilterKey; label: string }[] = [
   { key: 'all', label: 'All' },
@@ -997,6 +1004,10 @@ function DetailedView({ onBack, search = '' }: { onBack: () => void; search?: st
           (s) => s.status === 'fu1' || s.status === 'fu2' || s.status === 'fu3',
         ),
       );
+    else if (filter === 'out')
+      result = result.filter((t) =>
+        t.subs.some((s) => s.status === 'snt' || s.status === 'rec'),
+      );
     else if (filter !== 'all')
       result = result.filter((t) => t.subs.some((s) => s.status === filter));
     if (search.trim()) {
@@ -1024,6 +1035,9 @@ function DetailedView({ onBack, search = '' }: { onBack: () => void; search?: st
       ).length,
       ntb: trades.filter(
         (t) => t.subs.length > 0 && t.subs.every((s) => s.status === 'ntb'),
+      ).length,
+      out: trades.filter((t) =>
+        t.subs.some((s) => s.status === 'snt' || s.status === 'rec'),
       ).length,
       fu1: 0,
       fu2: 0,
@@ -1350,6 +1364,8 @@ function DetailedView({ onBack, search = '' }: { onBack: () => void; search?: st
           value={kpis.total}
           icon="ti-list"
           tone="info"
+          active={filter === 'all'}
+          onClick={() => setFilter('all')}
         />
         <KpiCard
           label="Finalized"
@@ -1357,6 +1373,8 @@ function DetailedView({ onBack, search = '' }: { onBack: () => void; search?: st
           value={kpis.fnlCount}
           icon="ti-trophy"
           tone="good"
+          active={filter === 'fnl'}
+          onClick={() => setFilter(filter === 'fnl' ? 'all' : 'fnl')}
         />
         <KpiCard
           label="Out for bid"
@@ -1364,6 +1382,8 @@ function DetailedView({ onBack, search = '' }: { onBack: () => void; search?: st
           value={kpis.outCount}
           icon="ti-send"
           tone="info"
+          active={filter === 'out'}
+          onClick={() => setFilter(filter === 'out' ? 'all' : 'out')}
         />
         <KpiCard
           label="On hold"
@@ -1371,6 +1391,8 @@ function DetailedView({ onBack, search = '' }: { onBack: () => void; search?: st
           value={kpis.hldCount}
           icon="ti-hand-stop"
           tone="danger"
+          active={filter === 'hld'}
+          onClick={() => setFilter(filter === 'hld' ? 'all' : 'hld')}
         />
         <KpiCard
           label="Not bidding"
@@ -1378,6 +1400,8 @@ function DetailedView({ onBack, search = '' }: { onBack: () => void; search?: st
           value={kpis.ntbCount}
           icon="ti-ban"
           tone="amber"
+          active={filter === 'ntb'}
+          onClick={() => setFilter(filter === 'ntb' ? 'all' : 'ntb')}
         />
         <KpiCard
           label="Lowest running"
