@@ -486,7 +486,7 @@ function ProjectPicker({
       <div style={{ maxHeight: 240, overflowY: 'auto' }}>
         {projects.length === 0 ? (
           <div style={{ padding: '1rem', textAlign: 'center', color: 'var(--color-text-tertiary)', fontSize: 12 }}>
-            No projects match "{search}".
+            No projects match &ldquo;{search}&rdquo;.
           </div>
         ) : (
           projects.map((p) => {
