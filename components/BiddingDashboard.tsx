@@ -1013,7 +1013,7 @@ function DetailedView({ onBack, search = '' }: { onBack: () => void; search?: st
         </button>
         <i className="ti ti-chevron-right" style={{ fontSize: 12, opacity: 0.5 }} />
         <strong style={{ color: 'var(--color-text-primary)' }}>
-          800 Brady Ave · Bidding
+          {project.name} · Bidding
         </strong>
       </div>
 
@@ -1352,7 +1352,6 @@ function DetailedView({ onBack, search = '' }: { onBack: () => void; search?: st
                           </td>
                         );
                       }
-                      const m = STATUS_META[sub.status];
                       const isLow = sub.amount !== null && sub.amount === trade.low;
                       return (
                         <td
@@ -1365,43 +1364,61 @@ function DetailedView({ onBack, search = '' }: { onBack: () => void; search?: st
                           }}
                           onClick={() => setDrawer({ type: 'sub', trade, sub })}
                         >
-                          {/* name block */}
+                          {/* name block — neutral, single color */}
                           <div
                             style={{
                               display: 'block',
                               padding: '5px 8px',
-                              borderRadius: '5px 5px 0 0',
-                              border: `1px solid ${m.ring}`,
-                              borderBottom: 'none',
+                              borderRadius: isLow ? '5px 5px 0 0' : 5,
+                              border: isLow
+                                ? '1px solid var(--good-strong)'
+                                : '1px solid var(--color-border-tertiary)',
+                              borderBottom: isLow ? 'none' : undefined,
                               fontSize: 11.5,
                               textAlign: 'center',
                               fontWeight: 500,
                               minHeight: 26,
-                              background: m.bg,
-                              color: m.fg,
+                              background: isLow ? 'var(--good-bg)' : 'var(--color-background-secondary)',
+                              color: isLow ? 'var(--good-fg)' : 'var(--color-text-primary)',
                             }}
                           >
                             {sub.name}
                           </div>
-                          {/* amount block */}
-                          <div
-                            style={{
-                              display: 'block',
-                              padding: '5px 8px',
-                              border: `1px solid var(--color-border-tertiary)`,
-                              borderTop: 'none',
-                              borderRadius: '0 0 5px 5px',
-                              fontSize: 11.5,
-                              textAlign: 'right',
-                              fontVariantNumeric: 'tabular-nums',
-                              minHeight: 26,
-                              background: isLow ? 'var(--good-bg)' : 'transparent',
-                              color: isLow ? 'var(--good-fg)' : 'var(--color-text-secondary)',
-                              fontWeight: isLow ? 600 : 400,
-                            }}
-                          >
-                            {sub.amount !== null ? fmt$(sub.amount) : '—'}
-                          </div>
+                          {/* amount block — green only for lowest */}
+                          {isLow && (
+                            <div
+                              style={{
+                                display: 'block',
+                                padding: '5px 8px',
+                                border: '1px solid var(--good-strong)',
+                                borderTop: 'none',
+                                borderRadius: '0 0 5px 5px',
+                                fontSize: 11.5,
+                                textAlign: 'right',
+                                fontVariantNumeric: 'tabular-nums',
+                                minHeight: 26,
+                                background: 'var(--good-bg)',
+                                color: 'var(--good-fg)',
+                                fontWeight: 600,
+                              }}
+                            >
+                              {sub.amount !== null ? fmt$(sub.amount) : '—'}
+                            </div>
+                          )}
+                          {!isLow && sub.amount !== null && (
+                            <div
+                              style={{
+                                display: 'block',
+                                padding: '3px 8px',
+                                fontSize: 11,
+                                textAlign: 'right',
+                                fontVariantNumeric: 'tabular-nums',
+                                color: 'var(--color-text-secondary)',
+                              }}
+                            >
+                              {fmt$(sub.amount)}
+                            </div>
+                          )}
                         </td>
                       );
                     })}
