@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useMemo, useState, type ReactNo
 import useSWR from 'swr';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { LogoHeader } from '@/components/LogoHeader';
+import { CLICKUP } from '@/lib/constants';
 import type {
   BudgetTrade,
   BudgetPayload,
@@ -543,18 +544,22 @@ function PortfolioBudgetView({
 function DetailedView({
   onGoOverview,
   onTradeClick,
+  search,
 }: {
   onGoOverview: () => void;
   onTradeClick: (t: BudgetTrade) => void;
+  search?: string;
 }) {
   const { project } = useBudget();
-  const bs = computeStats(project.trades);
+  const q = search?.toLowerCase().trim() || '';
+  const filteredTrades = q ? project.trades.filter(r => r.trade.toLowerCase().includes(q)) : project.trades;
+  const bs = computeStats(filteredTrades);
   const d = bs.newv - bs.est;
   const dp = bs.est > 0 ? (d / bs.est * 100) : 0;
   const [shareCopied, setShareCopied] = useState(false);
 
   // "where budget moved"
-  const movers = project.trades
+  const movers = filteredTrades
     .filter(r => isMoney(r.est) && isMoney(r.fin))
     .map(r => ({ trade: r.trade, d: (r.fin as number) - (r.est as number) }));
   movers.sort((a, b) => a.d - b.d);
@@ -589,7 +594,7 @@ function DetailedView({
     const fmtFull = (v: number): string =>
       '$' + v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-    const rows = project.trades.map((r, ti) => {
+    const rows = filteredTrades.map((r, ti) => {
       const rowBg = ti % 2 === 0 ? '#fff' : '#fafaf8';
       const rd = (isMoney(r.newv) && isMoney(r.est)) ? (r.newv - r.est) : null;
       const rdp = (rd !== null && isMoney(r.est) && r.est > 0) ? (rd / r.est * 100) : null;
@@ -731,6 +736,24 @@ function DetailedView({
             {shareCopied ? 'Copied!' : 'Share'}
           </button>
         </div>
+        <a
+          href={`${CLICKUP.BASE_URL}/${CLICKUP.WORKSPACE_ID}/v/f/${project.id}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 5, height: 28, padding: '0 10px', border: '0.5px solid var(--color-border-secondary)', borderRadius: 'var(--border-radius-md)', background: 'var(--color-background-secondary)', color: 'var(--color-text-secondary)', fontSize: 11, textDecoration: 'none' }}
+        >
+          <i className="ti ti-folder" style={{ fontSize: 13 }} />
+          ClickUp folder
+        </a>
+        <a
+          href={`${CLICKUP.BASE_URL}/${CLICKUP.WORKSPACE_ID}/v/f/${project.id}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 5, height: 28, padding: '0 10px', border: '0.5px solid var(--lib-black)', borderRadius: 'var(--border-radius-md)', background: 'var(--lib-black)', color: '#fff', fontSize: 11, textDecoration: 'none' }}
+        >
+          <i className="ti ti-external-link" style={{ fontSize: 13 }} />
+          Open in ClickUp
+        </a>
       </div>
 
       {/* Project header */}
@@ -745,14 +768,6 @@ function DetailedView({
               <span><i className="ti ti-map-pin" style={{ fontSize: 13, verticalAlign: '-2px' }} /> {project.location}</span>
             </div>
           )}
-        </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button style={{ height: 32, padding: '0 13px', borderRadius: 'var(--border-radius-md)', border: '0.5px solid var(--color-border-secondary)', fontSize: 12.5, display: 'inline-flex', alignItems: 'center', gap: 6, background: 'var(--color-background-primary)', color: 'var(--color-text-primary)', cursor: 'pointer', fontFamily: 'inherit' }}>
-            <i className="ti ti-folder" /> ClickUp folder
-          </button>
-          <button style={{ height: 32, padding: '0 13px', borderRadius: 'var(--border-radius-md)', border: '0.5px solid var(--lib-black)', fontSize: 12.5, display: 'inline-flex', alignItems: 'center', gap: 6, background: 'var(--lib-black)', color: '#fff', cursor: 'pointer', fontFamily: 'inherit' }}>
-            <i className="ti ti-external-link" /> Open in ClickUp
-          </button>
         </div>
       </div>
 
@@ -798,7 +813,7 @@ function DetailedView({
                 </tr>
               </thead>
               <tbody>
-                {project.trades.map((r, idx) => (
+                {filteredTrades.map((r, idx) => (
                   <tr
                     key={idx}
                     style={{ cursor: 'pointer' }}
@@ -911,9 +926,10 @@ function DetailedView({
 // ──────────────────────────────────────────────────────────────
 // VarianceView
 // ──────────────────────────────────────────────────────────────
-function VarianceView({ onBack }: { onBack: () => void }) {
+function VarianceView({ onBack, search }: { onBack: () => void; search?: string }) {
   const { project } = useBudget();
-  const trades = project.trades;
+  const q = search?.toLowerCase().trim() || '';
+  const trades = q ? project.trades.filter(r => r.trade.toLowerCase().includes(q)) : project.trades;
   const [drawerTrade, setDrawerTrade] = useState<BudgetTrade | null>(null);
   const closeDrawer = useCallback(() => setDrawerTrade(null), []);
 
@@ -1115,9 +1131,10 @@ function VarianceView({ onBack }: { onBack: () => void }) {
 // ──────────────────────────────────────────────────────────────
 // TreemapView
 // ──────────────────────────────────────────────────────────────
-function TreemapView({ onBack }: { onBack: () => void }) {
+function TreemapView({ onBack, search }: { onBack: () => void; search?: string }) {
   const { project } = useBudget();
-  const trades = project.trades;
+  const q = search?.toLowerCase().trim() || '';
+  const trades = q ? project.trades.filter(r => r.trade.toLowerCase().includes(q)) : project.trades;
   const bs = computeStats(trades);
 
   // Numeric newv trades
@@ -1350,9 +1367,10 @@ const WORK_PACKAGES = [
   },
 ];
 
-function CategoriesView({ onBack }: { onBack: () => void }) {
+function CategoriesView({ onBack, search }: { onBack: () => void; search?: string }) {
   const { project } = useBudget();
-  const trades = project.trades;
+  const q = search?.toLowerCase().trim() || '';
+  const trades = q ? project.trades.filter(r => r.trade.toLowerCase().includes(q)) : project.trades;
   const [openPkg, setOpenPkg] = useState<string | null>(null);
   const [allOpen, setAllOpen] = useState(false);
 
@@ -1548,6 +1566,7 @@ export function BudgetDashboard({ projectId }: { projectId?: string } = {}) {
   const searchParams = useSearchParams();
   const tab = (searchParams?.get('tab') ?? 'table') as ProjectTab;
   const [search, setSearch] = useState('');
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const [drawerTrade, setDrawerTrade] = useState<BudgetTrade | null>(null);
   const closeDrawer = useCallback(() => setDrawerTrade(null), []);
 
@@ -1602,6 +1621,16 @@ export function BudgetDashboard({ projectId }: { projectId?: string } = {}) {
     if (portfolioData) return portfolioData.projects.map((p) => p.name);
     return [];
   }, [projectData, portfolioData]);
+
+  // Trade name suggestions for search autocomplete (per-project mode only)
+  const suggestions = useMemo(() => {
+    if (!search.trim() || !projectId || !projectData) return [];
+    const q = search.toLowerCase();
+    return projectData.project.trades
+      .map(t => t.trade)
+      .filter(name => name.toLowerCase().includes(q))
+      .slice(0, 8);
+  }, [search, projectId, projectData]);
 
   // Loading skeleton
   if (isLoading || (projectId ? !projectData : !portfolioData)) {
@@ -1659,6 +1688,8 @@ export function BudgetDashboard({ projectId }: { projectId?: string } = {}) {
             placeholder={projectId ? 'Search trades…' : 'Search trades, projects…'}
             value={search}
             onChange={e => setSearch(e.target.value)}
+            onFocus={() => setShowSuggestions(true)}
+            onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
             style={{
               height: 32, paddingLeft: 26, paddingRight: 8,
               border: '0.5px solid var(--color-border-secondary)',
@@ -1668,6 +1699,35 @@ export function BudgetDashboard({ projectId }: { projectId?: string } = {}) {
               fontFamily: 'inherit', fontSize: 13, width: 200, outline: 'none',
             }}
           />
+          {suggestions.length > 0 && showSuggestions && (
+            <div style={{
+              position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 4,
+              background: 'var(--color-background-primary)',
+              border: '0.5px solid var(--color-border-secondary)',
+              borderRadius: 'var(--border-radius-md)',
+              boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
+              zIndex: 100, overflow: 'hidden',
+            }}>
+              {suggestions.map(name => (
+                <button
+                  key={name}
+                  type="button"
+                  onMouseDown={() => { setSearch(name); setShowSuggestions(false); }}
+                  style={{
+                    display: 'block', width: '100%', textAlign: 'left',
+                    padding: '8px 12px', fontSize: 12.5,
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    color: 'var(--color-text-primary)', fontFamily: 'inherit',
+                    borderBottom: '0.5px solid var(--color-border-tertiary)',
+                  }}
+                  onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-background-secondary)')}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+                >
+                  {name}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Project picker */}
@@ -1739,11 +1799,12 @@ export function BudgetDashboard({ projectId }: { projectId?: string } = {}) {
             <DetailedView
               onGoOverview={navigateToPortfolio}
               onTradeClick={setDrawerTrade}
+              search={search}
             />
           )}
-          {tab === 'variance' && <VarianceView onBack={navigateToPortfolio} />}
-          {tab === 'treemap' && <TreemapView onBack={navigateToPortfolio} />}
-          {tab === 'categories' && <CategoriesView onBack={navigateToPortfolio} />}
+          {tab === 'variance' && <VarianceView onBack={navigateToPortfolio} search={search} />}
+          {tab === 'treemap' && <TreemapView onBack={navigateToPortfolio} search={search} />}
+          {tab === 'categories' && <CategoriesView onBack={navigateToPortfolio} search={search} />}
         </BudgetCtx.Provider>
       )}
 

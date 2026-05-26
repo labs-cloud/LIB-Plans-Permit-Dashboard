@@ -55,9 +55,9 @@ async function buildPayload(projectId: string): Promise<BudgetPayload> {
     real: true,
   }));
 
-  // Resolve the target project name from the route param, defaulting to the first entry.
-  const targetName =
-    folders.find((f) => f.name === projectId)?.name ?? folders[0]?.name;
+  // Resolve the target project folder from the route param, defaulting to the first entry.
+  const targetFolder = folders.find((f) => f.name === projectId) ?? folders[0];
+  const targetName = targetFolder?.name;
 
   if (!targetName) {
     return { project: EMPTY_PROJECT, portfolioProjects, syncedAt: Date.now(), source: 'live' };
@@ -69,7 +69,7 @@ async function buildPayload(projectId: string): Promise<BudgetPayload> {
     (task) => getFieldText(task, F.PROJECT_ID) === targetName,
   );
 
-  const project = transformBudgetTasks(projectTrades, targetName, '', targetName, '', '');
+  const project = transformBudgetTasks(projectTrades, targetName, '', targetFolder?.id ?? targetName, '', '');
 
   return { project, portfolioProjects, syncedAt: Date.now(), source: 'live' };
 }

@@ -59,7 +59,7 @@ async function buildPortfolioPayload(): Promise<BudgetPortfolioPayload> {
       const projectTrades = allTradeTasks.filter(
         (t) => getFieldText(t, F.PROJECT_ID) === name,
       );
-      return transformBudgetTasks(projectTrades, name, '', name, '', '');
+      return transformBudgetTasks(projectTrades, name, '', folder.id, '', '');
     }),
   );
 
