@@ -46,11 +46,6 @@ function fmtFull$(v: MoneyVal): string {
   return '$' + v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-function siblingEstM(idx: number): number {
-  const seed = ((idx + 7) * 173) % 100;
-  return 4 + (seed / 100) * 18;
-}
-
 // ──────────────────────────────────────────────────────────────
 // stats
 // ──────────────────────────────────────────────────────────────
@@ -387,21 +382,13 @@ function Drawer({
 // ──────────────────────────────────────────────────────────────
 // VIEWS
 // ──────────────────────────────────────────────────────────────
-function OverviewView({ onGoBrady }: { onGoBrady: () => void }) {
+function OverviewView({ onGoProject }: { onGoProject: (name: string) => void }) {
   const { project, portfolioProjects } = useBudget();
   const bs = computeStats(project.trades);
   const bDelta = bs.newv - bs.est;
   const bDp = bs.est > 0 ? (bDelta / bs.est * 100) : 0;
 
-  let pfEst = bs.est;
-  portfolioProjects.forEach((p, i) => {
-    if (!p.real) pfEst += siblingEstM(i) * 1e6;
-  });
-  const pfDelta = bs.newv - bs.est;
-  const pfDp = bs.est > 0 ? (pfDelta / bs.est * 100) : 0;
-
-  const over = bs.newv > bs.est ? 1 : 0;
-  const under = bs.newv < bs.est ? 1 : 0;
+  const otherProjects = portfolioProjects.filter(p => p.name !== project.name);
 
   const th: React.CSSProperties = {
     position: 'sticky', top: 0, zIndex: 2,
@@ -413,21 +400,23 @@ function OverviewView({ onGoBrady }: { onGoBrady: () => void }) {
     whiteSpace: 'nowrap', textAlign: 'left',
   };
 
+  const tdBase: React.CSSProperties = { padding: '9px 12px', borderBottom: '0.5px solid var(--color-border-tertiary)', textAlign: 'right', fontVariantNumeric: 'tabular-nums' };
+
   return (
     <div>
       {/* KPI strip */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 10, marginBottom: '1.25rem' }}>
-        <KpiCard label="Total New Budget" value={fmt$(bs.newv)} sub="active job value · Brady" icon="ti-wallet" tone="good" />
+        <KpiCard label="New Budget (loaded)" value={fmt$(bs.newv)} sub={project.name} icon="ti-wallet" tone="good" />
         <KpiCard
           label="Δ vs Estimated"
           value={(bDelta < 0 ? '−' : bDelta > 0 ? '+' : '') + fmt$(Math.abs(bDelta))}
-          sub={bDp.toFixed(1) + '% · Brady-anchored'}
+          sub={bDp.toFixed(1) + '% vs estimate'}
           icon="ti-trending-down"
-          tone="danger"
+          tone={bDelta > 0 ? 'danger' : bDelta < 0 ? 'good' : 'default'}
         />
-        <KpiCard label="Projects over budget" value={String(over)} sub="New > Estimated" icon="ti-arrow-up-right" tone="amber" />
-        <KpiCard label="Projects under budget" value={String(under)} sub="savings vs estimate" icon="ti-arrow-down-right" tone="good" />
-        <KpiCard label="Trades awaiting bids" value={String(bs.eo)} sub="on Brady · 42 siblings pending sync" icon="ti-hourglass" tone="info" />
+        <KpiCard label="Projects in portfolio" value={String(portfolioProjects.length)} sub="from ClickUp Master Board" icon="ti-buildings" />
+        <KpiCard label="Trades with bids in" value={String(bs.withBids)} sub={`${project.name} · loaded`} icon="ti-checks" tone="info" />
+        <KpiCard label="Estimate-only trades" value={String(bs.eo)} sub="no bids yet · carry-forward" icon="ti-hourglass" tone="amber" />
       </div>
 
       {/* Projects matrix */}
@@ -442,14 +431,7 @@ function OverviewView({ onGoBrady }: { onGoBrady: () => void }) {
           <i className="ti ti-table" />
           Projects matrix
           <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--color-text-tertiary)', fontWeight: 400 }}>
-            click{' '}
-            <button
-              onClick={onGoBrady}
-              style={{ background: 'none', border: 'none', color: 'var(--color-text-info)', cursor: 'pointer', padding: 0, fontSize: 11, fontFamily: 'inherit' }}
-            >
-              800 Brady
-            </button>
-            {' '}for the per-trade drill-in · ghost rows = pending ClickUp sync
+            click a row to select that project and see its budget detail
           </span>
         </h2>
         <div style={{ maxHeight: 600, overflowY: 'auto', background: 'var(--color-background-primary)', borderRadius: 8, border: '0.5px solid var(--color-border-tertiary)' }}>
@@ -462,77 +444,59 @@ function OverviewView({ onGoBrady }: { onGoBrady: () => void }) {
               </tr>
             </thead>
             <tbody>
-              {/* Real row: 800 Brady */}
-              <tr style={{ cursor: 'pointer' }} onClick={onGoBrady}>
-                {[
-                  <td key="name" style={{ padding: '9px 12px', borderBottom: '0.5px solid var(--color-border-tertiary)', verticalAlign: 'middle' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontWeight: 500, color: 'var(--lib-orange)' }}>800 Brady Ave</span>
-                      <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>Bronx, NY · Sol</span>
-                    </div>
-                  </td>,
-                  <td key="est" style={{ padding: '9px 12px', borderBottom: '0.5px solid var(--color-border-tertiary)', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{fmt$(bs.est)}</td>,
-                  <td key="fin" style={{ padding: '9px 12px', borderBottom: '0.5px solid var(--color-border-tertiary)', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{fmt$(bs.fin)}</td>,
-                  <td key="new" style={{ padding: '9px 12px', borderBottom: '0.5px solid var(--color-border-tertiary)', textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}>{fmt$(bs.newv)}</td>,
-                  <td key="delta$" style={{ padding: '9px 12px', borderBottom: '0.5px solid var(--color-border-tertiary)', textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: bDelta < 0 ? 'var(--var-under)' : bDelta > 0 ? 'var(--var-over)' : undefined }}>
-                    {(bDelta < 0 ? '−' : bDelta > 0 ? '+' : '')}{fmt$(Math.abs(bDelta))}
-                  </td>,
-                  <td key="deltaP" style={{ padding: '9px 12px', borderBottom: '0.5px solid var(--color-border-tertiary)', textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: bDelta < 0 ? 'var(--var-under)' : bDelta > 0 ? 'var(--var-over)' : undefined }}>
-                    {bDp.toFixed(1)}%
-                  </td>,
-                  <td key="spark" style={{ padding: '9px 12px', borderBottom: '0.5px solid var(--color-border-tertiary)', textAlign: 'center' }}>
-                    <SparkBar finalized={bs.withBids} total={bs.count - bs.na - bs.inc} />
-                  </td>,
-                ]}
+              {/* Currently-loaded project — has real data */}
+              <tr
+                style={{ cursor: 'pointer' }}
+                onClick={() => onGoProject(project.name)}
+                onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-background-secondary)')}
+                onMouseLeave={e => (e.currentTarget.style.background = '')}
+              >
+                <td style={{ ...tdBase, textAlign: 'left', verticalAlign: 'middle' }}>
+                  <span style={{ fontWeight: 500, color: 'var(--lib-orange)' }}>{project.name}</span>
+                </td>
+                <td style={tdBase}>{fmt$(bs.est)}</td>
+                <td style={tdBase}>{fmt$(bs.fin)}</td>
+                <td style={{ ...tdBase, fontWeight: 600 }}>{fmt$(bs.newv)}</td>
+                <td style={{ ...tdBase, color: bDelta < 0 ? 'var(--var-under)' : bDelta > 0 ? 'var(--var-over)' : undefined }}>
+                  {(bDelta < 0 ? '−' : bDelta > 0 ? '+' : '')}{fmt$(Math.abs(bDelta))}
+                </td>
+                <td style={{ ...tdBase, color: bDelta < 0 ? 'var(--var-under)' : bDelta > 0 ? 'var(--var-over)' : undefined }}>
+                  {bDp.toFixed(1)}%
+                </td>
+                <td style={{ ...tdBase, textAlign: 'center' }}>
+                  <SparkBar finalized={bs.withBids} total={bs.count - bs.na - bs.inc} />
+                </td>
               </tr>
-              {/* Ghost rows */}
-              {portfolioProjects.filter(p => !p.real).map((p, i) => {
-                const estM = siblingEstM(i);
-                return (
-                  <tr key={p.name}>
-                    <td style={{ padding: '9px 12px', borderBottom: '0.5px solid var(--color-border-tertiary)', verticalAlign: 'middle' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span style={{ fontWeight: 500 }}>{p.name}</span>
-                        <span style={{
-                          fontSize: 9, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase',
-                          padding: '1px 6px', borderRadius: 999,
-                          background: 'var(--color-background-tertiary)', color: 'var(--color-text-tertiary)',
-                          border: '1px solid var(--color-border-tertiary)',
-                          display: 'inline-flex', alignItems: 'center', gap: 3,
-                        }}>
-                          <i className="ti ti-cloud-off" style={{ fontSize: 9 }} /> pending sync
-                        </span>
-                      </div>
-                      <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 1 }}>{p.loc}</div>
-                    </td>
-                    {['$' + estM.toFixed(1) + 'M est', '—', '—', '—', '—'].map((v, ci) => (
-                      <td key={ci} style={{ padding: '9px 12px', borderBottom: '0.5px solid var(--color-border-tertiary)', textAlign: 'right', color: 'var(--color-text-tertiary)', fontStyle: 'italic', opacity: 0.55, fontVariantNumeric: 'tabular-nums' }}>{v}</td>
-                    ))}
-                    <td style={{ padding: '9px 12px', borderBottom: '0.5px solid var(--color-border-tertiary)', textAlign: 'center' }}>
-                      <SparkBar ghost />
-                    </td>
-                  </tr>
-                );
-              })}
+              {/* Other portfolio projects — click to load their data */}
+              {otherProjects.map(p => (
+                <tr
+                  key={p.name}
+                  style={{ cursor: 'pointer' }}
+                  onClick={() => onGoProject(p.name)}
+                  onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-background-secondary)')}
+                  onMouseLeave={e => (e.currentTarget.style.background = '')}
+                >
+                  <td style={{ ...tdBase, textAlign: 'left', verticalAlign: 'middle' }}>
+                    <span style={{ fontWeight: 500 }}>{p.name}</span>
+                  </td>
+                  {['—', '—', '—', '—', '—'].map((v, ci) => (
+                    <td key={ci} style={{ ...tdBase, color: 'var(--color-text-tertiary)', fontStyle: 'italic' }}>{v}</td>
+                  ))}
+                  <td style={{ ...tdBase, textAlign: 'center' }}>
+                    <SparkBar ghost />
+                  </td>
+                </tr>
+              ))}
             </tbody>
             <tfoot>
               <tr>
                 <td style={{ position: 'sticky', bottom: 0, zIndex: 2, background: 'var(--color-background-secondary)', borderTop: '1.5px solid var(--color-border-secondary)', padding: '14px 12px', fontWeight: 600 }}>
-                  Portfolio total{' '}
-                  <span style={{ fontWeight: 400, color: 'var(--color-text-tertiary)', fontSize: 11 }}>· est = Brady + ghosted siblings · committed/new = Brady only</span>
+                  Portfolio
+                  <span style={{ fontWeight: 400, color: 'var(--color-text-tertiary)', fontSize: 11 }}> · {portfolioProjects.length} active projects · select a row to load full data</span>
                 </td>
-                {[fmt$(pfEst), fmt$(bs.fin), fmt$(bs.newv)].map((v, i) => (
-                  <td key={i} style={{ position: 'sticky', bottom: 0, zIndex: 2, background: 'var(--color-background-secondary)', borderTop: '1.5px solid var(--color-border-secondary)', padding: '14px 12px', textAlign: 'right', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{v}</td>
+                {['—', '—', '—', '—', '—', '—'].map((v, i) => (
+                  <td key={i} style={{ position: 'sticky', bottom: 0, zIndex: 2, background: 'var(--color-background-secondary)', borderTop: '1.5px solid var(--color-border-secondary)', padding: '14px 12px', textAlign: 'right', color: 'var(--color-text-tertiary)' }}>{v}</td>
                 ))}
-                <td style={{ position: 'sticky', bottom: 0, zIndex: 2, background: 'var(--color-background-secondary)', borderTop: '1.5px solid var(--color-border-secondary)', padding: '14px 12px', textAlign: 'right', fontWeight: 600, fontVariantNumeric: 'tabular-nums', color: pfDelta < 0 ? 'var(--var-under)' : pfDelta > 0 ? 'var(--var-over)' : undefined }}>
-                  {(pfDelta < 0 ? '−' : pfDelta > 0 ? '+' : '')}{fmt$(Math.abs(pfDelta))}
-                </td>
-                <td style={{ position: 'sticky', bottom: 0, zIndex: 2, background: 'var(--color-background-secondary)', borderTop: '1.5px solid var(--color-border-secondary)', padding: '14px 12px', textAlign: 'right', fontWeight: 600 }}>
-                  {pfDp.toFixed(1)}%
-                </td>
-                <td style={{ position: 'sticky', bottom: 0, zIndex: 2, background: 'var(--color-background-secondary)', borderTop: '1.5px solid var(--color-border-secondary)', padding: '14px 12px', fontSize: 11, color: 'var(--color-text-tertiary)', textAlign: 'center' }}>
-                  1 real · 42 pending
-                </td>
               </tr>
             </tfoot>
           </table>
@@ -581,7 +545,7 @@ function DetailedView({
       <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginBottom: 12, display: 'flex', gap: 6, alignItems: 'center' }}>
         <button onClick={onGoOverview} style={{ background: 'none', border: 'none', color: 'var(--color-text-info)', cursor: 'pointer', padding: 0, fontSize: 12, fontFamily: 'inherit' }}>Portfolio</button>
         <i className="ti ti-chevron-right" style={{ fontSize: 14, opacity: 0.6 }} />
-        <span>800 Brady Ave · Budget</span>
+        <span>{project.name} · Budget</span>
       </div>
 
       {/* Project header */}
@@ -590,18 +554,12 @@ function DetailedView({
         paddingBottom: 14, borderBottom: '0.5px solid var(--color-border-tertiary)', marginBottom: 14,
       }}>
         <div>
-          <h1 style={{ fontSize: 22, fontWeight: 500, letterSpacing: '-0.015em', margin: '0 0 6px' }}>800 Brady Ave</h1>
-          <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'center', fontSize: 12.5, color: 'var(--color-text-secondary)' }}>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: 999, background: 'var(--c-sol-bg)', color: 'var(--c-sol-dark)' }}>
-              <span style={{ width: 18, height: 18, borderRadius: '50%', background: '#fff', color: 'var(--c-sol-dark)', fontSize: 9, fontWeight: 700, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>SK</span>
-              Sol Klein
-            </span>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: 999, background: 'var(--info-bg)', color: 'var(--info-fg)' }}>
-              <i className="ti ti-calculator" style={{ fontSize: 13 }} />Budgeting
-            </span>
-            <span><i className="ti ti-map-pin" style={{ fontSize: 13, verticalAlign: '-2px' }} /> Bronx, NY 10462</span>
-            <span><i className="ti ti-id" style={{ fontSize: 13, verticalAlign: '-2px' }} /> 800-BRDY-2025</span>
-          </div>
+          <h1 style={{ fontSize: 22, fontWeight: 500, letterSpacing: '-0.015em', margin: '0 0 6px' }}>{project.name}</h1>
+          {project.location && (
+            <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'center', fontSize: 12.5, color: 'var(--color-text-secondary)' }}>
+              <span><i className="ti ti-map-pin" style={{ fontSize: 13, verticalAlign: '-2px' }} /> {project.location}</span>
+            </div>
+          )}
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <button style={{ height: 32, padding: '0 13px', borderRadius: 'var(--border-radius-md)', border: '0.5px solid var(--color-border-secondary)', fontSize: 12.5, display: 'inline-flex', alignItems: 'center', gap: 6, background: 'var(--color-background-primary)', color: 'var(--color-text-primary)', cursor: 'pointer', fontFamily: 'inherit' }}>
@@ -1606,8 +1564,10 @@ export function BudgetDashboard() {
       </div>
 
       {/* Mode content */}
-      {mode === 'table' && tableView === 'overview' && <OverviewView onGoBrady={() => setMode('variance')} />}
-      {mode === 'table' && tableView === 'detailed' && <DetailedView onGoOverview={() => setTableView('overview')} onTradeClick={setDrawerTrade} />}
+      {mode === 'table' && tableView === 'overview' && (
+        <OverviewView onGoProject={(name) => { setSelectedProject(name); }} />
+      )}
+      {mode === 'table' && tableView === 'detailed' && <DetailedView onGoOverview={() => { setSelectedProject(''); }} onTradeClick={setDrawerTrade} />}
       {mode === 'table' && tableView === 'matrix' && <MatrixView onGoDetailed={() => setTableView('detailed')} />}
       {mode === 'variance'   && <VarianceView   onBack={() => setMode('table')} />}
       {mode === 'treemap'    && <TreemapView    onBack={() => setMode('table')} />}
