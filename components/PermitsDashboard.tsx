@@ -1,11 +1,12 @@
 'use client';
 
-import { useCallback, useMemo, useRef } from 'react';
+import { useCallback, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
 import { buildPermitsCalendar } from '@/lib/permits-calendar';
+import { buildDetailedGroups, type DetailedProjectGroup, type DetailedPermitRow } from '@/lib/permits-detailed';
 import type { DashboardPayload } from '@/lib/types';
-import { permitsSearchUrl, taskUrl } from '@/lib/urls';
+import { folderUrl, listUrl, permitsSearchUrl, taskUrl } from '@/lib/urls';
 
 import { LogoHeader } from './LogoHeader';
 import { PermitsDetailedView } from './PermitsDetailedView';
@@ -55,6 +56,9 @@ export function PermitsDashboard({ initial, initialError }: Props) {
   const view: PermitsView =
     searchParams.get('view') === 'detailed' ? 'detailed' : 'overview';
 
+  const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
+  const [projectSearch, setProjectSearch] = useState('');
+
   const setView = useCallback(
     (v: PermitsView) => {
       const params = new URLSearchParams(searchParamsRef.current.toString());
@@ -70,6 +74,21 @@ export function PermitsDashboard({ initial, initialError }: Props) {
     () => buildPermitsCalendar(payload?.projects ?? []),
     [payload?.projects],
   );
+
+  const projectGroups = useMemo(
+    () => buildDetailedGroups(payload?.projects ?? []),
+    [payload?.projects],
+  );
+
+  const filteredProjectGroups = useMemo(() => {
+    if (!projectSearch.trim()) return projectGroups;
+    const q = projectSearch.toLowerCase();
+    return projectGroups.filter((g) => g.name.toLowerCase().includes(q));
+  }, [projectGroups, projectSearch]);
+
+  const selectedProject = selectedFolderId
+    ? projectGroups.find((g) => g.folderId === selectedFolderId) ?? null
+    : null;
 
   const permits = payload?.permits;
 
@@ -164,6 +183,25 @@ export function PermitsDashboard({ initial, initialError }: Props) {
             <div className="s">stop-work risk</div>
           </div>
         </div>
+
+        {/* ── Project picker (overview) ───────────────── */}
+        {view === 'overview' && (
+          <ProjectPicker
+            groups={filteredProjectGroups}
+            allGroups={projectGroups}
+            search={projectSearch}
+            onSearch={setProjectSearch}
+            selectedFolderId={selectedFolderId}
+            onSelect={(id) => setSelectedFolderId(id === selectedFolderId ? null : id)}
+          />
+        )}
+
+        {view === 'overview' && selectedProject && (
+          <ProjectPermitsDetail
+            group={selectedProject}
+            onClose={() => setSelectedFolderId(null)}
+          />
+        )}
 
         {view === 'overview' && (
         <div className="permits-view-subhead">
@@ -332,6 +370,295 @@ export function PermitsDashboard({ initial, initialError }: Props) {
       >
         Live from ClickUp · 60-second cache · click any permit to open in ClickUp
       </div>
+    </div>
+  );
+}
+
+// ─── ProjectPicker ─────────────────────────────────────────────────────────
+
+function ProjectPicker({
+  groups,
+  allGroups,
+  search,
+  onSearch,
+  selectedFolderId,
+  onSelect,
+}: {
+  groups: DetailedProjectGroup[];
+  allGroups: DetailedProjectGroup[];
+  search: string;
+  onSearch: (v: string) => void;
+  selectedFolderId: string | null;
+  onSelect: (id: string) => void;
+}) {
+  const hasUrgent = allGroups.some((g) => g.totals.expired > 0 || g.totals.expiring > 0);
+
+  return (
+    <div style={{
+      margin: '0 0 16px',
+      border: '0.5px solid var(--color-border-tertiary)',
+      borderRadius: 'var(--border-radius-lg)',
+      overflow: 'hidden',
+    }}>
+      {/* Picker header */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 10,
+        padding: '10px 14px',
+        background: 'var(--color-background-secondary)',
+        borderBottom: '0.5px solid var(--color-border-tertiary)',
+      }}>
+        <i className="ti ti-building-skyscraper" style={{ fontSize: 14, color: 'var(--color-text-tertiary)' }} />
+        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-secondary)', flex: 1 }}>
+          Projects · {allGroups.length} with permits
+          {hasUrgent && (
+            <span style={{ marginLeft: 8, fontSize: 10, color: 'var(--danger-strong)', fontWeight: 700 }}>
+              · attention needed
+            </span>
+          )}
+        </span>
+        {/* Search */}
+        <div style={{ position: 'relative' }}>
+          <i className="ti ti-search" style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', fontSize: 12, color: 'var(--color-text-tertiary)', pointerEvents: 'none' }} />
+          <input
+            type="search"
+            value={search}
+            onChange={(e) => onSearch(e.target.value)}
+            placeholder="Search projects…"
+            style={{
+              paddingLeft: 28, paddingRight: 10, paddingTop: 5, paddingBottom: 5,
+              fontSize: 12, border: '0.5px solid var(--color-border-secondary)',
+              borderRadius: 'var(--border-radius-md)', background: 'var(--color-background-primary)',
+              color: 'var(--color-text-primary)', fontFamily: 'inherit', width: 180,
+            }}
+          />
+        </div>
+      </div>
+
+      {/* Project rows */}
+      <div style={{ maxHeight: 220, overflowY: 'auto' }}>
+        {groups.length === 0 ? (
+          <div style={{ padding: '1rem', textAlign: 'center', color: 'var(--color-text-tertiary)', fontSize: 12 }}>
+            No projects match.
+          </div>
+        ) : (
+          groups.map((g) => {
+            const isSelected = g.folderId === selectedFolderId;
+            const isHot = g.totals.expired > 0 || g.totals.expiring > 0;
+            return (
+              <button
+                key={g.folderId}
+                type="button"
+                onClick={() => onSelect(g.folderId)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  width: '100%', padding: '9px 14px',
+                  border: 'none', borderBottom: '0.5px solid var(--color-border-tertiary)',
+                  background: isSelected ? 'var(--color-background-secondary)' : 'var(--color-background-primary)',
+                  cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit',
+                  borderLeft: isSelected ? '3px solid var(--lib-black)' : '3px solid transparent',
+                  transition: 'background 0.12s',
+                }}
+                onMouseEnter={(e) => { if (!isSelected) (e.currentTarget as HTMLElement).style.background = 'var(--color-background-secondary)'; }}
+                onMouseLeave={(e) => { if (!isSelected) (e.currentTarget as HTMLElement).style.background = 'var(--color-background-primary)'; }}
+              >
+                <span style={{ flex: 1, fontSize: 13, fontWeight: isHot ? 600 : 400, color: 'var(--color-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {g.name}
+                </span>
+                <span style={{ display: 'flex', gap: 5, flexShrink: 0 }}>
+                  {g.totals.expired > 0 && (
+                    <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 7px', borderRadius: 999, background: 'var(--danger-bg)', color: 'var(--danger-strong)' }}>
+                      {g.totals.expired} expired
+                    </span>
+                  )}
+                  {g.totals.expiring > 0 && (
+                    <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 7px', borderRadius: 999, background: 'var(--warn-bg)', color: 'var(--warn-strong)' }}>
+                      {g.totals.expiring} expiring
+                    </span>
+                  )}
+                  {g.totals.expired === 0 && g.totals.expiring === 0 && (
+                    <span style={{ fontSize: 10, fontWeight: 500, padding: '1px 7px', borderRadius: 999, background: 'var(--good-bg)', color: 'var(--good-strong)' }}>
+                      {g.totals.active} active
+                    </span>
+                  )}
+                </span>
+                <i className="ti ti-chevron-right" style={{ fontSize: 12, color: 'var(--color-text-tertiary)', opacity: isSelected ? 0 : 0.5 }} />
+              </button>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── ProjectPermitsDetail ───────────────────────────────────────────────────
+
+const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+function shortDate(ts: number | null): string {
+  if (ts == null) return '—';
+  const d = new Date(ts);
+  return `${MONTH_NAMES[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
+}
+
+function statusLabel(p: DetailedPermitRow): string {
+  if (p.status === 'expired') return p.daysLeft != null ? `Expired · ${Math.abs(p.daysLeft)}d ago` : 'Expired';
+  if (p.status === 'expiring') return p.daysLeft != null ? `Expiring · ${p.daysLeft}d` : 'Expiring';
+  return p.daysLeft != null ? `Active · ${p.daysLeft}d left` : 'Active';
+}
+
+type DetailTab = 'urgent' | 'all';
+
+function ProjectPermitsDetail({ group, onClose }: { group: DetailedProjectGroup; onClose: () => void }) {
+  const [tab, setTab] = useState<DetailTab>('urgent');
+  const openHref = group.permitsListId ? listUrl(group.permitsListId) : folderUrl(group.folderId);
+
+  const urgentPermits = group.permits.filter((p) => p.status === 'expired' || p.status === 'expiring');
+  const shownPermits = tab === 'urgent' ? urgentPermits : group.permits;
+  const hasUrgent = urgentPermits.length > 0;
+
+  const statusColors: Record<string, { bg: string; color: string }> = {
+    expired:  { bg: 'var(--danger-bg)',  color: 'var(--danger-strong)' },
+    expiring: { bg: 'var(--warn-bg)',    color: 'var(--warn-strong)' },
+    active:   { bg: 'var(--good-bg)',    color: 'var(--good-strong)' },
+  };
+
+  const th: CSSProperties = {
+    padding: '8px 12px', fontSize: 9.5, fontWeight: 700, letterSpacing: '0.06em',
+    textTransform: 'uppercase', color: 'var(--color-text-secondary)',
+    background: 'var(--color-background-secondary)',
+    borderBottom: '0.5px solid var(--color-border-tertiary)',
+    whiteSpace: 'nowrap',
+  };
+
+  return (
+    <div style={{
+      margin: '0 0 16px',
+      border: '0.5px solid var(--color-border-secondary)',
+      borderRadius: 'var(--border-radius-lg)',
+      overflow: 'hidden',
+    }}>
+      {/* Detail header */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 10,
+        padding: '10px 14px',
+        background: 'var(--color-background-secondary)',
+        borderBottom: '0.5px solid var(--color-border-tertiary)',
+      }}>
+        <i className="ti ti-license" style={{ fontSize: 14 }} />
+        <span style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>{group.name}</span>
+        <span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>
+          {group.totals.total} permit{group.totals.total === 1 ? '' : 's'}
+        </span>
+
+        {/* Tab toggle */}
+        <div style={{ display: 'inline-flex', border: '0.5px solid var(--color-border-secondary)', borderRadius: 'var(--border-radius-md)', overflow: 'hidden' }}>
+          {hasUrgent && (
+            <button
+              type="button"
+              onClick={() => setTab('urgent')}
+              style={{
+                padding: '3px 10px', fontSize: 11, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+                background: tab === 'urgent' ? 'var(--lib-black)' : 'transparent',
+                color: tab === 'urgent' ? '#fff' : 'var(--color-text-secondary)',
+              }}
+            >
+              Expired / Expiring <span style={{ fontWeight: 700 }}>{urgentPermits.length}</span>
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => setTab('all')}
+            style={{
+              padding: '3px 10px', fontSize: 11, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+              background: tab === 'all' ? 'var(--lib-black)' : 'transparent',
+              color: tab === 'all' ? '#fff' : 'var(--color-text-secondary)',
+            }}
+          >
+            All permits
+          </button>
+        </div>
+
+        <a href={openHref} target="_blank" rel="noopener noreferrer"
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--color-text-info)', textDecoration: 'none', fontWeight: 500 }}>
+          Open in ClickUp <i className="ti ti-arrow-up-right" style={{ fontSize: 11 }} />
+        </a>
+
+        <button
+          type="button"
+          onClick={onClose}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: 'var(--color-text-tertiary)', display: 'flex', alignItems: 'center' }}
+          title="Close"
+        >
+          <i className="ti ti-x" style={{ fontSize: 14 }} />
+        </button>
+      </div>
+
+      {/* Permits table */}
+      {shownPermits.length === 0 ? (
+        <div style={{ padding: '1.25rem', textAlign: 'center', color: 'var(--color-text-tertiary)', fontSize: 12 }}>
+          No {tab === 'urgent' ? 'expired or expiring' : ''} permits.
+        </div>
+      ) : (
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+            <colgroup>
+              <col />
+              <col style={{ width: 130 }} />
+              <col style={{ width: 130 }} />
+              <col style={{ width: 200 }} />
+              <col style={{ width: 160 }} />
+            </colgroup>
+            <thead>
+              <tr>
+                <th style={{ ...th, textAlign: 'left' }}>Permit</th>
+                <th style={{ ...th, textAlign: 'left' }}>Issued</th>
+                <th style={{ ...th, textAlign: 'left' }}>Expires</th>
+                <th style={{ ...th, textAlign: 'left' }}>Lifecycle</th>
+                <th style={{ ...th, textAlign: 'left' }}>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {shownPermits.map((p) => {
+                const sc = statusColors[p.status] ?? statusColors.active;
+                return (
+                  <tr
+                    key={p.id}
+                    onClick={() => window.open(taskUrl(p.id), '_blank', 'noopener')}
+                    style={{ cursor: 'pointer' }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--color-background-secondary)')}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = '')}
+                  >
+                    <td style={{ padding: '9px 12px', borderBottom: '0.5px solid var(--color-border-tertiary)', fontWeight: 500 }}>{p.name}</td>
+                    <td style={{ padding: '9px 12px', borderBottom: '0.5px solid var(--color-border-tertiary)', color: 'var(--color-text-secondary)', fontSize: 12 }}>{shortDate(p.filingDate)}</td>
+                    <td style={{ padding: '9px 12px', borderBottom: '0.5px solid var(--color-border-tertiary)', color: 'var(--color-text-secondary)', fontSize: 12 }}>{shortDate(p.expirationDate)}</td>
+                    <td style={{ padding: '9px 12px', borderBottom: '0.5px solid var(--color-border-tertiary)' }}>
+                      {p.lifecyclePct == null ? (
+                        <span style={{ color: 'var(--color-text-tertiary)' }}>—</span>
+                      ) : (
+                        <div>
+                          <div style={{ height: 5, borderRadius: 3, background: 'var(--color-border-secondary)', overflow: 'hidden', marginBottom: 3 }}>
+                            <div style={{ height: '100%', width: `${p.lifecyclePct}%`, background: p.status === 'expired' ? 'var(--danger-strong)' : p.status === 'expiring' ? 'var(--warn-strong)' : 'var(--good-strong)', borderRadius: 3 }} />
+                          </div>
+                          <span style={{ fontSize: 10.5, color: 'var(--color-text-tertiary)' }}>
+                            {p.lifecyclePct}% used{p.daysLeft != null ? (p.daysLeft < 0 ? ` · ${Math.abs(p.daysLeft)}d overdue` : ` · ${p.daysLeft}d left`) : ''}
+                          </span>
+                        </div>
+                      )}
+                    </td>
+                    <td style={{ padding: '9px 12px', borderBottom: '0.5px solid var(--color-border-tertiary)' }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '2px 8px', borderRadius: 999, fontSize: 11, fontWeight: 600, background: sc.bg, color: sc.color }}>
+                        <span style={{ width: 5, height: 5, borderRadius: '50%', background: sc.color, flexShrink: 0 }} />
+                        {statusLabel(p)}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
