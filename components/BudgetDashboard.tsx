@@ -837,7 +837,31 @@ function DetailedView({
                       onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-background-secondary)')}
                       onMouseLeave={e => (e.currentTarget.style.background = '')}
                     >
-                      <td style={{ padding: '10px 12px', borderBottom: '0.5px solid var(--color-border-tertiary)', verticalAlign: 'middle', fontSize: 13, fontWeight: 500 }}>{r.trade}</td>
+                      <td style={{ padding: '10px 12px', borderBottom: '0.5px solid var(--color-border-tertiary)', verticalAlign: 'middle', fontSize: 13, fontWeight: 500 }}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                          {r.trade}
+                          {r.hasDuplicate && r.duplicateTaskUrls && r.duplicateTaskUrls.length > 0 && (
+                            <a
+                              href={r.duplicateTaskUrls[0]}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={e => e.stopPropagation()}
+                              title={`${r.duplicateTaskUrls.length} duplicate trade row${r.duplicateTaskUrls.length > 1 ? 's' : ''} detected — click to review in ClickUp`}
+                              style={{
+                                display: 'inline-flex', alignItems: 'center', gap: 3,
+                                fontSize: 9.5, fontWeight: 600, letterSpacing: '0.04em',
+                                padding: '1px 6px', borderRadius: 4,
+                                background: '#FEF3C7', color: '#92400E',
+                                border: '0.5px solid #FCD34D',
+                                textDecoration: 'none', whiteSpace: 'nowrap',
+                              }}
+                            >
+                              <i className="ti ti-copy" style={{ fontSize: 9 }} />
+                              duplicate
+                            </a>
+                          )}
+                        </span>
+                      </td>
                       <td style={{ padding: '10px 12px', borderBottom: '0.5px solid var(--color-border-tertiary)', textAlign: 'right', verticalAlign: 'middle', fontVariantNumeric: 'tabular-nums', fontSize: 13 }}>
                         <MoneyToken v={r.est} dim={!isMoney(r.est)} />
                       </td>

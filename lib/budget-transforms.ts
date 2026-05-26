@@ -4,15 +4,6 @@ import { CLICKUP } from './constants';
 
 const F = CLICKUP.FIELD;
 
-// These three trades always carry the MANUAL badge. The auto-rule is bypassed
-// for them — their New Budget value is taken verbatim from ClickUp (Contract
-// → Best Bid → Budget Allocated) rather than being recomputed.
-const MANUAL_TRADE_NAMES = new Set([
-  'Structure',
-  'Site safety coordination',
-  'Lighting Material',
-]);
-
 function getFieldById(task: ClickUpTask, id: string): ClickUpCustomFieldValue | undefined {
   return task.custom_fields?.find(f => f.id === id);
 }
@@ -35,10 +26,75 @@ function getCurrency(task: ClickUpTask, id: string): number | null {
   return Number.isFinite(n) && n >= 0 ? n : null;
 }
 
-// Auto-rule: if a finalized/lowest bid exists use it; otherwise carry-forward the estimate.
+// Auto-rule: if an Updated Budget override exists use it; otherwise carry-forward the estimate.
 function deriveNewv(est: MoneyVal, fin: MoneyVal): MoneyVal {
   if (fin !== null && fin !== undefined) return fin;
   return est;
+}
+
+interface RawEntry {
+  taskId: string;
+  tradeName: string;
+  est: MoneyVal;
+  fin: MoneyVal;
+  newv: MoneyVal;
+  costType: 'hard' | 'soft';
+  status: string;
+  dateUpdated: string | null | undefined;
+}
+
+function taskUrl(taskId: string): string {
+  return `${CLICKUP.BASE_URL}/t/${taskId}`;
+}
+
+// Dedup by (costType, tradeName): prefer non-zero Budget Allocated; tie-break by most-recent date_updated.
+function dedup(entries: RawEntry[]): BudgetTrade[] {
+  const groups = new Map<string, RawEntry[]>();
+  for (const e of entries) {
+    const key = `${e.costType}::${e.tradeName}`;
+    let g = groups.get(key);
+    if (!g) { g = []; groups.set(key, g); }
+    g.push(e);
+  }
+
+  const result: BudgetTrade[] = [];
+  for (const [, group] of groups) {
+    if (group.length === 1) {
+      const e = group[0];
+      result.push({
+        trade: e.tradeName,
+        est: e.est,
+        fin: e.fin,
+        newv: e.newv,
+        costType: e.costType,
+        status: e.status,
+        taskId: e.taskId,
+      });
+      continue;
+    }
+
+    // Sort: non-zero est first, then most-recently updated.
+    const sorted = [...group].sort((a, b) => {
+      const aHas = typeof a.est === 'number' && a.est > 0 ? 1 : 0;
+      const bHas = typeof b.est === 'number' && b.est > 0 ? 1 : 0;
+      if (aHas !== bHas) return bHas - aHas;
+      return Number(b.dateUpdated ?? 0) - Number(a.dateUpdated ?? 0);
+    });
+
+    const [winner, ...losers] = sorted;
+    result.push({
+      trade: winner.tradeName,
+      est: winner.est,
+      fin: winner.fin,
+      newv: winner.newv,
+      costType: winner.costType,
+      status: winner.status,
+      taskId: winner.taskId,
+      hasDuplicate: true,
+      duplicateTaskUrls: losers.map(l => taskUrl(l.taskId)),
+    });
+  }
+  return result;
 }
 
 export function transformBudgetTasks(
@@ -49,24 +105,34 @@ export function transformBudgetTasks(
   coordInitials: string,
   coordName: string,
 ): BudgetProject {
-  const trades: BudgetTrade[] = tasks.map(task => {
-    const tradeName = task.name;
-    const isManual = MANUAL_TRADE_NAMES.has(tradeName);
-
-    // est = Budget Allocated custom field
+  const entries: RawEntry[] = tasks.map(task => {
     const est: MoneyVal = getCurrency(task, F.BUDGET_ALLOC);
-
-    // fin = Contract (set when AWARDED) → Best Bid → Lowest Bid
-    const fin: MoneyVal = getCurrency(task, F.CONTRACT)
-      ?? getCurrency(task, F.BEST_BID)
-      ?? getCurrency(task, F.LOWEST_BID);
-
-    // MANUAL trades keep verbatim values; non-manual apply the auto-rule
+    const fin: MoneyVal = getCurrency(task, F.UPDATED_BUDGET);
     const newv = deriveNewv(est, fin);
-
     const costType = getCostType(task);
-    return { trade: tradeName, est, fin, newv, manual: isManual || undefined, costType };
+    const status = task.status?.status ?? '';
+
+    return {
+      taskId: task.id,
+      tradeName: task.name,
+      est,
+      fin,
+      newv,
+      costType,
+      status,
+      dateUpdated: task.date_updated,
+    };
   });
 
-  return { name: projectName, location: projectLocation, id: projectId, phase: 'Budgeting', coordInitials, coordName, trades };
+  const trades = dedup(entries);
+
+  return {
+    name: projectName,
+    location: projectLocation,
+    id: projectId,
+    phase: 'Budgeting',
+    coordInitials,
+    coordName,
+    trades,
+  };
 }
