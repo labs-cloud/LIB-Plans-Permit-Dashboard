@@ -4,24 +4,28 @@ import { CLICKUP } from './constants';
 
 const F = CLICKUP.FIELD;
 
-// Maps ClickUp Bidding Status dropdown option names to the 8-color palette.
-//
-// The ClickUp field stores the selected option's orderindex as a number.
-// FOLLOWED UP is always mapped to fu1. Bucketing into fu1/fu2/fu3 by age
-// requires a dedicated last_contact_at timestamp field; when that field exists
-// wire it here by comparing task.date_updated against Date.now().
+// Maps ClickUp status names to the 8-color palette.
+// Handles both the central Budget-Bidding DB's custom-field option names AND
+// the per-project 02. Bidding list's native task statuses (lowercase, some with
+// ClickUp's persistent "recieved" typo).
 function mapBiddingStatusName(name: string): BidStatus {
   switch (name.toUpperCase().trim()) {
+    // Central list custom-field option names
     case 'TO SEND':            return 'ntb';
     case 'RFP SENT':           return 'snt';
     case 'FOLLOWED UP':        return 'fu1';
-    // TO CLARIFY / LEVELED / REVIEWED all resolve to the same REC bucket per design spec
     case 'PROPOSALS RECEIVED': return 'rec';
     case 'TO CLARIFY':         return 'rec';
     case 'LEVELED':            return 'rec';
     case 'REVIEWED':           return 'rec';
     case 'REJECTED':           return 'hld';
     case 'AWARDED':            return 'fnl';
+    // Per-project list native task statuses
+    case 'NOT STARTED':        return 'ntb';
+    case 'BID RECIEVED':       return 'rec'; // ClickUp's persistent typo
+    case 'BID RECEIVED':       return 'rec';
+    case 'NO BID / DECLINED':  return 'hld';
+    case 'NO BID':             return 'hld';
     default:                   return 'ntb';
   }
 }
@@ -49,8 +53,6 @@ function getBiddingStatus(task: ClickUpTask): BidStatus {
   const f = getFieldById(task, F.BIDDING_STATUS);
   if (!f || f.value == null) return 'ntb';
 
-  // ClickUp stores dropdown values as the option's orderindex (number).
-  // Fall back to matching by option id (string) for newer ClickUp API versions.
   const options = (f.type_config?.options ?? []) as Array<{ id: string; name: string; orderindex: number }>;
   let opt: typeof options[0] | undefined;
 
@@ -65,42 +67,68 @@ function getBiddingStatus(task: ClickUpTask): BidStatus {
   return mapBiddingStatusName(opt?.name ?? '');
 }
 
-// ── Name-based helpers (used by per-project 02. Bidding lists) ────────────
-// Field IDs differ per list; look up by the human-readable field name instead.
-
-function getFieldByName(task: ClickUpTask, name: string): ClickUpCustomFieldValue | undefined {
-  const lower = name.toLowerCase();
-  return task.custom_fields?.find(f => f.name.toLowerCase() === lower);
-}
-
-function getStringByName(task: ClickUpTask, name: string): string | null {
-  const f = getFieldByName(task, name);
-  if (!f || f.value == null) return null;
-  return typeof f.value === 'string' ? f.value.trim() || null : null;
-}
+// ── Name-based currency helper (shared by both transforms) ────────────────
 
 function getCurrencyByName(task: ClickUpTask, name: string): number | null {
-  const f = getFieldByName(task, name);
+  const lower = name.toLowerCase();
+  const f = task.custom_fields?.find(cf => cf.name.toLowerCase() === lower);
   if (!f || f.value == null) return null;
   const n = Number(f.value);
   return Number.isFinite(n) && n >= 0 ? n : null;
 }
 
-// Resolves bidding status from the task's own status field (per-project lists
-// use ClickUp task status as the bidding stage, not a custom field).
-// Falls back to a "Bidding Status" custom field if present for compatibility.
-function getBiddingStatusByName(task: ClickUpTask): BidStatus {
-  const f = getFieldByName(task, 'Bidding Status');
-  if (f && f.value != null) {
-    const options = (f.type_config?.options ?? []) as Array<{ id: string; name: string; orderindex: number }>;
-    let opt: typeof options[0] | undefined;
-    const numVal = Number(f.value);
-    if (Number.isFinite(numVal)) opt = options.find(o => o.orderindex === numVal);
-    if (!opt && typeof f.value === 'string') opt = options.find(o => o.id === f.value);
-    if (opt) return mapBiddingStatusName(opt.name);
+// ── Link field trade fallback ─────────────────────────────────────────────
+
+// Extracts the trade name from the "🔗 Link" SharePoint URL (field b0da1f9e).
+// URL pattern: .../Bids/{Trade Folder}/{Sub Name}
+// Returns the second-to-last decoded path segment, or null if not parseable.
+function extractTradeFromLink(task: ClickUpTask): string | null {
+  const f = task.custom_fields?.find(cf => cf.id === 'b0da1f9e');
+  if (!f || typeof f.value !== 'string' || !f.value) return null;
+  try {
+    const url = new URL(f.value);
+    const segments = url.pathname.split('/').map(s => decodeURIComponent(s)).filter(Boolean);
+    const bidsIdx = segments.findLastIndex(s => s.toLowerCase() === 'bids');
+    if (bidsIdx !== -1 && bidsIdx + 1 < segments.length - 1) {
+      return segments[bidsIdx + 1] || null;
+    }
+    if (segments.length >= 2) return segments[segments.length - 2] || null;
+    return null;
+  } catch {
+    return null;
   }
-  return mapBiddingStatusName(task.status?.status ?? '');
 }
+
+// ── Trade dropdown helpers (field ID is global/shared across all lists) ───
+
+type TradeOption = { name: string; orderindex: number };
+
+// Extracts the orderindex→name map from the "Trade" dropdown field on any task
+// in the list. All tasks share the same field schema so we only need one.
+function buildTradeOptionMap(tasks: ClickUpTask[]): Map<number, string> {
+  const map = new Map<number, string>();
+  for (const task of tasks) {
+    const f = getFieldById(task, F.TRADE);
+    if (!f?.type_config?.options) continue;
+    for (const opt of f.type_config.options as TradeOption[]) {
+      map.set(opt.orderindex, opt.name);
+    }
+    break;
+  }
+  return map;
+}
+
+// Returns the trade name for a single task using the option map.
+// The Trade field stores the selected option's orderindex as a number.
+function resolveTradeForTask(task: ClickUpTask, optionMap: Map<number, string>): string | null {
+  const f = getFieldById(task, F.TRADE);
+  if (!f || f.value == null) return null;
+  const numVal = Number(f.value);
+  if (!Number.isFinite(numVal)) return null;
+  return optionMap.get(numVal) ?? null;
+}
+
+// ── Transforms ────────────────────────────────────────────────────────────
 
 export function transformBiddingTasks(
   tasks: ClickUpTask[],
@@ -114,7 +142,6 @@ export function transformBiddingTasks(
     const tradeName = task.name;
     const tradeStatus = getBiddingStatus(task);
 
-    // Build subs from Sub 1–5 fields. A sub slot is populated if the name field is non-empty.
     const subs: BidSub[] = [];
     const slots: [string, string][] = [
       [F.SUB_1, F.SUB_1_AMT],
@@ -129,7 +156,6 @@ export function transformBiddingTasks(
       subs.push({ name, amount: getCurrency(task, amtId), status: tradeStatus });
     }
 
-    // Derive lowest bid: min of sub amounts, or fall back to Best Bid / Lowest Bid / Contract.
     let low: number | null = null;
     if (subs.length > 0) {
       const amounts = subs.map(s => s.amount).filter((a): a is number => a !== null);
@@ -147,9 +173,20 @@ export function transformBiddingTasks(
   return { name: projectName, location: projectLocation, id: projectId, phase: 'Bidding', coordInitials, coordName, trades };
 }
 
-// Transforms tasks from a per-project "02. Bidding" list where field IDs differ
-// per list. Looks up Sub 1-5 / amounts / status by field NAME instead of ID.
-// Task name is the trade name; task status is the bidding stage.
+// Transforms tasks from a per-project "02. Bidding" list.
+//
+// Schema (confirmed from live ClickUp data):
+//   • One task = one subcontractor bidding on one trade
+//   • task.name             = subcontractor company name
+//   • task.status.status    = bidding stage (e.g. "not started", "bid recieved",
+//                             "followed up", "awarded", "no bid / declined")
+//   • Field F.TRADE         = "Trade" drop_down — orderindex resolves to trade name
+//                             (same field ID as the central Budget-Bidding DB)
+//   • Field "Bid/Contracted Amount" (currency) = the sub's bid/contract amount
+//
+// The function groups tasks by trade, then assembles up to 5 subs per row and
+// computes the lowest bid as MIN(bid amounts for that trade).
+// Tasks whose Trade field is unset are skipped with a console.warn.
 export function transformBiddingTasksByName(
   tasks: ClickUpTask[],
   projectName: string,
@@ -158,38 +195,33 @@ export function transformBiddingTasksByName(
   coordInitials: string,
   coordName: string,
 ): BiddingProject {
-  const SUB_SLOTS: [string, string][] = [
-    ['Sub 1', 'Sub 1 Amount'],
-    ['Sub 2', 'Sub 2 Amount'],
-    ['Sub 3', 'Sub 3 Amount'],
-    ['Sub 4', 'Sub 4 Amount'],
-    ['Sub 5', 'Sub 5 Amount'],
-  ];
+  const tradeOptionMap = buildTradeOptionMap(tasks);
 
-  const trades: BidTrade[] = tasks.map(task => {
-    const tradeName = task.name;
-    const tradeStatus = getBiddingStatusByName(task);
-
-    const subs: BidSub[] = [];
-    for (const [nameField, amtField] of SUB_SLOTS) {
-      const name = getStringByName(task, nameField);
-      if (!name) continue;
-      subs.push({ name, amount: getCurrencyByName(task, amtField), status: tradeStatus });
+  // Group bid tasks by trade name, preserving insertion order.
+  const byTrade = new Map<string, ClickUpTask[]>();
+  for (const task of tasks) {
+    const tradeName = resolveTradeForTask(task, tradeOptionMap) ?? extractTradeFromLink(task);
+    if (!tradeName) {
+      console.warn(`[bidding] task "${task.name}" (${task.id}) has no Trade set — skipping`);
+      continue;
     }
+    if (!byTrade.has(tradeName)) byTrade.set(tradeName, []);
+    byTrade.get(tradeName)!.push(task);
+  }
 
-    let low: number | null = null;
-    if (subs.length > 0) {
-      const amounts = subs.map(s => s.amount).filter((a): a is number => a !== null);
-      if (amounts.length > 0) low = Math.min(...amounts);
-    }
-    if (low === null) {
-      low = getCurrencyByName(task, 'Best Bid')
-        ?? getCurrencyByName(task, 'Lowest Bid')
-        ?? getCurrencyByName(task, 'Contract');
-    }
+  const trades: BidTrade[] = [];
+  for (const [tradeName, bidTasks] of byTrade) {
+    const subs: BidSub[] = bidTasks.slice(0, 5).map(task => ({
+      name: task.name.trim(),
+      amount: getCurrencyByName(task, 'Bid/Contracted Amount'),
+      status: mapBiddingStatusName(task.status?.status ?? ''),
+    }));
 
-    return { trade: tradeName, annot: null, subs, low };
-  });
+    const amounts = subs.map(s => s.amount).filter((a): a is number => a !== null);
+    const low = amounts.length > 0 ? Math.min(...amounts) : null;
+
+    trades.push({ trade: tradeName, annot: null, subs, low });
+  }
 
   return { name: projectName, location: projectLocation, id: projectId, phase: 'Bidding', coordInitials, coordName, trades };
 }
