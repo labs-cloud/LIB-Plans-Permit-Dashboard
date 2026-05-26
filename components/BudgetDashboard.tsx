@@ -551,6 +551,7 @@ function DetailedView({
   const bs = computeStats(project.trades);
   const d = bs.newv - bs.est;
   const dp = bs.est > 0 ? (d / bs.est * 100) : 0;
+  const [shareCopied, setShareCopied] = useState(false);
 
   // "where budget moved"
   const movers = project.trades
@@ -573,6 +574,135 @@ function DetailedView({
     whiteSpace: 'nowrap',
   };
 
+  function handlePrint() {
+    const date = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+    const delta = bs.newv - bs.est;
+    const deltaPct = bs.est > 0 ? (delta / bs.est * 100) : 0;
+    const fmtNum = (v: MoneyVal): string => {
+      if (v === null || v === undefined) return '–';
+      if (v === 'INC') return 'Included';
+      if (v === 'NA') return 'NA';
+      if (Math.abs(v) >= 1e6) return '$' + (v / 1e6).toFixed(2) + 'M';
+      if (Math.abs(v) >= 1e4) return '$' + (v / 1e3).toFixed(0) + 'k';
+      return '$' + v.toLocaleString('en-US', { maximumFractionDigits: 0 });
+    };
+    const fmtFull = (v: number): string =>
+      '$' + v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    const rows = project.trades.map((r, ti) => {
+      const rowBg = ti % 2 === 0 ? '#fff' : '#fafaf8';
+      const rd = (isMoney(r.newv) && isMoney(r.est)) ? (r.newv - r.est) : null;
+      const rdp = (rd !== null && isMoney(r.est) && r.est > 0) ? (rd / r.est * 100) : null;
+      const varColor = rd === null ? '#aaa' : rd < 0 ? '#1F7A38' : rd > 0 ? '#A82828' : '#555';
+      const varText = rd === null ? '–'
+        : (rd < 0 ? '−' : rd > 0 ? '+' : '') + fmtNum(Math.abs(rd))
+          + (rdp !== null ? ` (${rdp < 0 ? '−' : '+'}${Math.abs(rdp).toFixed(1)}%)` : '');
+      return `<tr>
+        <td style="padding:8px 12px;border-bottom:0.5px solid #f0f0ec;font-weight:600;font-size:11px;background:${rowBg};">
+          ${r.trade}${r.manual ? ' <span style="font-size:8px;background:#FEF3C7;color:#854F0B;border:1px solid rgba(186,117,23,.35);border-radius:3px;padding:1px 4px;font-weight:700;letter-spacing:.05em;">MANUAL</span>' : ''}
+        </td>
+        <td style="padding:8px 12px;border-bottom:0.5px solid #f0f0ec;text-align:right;font-size:11px;background:${rowBg};color:${r.est === null ? '#aaa' : '#1a1a1a'};">${fmtNum(r.est)}</td>
+        <td style="padding:8px 12px;border-bottom:0.5px solid #f0f0ec;text-align:right;font-size:11px;background:${rowBg};color:${r.fin === null ? '#aaa' : '#1B7CB0'};">${fmtNum(r.fin)}</td>
+        <td style="padding:8px 12px;border-bottom:0.5px solid #f0f0ec;text-align:right;font-size:11px;font-weight:700;background:${rowBg};color:#1F7A38;">${fmtNum(r.newv)}</td>
+        <td style="padding:8px 12px;border-bottom:0.5px solid #f0f0ec;text-align:right;font-size:11px;font-weight:600;background:${rowBg};color:${varColor};">${varText}</td>
+      </tr>`;
+    }).join('');
+
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Budget Outlook · ${project.name}</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #1a1a1a; background: #fff; padding: 24px 28px; }
+    @page { size: landscape; margin: 10mm 12mm; }
+    @media print { body { padding: 0; } }
+    .header { display: flex; align-items: center; gap: 18px; border-bottom: 3px solid #F47832; padding-bottom: 14px; margin-bottom: 16px; }
+    .logo-crop { width: 60px; height: 60px; overflow: hidden; position: relative; flex-shrink: 0; }
+    .logo-img { position: absolute; width: 224px; height: auto; left: -18px; top: -1px; }
+    .header-text h1 { font-size: 17px; font-weight: 700; letter-spacing: -0.01em; }
+    .header-text p { font-size: 11px; color: #888; margin-top: 3px; }
+    .kpi-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-bottom: 14px; }
+    .kpi { background: #f8f8f6; border: 0.5px solid #e8e8e4; border-radius: 8px; padding: 9px 14px; }
+    .kpi-val { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .kpi-label { font-size: 9px; color: #888; margin-top: 2px; text-transform: uppercase; letter-spacing: 0.05em; }
+    table { width: 100%; border-collapse: collapse; }
+    th { padding: 8px 12px; font-size: 9px; letter-spacing: 0.07em; text-transform: uppercase; color: #888; background: #f5f5f2; border-bottom: 1px solid #e8e8e4; font-weight: 600; }
+    th:first-child { text-align: left; }
+    th:not(:first-child) { text-align: right; }
+    .total-row td { background: #f5fdf7 !important; font-weight: 700; font-size: 11px; border-top: 2px solid #b2dfdb; padding: 9px 12px; text-align: right; }
+    .total-row td:first-child { text-align: left; }
+    .footer { margin-top: 14px; font-size: 9.5px; color: #bbb; display: flex; justify-content: space-between; }
+    .legend { display: flex; gap: 14px; margin-bottom: 12px; font-size: 9.5px; color: #888; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="logo-crop">
+      <img class="logo-img" src="/lib_brand/lead_it_builders_logo.png" alt="Lead It Builders" />
+    </div>
+    <div class="header-text">
+      <h1>Budget Outlook Report · ${project.name}</h1>
+      <p>${project.location || project.id} · Generated ${date}</p>
+    </div>
+  </div>
+  <div class="kpi-grid">
+    <div class="kpi"><div class="kpi-val">${bs.count}</div><div class="kpi-label">Total trades</div></div>
+    <div class="kpi"><div class="kpi-val">${fmtFull(bs.est)}</div><div class="kpi-label">Estimated total</div></div>
+    <div class="kpi"><div class="kpi-val" style="color:#1F7A38;">${fmtFull(bs.newv)}</div><div class="kpi-label">New Budget</div></div>
+    <div class="kpi"><div class="kpi-val" style="color:${delta < 0 ? '#1F7A38' : '#A82828'};">${(delta < 0 ? '−' : '+') + fmtFull(Math.abs(delta))}</div><div class="kpi-label">Δ vs Estimated (${deltaPct < 0 ? '−' : '+'}${Math.abs(deltaPct).toFixed(1)}%)</div></div>
+    <div class="kpi"><div class="kpi-val" style="color:#1B7CB0;">${bs.withBids}</div><div class="kpi-label">Bids in</div></div>
+  </div>
+  <div class="legend">
+    <span><strong style="color:#1F7A38;">Green</strong> = under estimate</span>
+    <span><strong style="color:#A82828;">Red</strong> = over estimate</span>
+    <span><strong style="color:#1B7CB0;">Blue</strong> = bid/contract received</span>
+    <span><strong style="color:#854F0B;">MANUAL</strong> = auto-rule bypassed</span>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th style="text-align:left;">Trade</th>
+        <th>Estimated Budget</th>
+        <th>Finalized / Lowest Bid</th>
+        <th>New Budget</th>
+        <th>Variance vs Estimated</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${rows}
+      <tr class="total-row">
+        <td>Total</td>
+        <td>${fmtFull(bs.est)}</td>
+        <td>${fmtFull(bs.fin)}</td>
+        <td style="color:#1F7A38;">${fmtFull(bs.newv)}</td>
+        <td style="color:${delta < 0 ? '#1F7A38' : '#A82828'};">${(delta < 0 ? '−' : '+') + fmtFull(Math.abs(delta))} (${deltaPct < 0 ? '−' : '+'}${Math.abs(deltaPct).toFixed(1)}%)</td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="footer">
+    <span>Lead It Builders · Budget Outlook · ${date}</span>
+    <span>New Budget = Finalized if available, otherwise Estimated carry-forward</span>
+  </div>
+  <script>window.onload = function() { window.print(); };<\/script>
+</body>
+</html>`;
+
+    const w = window.open('', '_blank');
+    if (!w) return;
+    w.document.write(html);
+    w.document.close();
+  }
+
+  function handleShareLink() {
+    const url = `${window.location.origin}/budget/${encodeURIComponent(project.name)}/report`;
+    navigator.clipboard.writeText(url).then(() => {
+      setShareCopied(true);
+      setTimeout(() => setShareCopied(false), 2500);
+    });
+  }
+
   return (
     <div>
       {/* Breadcrumb */}
@@ -580,6 +710,27 @@ function DetailedView({
         <button onClick={onGoOverview} style={{ background: 'none', border: 'none', color: 'var(--color-text-info)', cursor: 'pointer', padding: 0, fontSize: 12, fontFamily: 'inherit' }}>Portfolio</button>
         <i className="ti ti-chevron-right" style={{ fontSize: 14, opacity: 0.6 }} />
         <span>{project.name} · Budget</span>
+        <span style={{ flex: 1 }} />
+        {/* Print / Share button group */}
+        <div style={{ display: 'inline-flex', borderRadius: 'var(--border-radius-md)', overflow: 'hidden', border: '0.5px solid var(--color-border-secondary)' }}>
+          <button
+            type="button"
+            onClick={handlePrint}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 10px', background: 'var(--color-background-secondary)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer', fontFamily: 'inherit', border: 'none', borderRight: '0.5px solid var(--color-border-secondary)' }}
+          >
+            <i className="ti ti-printer" style={{ fontSize: 13 }} />
+            Print
+          </button>
+          <button
+            type="button"
+            onClick={handleShareLink}
+            title="Copy live report link to clipboard"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 10px', background: shareCopied ? 'var(--bid-fnl-bg)' : 'var(--color-background-secondary)', color: shareCopied ? 'var(--bid-fnl-fg)' : 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer', fontFamily: 'inherit', border: 'none', transition: 'background 0.2s, color 0.2s' }}
+          >
+            <i className={`ti ${shareCopied ? 'ti-check' : 'ti-link'}`} style={{ fontSize: 13 }} />
+            {shareCopied ? 'Copied!' : 'Share'}
+          </button>
+        </div>
       </div>
 
       {/* Project header */}
