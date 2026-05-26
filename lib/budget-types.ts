@@ -31,3 +31,10 @@ export interface BudgetPayload {
   source?: 'live' | 'empty';
   warning?: string;
 }
+
+export interface BudgetPortfolioPayload {
+  projects: BudgetProject[];
+  syncedAt: number;
+  source?: 'live' | 'empty';
+  warning?: string;
+}

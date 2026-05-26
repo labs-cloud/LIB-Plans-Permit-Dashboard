@@ -1,13 +1,19 @@
 'use client';
 
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
 import useSWR from 'swr';
-import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { LogoHeader } from '@/components/LogoHeader';
-import type { BudgetTrade, BudgetPayload, MoneyVal } from '@/lib/budget-types';
+import type {
+  BudgetTrade,
+  BudgetPayload,
+  BudgetPortfolioPayload,
+  BudgetProject,
+  MoneyVal,
+} from '@/lib/budget-types';
 
 // ──────────────────────────────────────────────────────────────
-// Data context (replaces static fixture import)
+// Data context (per-project mode)
 // ──────────────────────────────────────────────────────────────
 const BudgetCtx = createContext<BudgetPayload | null>(null);
 
@@ -21,6 +27,12 @@ async function fetcher(url: string): Promise<BudgetPayload> {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`fetch ${url} → ${res.status}`);
   return res.json() as Promise<BudgetPayload>;
+}
+
+async function portfolioFetcher(url: string): Promise<BudgetPortfolioPayload> {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`fetch ${url} → ${res.status}`);
+  return res.json() as Promise<BudgetPortfolioPayload>;
 }
 
 // ──────────────────────────────────────────────────────────────
@@ -174,26 +186,6 @@ function VarBar({ r }: { r: BudgetTrade }) {
   );
 }
 
-function SparkBar({ ghost, finalized, total }: { ghost?: boolean; finalized?: number; total?: number }) {
-  const bars = Array.from({ length: 14 }, (_, i) => {
-    const filled = !ghost && i < (finalized ?? 0);
-    return (
-      <div key={i} style={{
-        flex: 1, borderRadius: 1,
-        background: ghost ? 'var(--color-border-tertiary)' : filled ? 'var(--var-under)' : 'var(--var-zero)',
-        minHeight: 2,
-        height: `${60 + (i * 137) % 40}%`,
-        alignSelf: 'flex-end',
-      }} />
-    );
-  });
-  return (
-    <div style={{ display: 'flex', gap: 1, height: 18, alignItems: 'flex-end', width: 96 }}>
-      {bars}
-    </div>
-  );
-}
-
 function SideCard({ title, icon, children }: { title: string; icon: string; children: ReactNode }) {
   return (
     <div style={{
@@ -230,50 +222,6 @@ function ManualBadge() {
     }}>
       <i className="ti ti-settings-2" style={{ fontSize: 9 }} /> Manual
     </span>
-  );
-}
-
-// ──────────────────────────────────────────────────────────────
-// ProjectHeroCard — shared
-// ──────────────────────────────────────────────────────────────
-function ProjectHeroCard({ onBack }: { onBack: () => void }) {
-  const { project } = useBudget();
-  return (
-    <div style={{
-      display: 'grid', gridTemplateColumns: '1fr auto', gap: 24, alignItems: 'flex-start',
-      paddingBottom: 14, borderBottom: '0.5px solid var(--color-border-tertiary)', marginBottom: 14,
-    }}>
-      <div>
-        <h1 style={{ fontSize: 22, fontWeight: 500, letterSpacing: '-0.015em', margin: '0 0 6px' }}>{project.name}</h1>
-        <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'center', fontSize: 12.5, color: 'var(--color-text-secondary)' }}>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: 999, background: 'var(--c-sol-bg)', color: 'var(--c-sol-dark)' }}>
-            <span style={{ width: 18, height: 18, borderRadius: '50%', background: '#fff', color: 'var(--c-sol-dark)', fontSize: 9, fontWeight: 700, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>{project.coordInitials}</span>
-            {project.coordName}
-          </span>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: 999, background: 'var(--info-bg)', color: 'var(--info-fg)' }}>
-            <i className="ti ti-calculator" style={{ fontSize: 13 }} />{project.phase}
-          </span>
-          <span><i className="ti ti-map-pin" style={{ fontSize: 13, verticalAlign: '-2px' }} /> {project.location}</span>
-          <span><i className="ti ti-id" style={{ fontSize: 13, verticalAlign: '-2px' }} /> {project.id}</span>
-        </div>
-      </div>
-      <div style={{ display: 'flex', gap: 8 }}>
-        <button
-          onClick={onBack}
-          style={{ height: 32, padding: '0 13px', borderRadius: 'var(--border-radius-md)', border: '0.5px solid var(--color-border-secondary)', fontSize: 12.5, display: 'inline-flex', alignItems: 'center', gap: 6, background: 'var(--color-background-primary)', color: 'var(--color-text-primary)', cursor: 'pointer', fontFamily: 'inherit' }}
-        >
-          <i className="ti ti-arrow-left" /> Standard view
-        </button>
-        <a
-          href="https://app.clickup.com/9017603275/v/l/90173230172"
-          target="_blank"
-          rel="noopener noreferrer"
-          style={{ height: 32, padding: '0 13px', borderRadius: 'var(--border-radius-md)', border: '0.5px solid var(--lib-black)', fontSize: 12.5, display: 'inline-flex', alignItems: 'center', gap: 6, background: 'var(--lib-black)', color: '#fff', textDecoration: 'none', fontFamily: 'inherit' }}
-        >
-          <i className="ti ti-external-link" /> Open in ClickUp
-        </a>
-      </div>
-    </div>
   );
 }
 
@@ -380,132 +328,218 @@ function Drawer({
 }
 
 // ──────────────────────────────────────────────────────────────
-// VIEWS
+// PortfolioBudgetView — Trade × Project matrix
 // ──────────────────────────────────────────────────────────────
-function OverviewView({ onGoProject }: { onGoProject: (name: string) => void }) {
-  const { project, portfolioProjects } = useBudget();
-  const bs = computeStats(project.trades);
-  const bDelta = bs.newv - bs.est;
-  const bDp = bs.est > 0 ? (bDelta / bs.est * 100) : 0;
+function PortfolioBudgetView({
+  portfolioData,
+  onNavigateToProject,
+  search,
+}: {
+  portfolioData: BudgetPortfolioPayload;
+  onNavigateToProject: (id: string) => void;
+  search: string;
+}) {
+  const projects = portfolioData.projects;
 
-  const otherProjects = portfolioProjects.filter(p => p.name !== project.name);
+  const projectTradeMap = useMemo(() => {
+    const map = new Map<string, Map<string, BudgetTrade>>();
+    for (const proj of projects) {
+      const tm = new Map<string, BudgetTrade>();
+      for (const t of proj.trades) tm.set(t.trade, t);
+      map.set(proj.name, tm);
+    }
+    return map;
+  }, [projects]);
 
-  const th: React.CSSProperties = {
-    position: 'sticky', top: 0, zIndex: 2,
-    background: 'var(--color-background-secondary)',
-    padding: '10px 12px',
-    fontSize: 9.5, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase',
+  const allTradeNames = useMemo(() => {
+    const names = new Set<string>();
+    for (const [, tm] of projectTradeMap) for (const n of tm.keys()) names.add(n);
+    const sorted = [...names].sort();
+    if (!search.trim()) return sorted;
+    const q = search.toLowerCase();
+    return sorted.filter((n) => n.toLowerCase().includes(q));
+  }, [projectTradeMap, search]);
+
+  // Per-project summary stats for the header
+  const projectStats = useMemo(() => {
+    const stats = new Map<string, ReturnType<typeof computeStats>>();
+    for (const proj of projects) {
+      stats.set(proj.name, computeStats(proj.trades));
+    }
+    return stats;
+  }, [projects]);
+
+  const thStyle: React.CSSProperties = {
+    textAlign: 'left',
+    padding: '8px 12px',
+    fontSize: 10,
+    letterSpacing: '0.06em',
+    textTransform: 'uppercase',
     color: 'var(--color-text-tertiary)',
-    borderBottom: '0.5px solid var(--color-border-tertiary)',
-    whiteSpace: 'nowrap', textAlign: 'left',
+    fontWeight: 600,
+    background: 'var(--color-background-secondary)',
+    border: '0.5px solid var(--color-border-tertiary)',
+    position: 'sticky',
+    left: 0,
+    zIndex: 2,
+    whiteSpace: 'nowrap',
   };
 
-  const tdBase: React.CSSProperties = { padding: '9px 12px', borderBottom: '0.5px solid var(--color-border-tertiary)', textAlign: 'right', fontVariantNumeric: 'tabular-nums' };
-
   return (
-    <div>
-      {/* KPI strip */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 10, marginBottom: '1.25rem' }}>
-        <KpiCard label="New Budget (loaded)" value={fmt$(bs.newv)} sub={project.name} icon="ti-wallet" tone="good" />
-        <KpiCard
-          label="Δ vs Estimated"
-          value={(bDelta < 0 ? '−' : bDelta > 0 ? '+' : '') + fmt$(Math.abs(bDelta))}
-          sub={bDp.toFixed(1) + '% vs estimate'}
-          icon="ti-trending-down"
-          tone={bDelta > 0 ? 'danger' : bDelta < 0 ? 'good' : 'default'}
-        />
-        <KpiCard label="Projects in portfolio" value={String(portfolioProjects.length)} sub="from ClickUp Master Board" icon="ti-buildings" />
-        <KpiCard label="Trades with bids in" value={String(bs.withBids)} sub={`${project.name} · loaded`} icon="ti-checks" tone="info" />
-        <KpiCard label="Estimate-only trades" value={String(bs.eo)} sub="no bids yet · carry-forward" icon="ti-hourglass" tone="amber" />
-      </div>
-
-      {/* Projects matrix */}
-      <div style={{
-        background: 'var(--color-background-primary)',
-        border: '0.5px solid var(--color-border-tertiary)',
-        borderRadius: 'var(--border-radius-lg)',
-        padding: '18px 20px',
-        marginBottom: '1.25rem',
-      }}>
-        <h2 style={{ margin: '0 0 14px', fontSize: 13, fontWeight: 500, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <i className="ti ti-table" />
-          Projects matrix
-          <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--color-text-tertiary)', fontWeight: 400 }}>
-            click a row to select that project and see its budget detail
-          </span>
-        </h2>
-        <div style={{ maxHeight: 600, overflowY: 'auto', background: 'var(--color-background-primary)', borderRadius: 8, border: '0.5px solid var(--color-border-tertiary)' }}>
-          <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, fontSize: 12.5 }}>
-            <thead>
+    <div style={{
+      background: 'var(--color-background-primary)',
+      border: '0.5px solid var(--color-border-tertiary)',
+      borderRadius: 'var(--border-radius-lg)',
+      padding: '18px 20px',
+    }}>
+      <h2 style={{ margin: '0 0 14px', fontSize: 13, fontWeight: 500, display: 'flex', alignItems: 'center', gap: 8 }}>
+        <i className="ti ti-table" />
+        Portfolio budget matrix
+        <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--color-text-tertiary)', fontWeight: 400 }}>
+          click a project column header to view its full budget detail
+        </span>
+      </h2>
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+          <colgroup>
+            <col style={{ minWidth: 200 }} />
+            {projects.map((_, i) => (
+              <col key={i} style={{ minWidth: 130 }} />
+            ))}
+          </colgroup>
+          <thead>
+            {/* Project name row — clickable */}
+            <tr>
+              <th style={thStyle}>Trade</th>
+              {projects.map((proj) => {
+                const ps = projectStats.get(proj.name);
+                return (
+                  <th
+                    key={proj.name}
+                    title={`View ${proj.name} budget`}
+                    onClick={() => onNavigateToProject(proj.name)}
+                    style={{
+                      textAlign: 'center',
+                      padding: '7px 8px',
+                      fontSize: 10,
+                      color: 'var(--color-text-primary)',
+                      fontWeight: 600,
+                      background: 'var(--color-background-secondary)',
+                      border: '0.5px solid var(--color-border-tertiary)',
+                      whiteSpace: 'nowrap',
+                      cursor: 'pointer',
+                      letterSpacing: '0.02em',
+                      maxWidth: 130,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                    }}
+                  >
+                    <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 120 }}>{proj.name}</div>
+                    {ps && (
+                      <div style={{ fontSize: 9, fontWeight: 400, color: 'var(--color-text-tertiary)', marginTop: 2 }}>
+                        {fmt$(ps.newv)}
+                      </div>
+                    )}
+                  </th>
+                );
+              })}
+            </tr>
+          </thead>
+          <tbody>
+            {allTradeNames.length === 0 ? (
               <tr>
-                {['Project', 'Estimated', 'Committed', 'New Budget', 'Δ $', 'Δ %', '# trades finalized'].map((h, i) => (
-                  <th key={h} style={{ ...th, textAlign: i === 0 ? 'left' : i === 6 ? 'center' : 'right' }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {/* Currently-loaded project — has real data */}
-              <tr
-                style={{ cursor: 'pointer' }}
-                onClick={() => onGoProject(project.name)}
-                onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-background-secondary)')}
-                onMouseLeave={e => (e.currentTarget.style.background = '')}
-              >
-                <td style={{ ...tdBase, textAlign: 'left', verticalAlign: 'middle' }}>
-                  <span style={{ fontWeight: 500, color: 'var(--lib-orange)' }}>{project.name}</span>
-                </td>
-                <td style={tdBase}>{fmt$(bs.est)}</td>
-                <td style={tdBase}>{fmt$(bs.fin)}</td>
-                <td style={{ ...tdBase, fontWeight: 600 }}>{fmt$(bs.newv)}</td>
-                <td style={{ ...tdBase, color: bDelta < 0 ? 'var(--var-under)' : bDelta > 0 ? 'var(--var-over)' : undefined }}>
-                  {(bDelta < 0 ? '−' : bDelta > 0 ? '+' : '')}{fmt$(Math.abs(bDelta))}
-                </td>
-                <td style={{ ...tdBase, color: bDelta < 0 ? 'var(--var-under)' : bDelta > 0 ? 'var(--var-over)' : undefined }}>
-                  {bDp.toFixed(1)}%
-                </td>
-                <td style={{ ...tdBase, textAlign: 'center' }}>
-                  <SparkBar finalized={bs.withBids} total={bs.count - bs.na - bs.inc} />
-                </td>
-              </tr>
-              {/* Other portfolio projects — click to load their data */}
-              {otherProjects.map(p => (
-                <tr
-                  key={p.name}
-                  style={{ cursor: 'pointer' }}
-                  onClick={() => onGoProject(p.name)}
-                  onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-background-secondary)')}
-                  onMouseLeave={e => (e.currentTarget.style.background = '')}
+                <td
+                  colSpan={projects.length + 1}
+                  style={{
+                    padding: 24,
+                    textAlign: 'center',
+                    color: 'var(--color-text-tertiary)',
+                    fontSize: 12,
+                  }}
                 >
-                  <td style={{ ...tdBase, textAlign: 'left', verticalAlign: 'middle' }}>
-                    <span style={{ fontWeight: 500 }}>{p.name}</span>
-                  </td>
-                  {['—', '—', '—', '—', '—'].map((v, ci) => (
-                    <td key={ci} style={{ ...tdBase, color: 'var(--color-text-tertiary)', fontStyle: 'italic' }}>{v}</td>
-                  ))}
-                  <td style={{ ...tdBase, textAlign: 'center' }}>
-                    <SparkBar ghost />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-            <tfoot>
-              <tr>
-                <td style={{ position: 'sticky', bottom: 0, zIndex: 2, background: 'var(--color-background-secondary)', borderTop: '1.5px solid var(--color-border-secondary)', padding: '14px 12px', fontWeight: 600 }}>
-                  Portfolio
-                  <span style={{ fontWeight: 400, color: 'var(--color-text-tertiary)', fontSize: 11 }}> · {portfolioProjects.length} active projects · select a row to load full data</span>
+                  {search ? 'No trades match your search.' : 'No budget data yet.'}
                 </td>
-                {['—', '—', '—', '—', '—', '—'].map((v, i) => (
-                  <td key={i} style={{ position: 'sticky', bottom: 0, zIndex: 2, background: 'var(--color-background-secondary)', borderTop: '1.5px solid var(--color-border-secondary)', padding: '14px 12px', textAlign: 'right', color: 'var(--color-text-tertiary)' }}>{v}</td>
-                ))}
               </tr>
-            </tfoot>
-          </table>
-        </div>
+            ) : (
+              allTradeNames.map((tradeName, ti) => (
+                <tr key={ti}>
+                  <td
+                    style={{
+                      padding: '7px 12px',
+                      border: '0.5px solid var(--color-border-tertiary)',
+                      fontWeight: 500,
+                      background: 'var(--color-background-primary)',
+                      position: 'sticky',
+                      left: 0,
+                      zIndex: 1,
+                      fontSize: 12.5,
+                    }}
+                  >
+                    {tradeName}
+                  </td>
+                  {projects.map((proj) => {
+                    const trade = projectTradeMap.get(proj.name)?.get(tradeName);
+                    if (!trade) {
+                      return (
+                        <td
+                          key={proj.name}
+                          style={{
+                            padding: '6px 8px',
+                            border: '0.5px solid var(--color-border-tertiary)',
+                            textAlign: 'center',
+                            color: 'var(--color-text-tertiary)',
+                            fontSize: 11,
+                          }}
+                        >
+                          —
+                        </td>
+                      );
+                    }
+
+                    // Determine cell coloring based on variance
+                    let bg: string | undefined;
+                    let textColor: string | undefined;
+                    if (isMoney(trade.newv) && isMoney(trade.est) && trade.est > 0) {
+                      if ((trade.newv as number) < (trade.est as number)) {
+                        bg = '#e8f5e9';
+                        textColor = '#1F7A38';
+                      } else if ((trade.newv as number) > (trade.est as number)) {
+                        bg = '#fdecea';
+                        textColor = '#A82828';
+                      }
+                    }
+
+                    return (
+                      <td
+                        key={proj.name}
+                        style={{
+                          padding: '6px 8px',
+                          border: '0.5px solid var(--color-border-tertiary)',
+                          textAlign: 'right',
+                          background: bg,
+                          color: textColor ?? 'var(--color-text-primary)',
+                          fontVariantNumeric: 'tabular-nums',
+                          fontSize: 12,
+                          fontWeight: isMoney(trade.newv) ? 500 : 400,
+                        }}
+                      >
+                        {fmt$(trade.newv)}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
       </div>
     </div>
   );
 }
 
+// ──────────────────────────────────────────────────────────────
+// DetailedView
+// ──────────────────────────────────────────────────────────────
 function DetailedView({
   onGoOverview,
   onTradeClick,
@@ -723,38 +757,6 @@ function DetailedView({
   );
 }
 
-function MatrixView({ onGoDetailed }: { onGoDetailed: () => void }) {
-  return (
-    <div style={{ textAlign: 'center', padding: '48px 24px', maxWidth: 680, margin: '24px auto' }}>
-      <div style={{
-        width: 48, height: 48, borderRadius: 999,
-        background: 'var(--color-background-secondary)',
-        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-        marginBottom: 14,
-      }}>
-        <i className="ti ti-table-off" style={{ fontSize: 22, color: 'var(--color-text-tertiary)' }} />
-      </div>
-      <h2 style={{ margin: '0 0 8px', fontSize: 15, fontWeight: 500, justifyContent: 'center', display: 'block' }}>
-        Matrix view lives on the Bidding dashboard
-      </h2>
-      <p style={{ margin: '0 auto', fontSize: 12.5, color: 'var(--color-text-secondary)', lineHeight: 1.55, maxWidth: 480 }}>
-        Budget has a single source of truth — the per-trade table in{' '}
-        <button onClick={onGoDetailed} style={{ background: 'none', border: 'none', color: 'var(--color-text-info)', cursor: 'pointer', padding: 0, fontSize: 12.5, fontFamily: 'inherit' }}>Detailed view</button>
-        {' '}— so a separate matrix layout doesn&apos;t add a new angle. The Trade × Sub matrix with the 8-color status palette lives on the{' '}
-        <Link href="/bidding" style={{ color: 'var(--color-text-info)' }}>Bidding dashboard</Link>.
-      </p>
-      <div style={{ display: 'inline-flex', gap: 8, marginTop: 18 }}>
-        <button onClick={onGoDetailed} style={{ height: 32, padding: '0 13px', borderRadius: 'var(--border-radius-md)', border: '0.5px solid var(--color-border-secondary)', fontSize: 12.5, background: 'var(--color-background-primary)', color: 'var(--color-text-primary)', cursor: 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-          <i className="ti ti-list-details" /> Open Detailed view
-        </button>
-        <Link href="/bidding" style={{ height: 32, padding: '0 13px', borderRadius: 'var(--border-radius-md)', border: '0.5px solid var(--lib-black)', background: 'var(--lib-black)', color: '#fff', fontSize: 12.5, display: 'inline-flex', alignItems: 'center', gap: 6, textDecoration: 'none' }}>
-          <i className="ti ti-gavel" /> Switch to Bidding dashboard
-        </Link>
-      </div>
-    </div>
-  );
-}
-
 // ──────────────────────────────────────────────────────────────
 // VarianceView
 // ──────────────────────────────────────────────────────────────
@@ -839,10 +841,8 @@ function VarianceView({ onBack }: { onBack: () => void }) {
       <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginBottom: 12, display: 'flex', gap: 6, alignItems: 'center' }}>
         <button onClick={onBack} style={{ background: 'none', border: 'none', color: 'var(--color-text-info)', cursor: 'pointer', padding: 0, fontSize: 12, fontFamily: 'inherit' }}>Portfolio</button>
         <i className="ti ti-chevron-right" style={{ fontSize: 14, opacity: 0.6 }} />
-        <span>800 Brady Ave · Budget</span>
+        <span>{project.name} · Variance</span>
       </div>
-
-      <ProjectHeroCard onBack={onBack} />
 
       {/* 4-KPI strip */}
       {(() => {
@@ -1032,10 +1032,8 @@ function TreemapView({ onBack }: { onBack: () => void }) {
       <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginBottom: 12, display: 'flex', gap: 6, alignItems: 'center' }}>
         <button onClick={onBack} style={{ background: 'none', border: 'none', color: 'var(--color-text-info)', cursor: 'pointer', padding: 0, fontSize: 12, fontFamily: 'inherit' }}>Portfolio</button>
         <i className="ti ti-chevron-right" style={{ fontSize: 14, opacity: 0.6 }} />
-        <span>800 Brady Ave · Budget</span>
+        <span>{project.name} · Treemap</span>
       </div>
-
-      <ProjectHeroCard onBack={onBack} />
 
       {/* 4-KPI strip */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, marginBottom: '1.25rem' }}>
@@ -1048,7 +1046,7 @@ function TreemapView({ onBack }: { onBack: () => void }) {
       {/* Treemap section */}
       <div style={{ background: 'var(--color-background-primary)', border: '0.5px solid var(--color-border-tertiary)', borderRadius: 'var(--border-radius-lg)', padding: '18px 20px', marginBottom: '1.25rem' }}>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 10 }}>
-          <h2 style={{ margin: 0, fontSize: 13, fontWeight: 500 }}>Spend treemap · 800 Brady</h2>
+          <h2 style={{ margin: 0, fontSize: 13, fontWeight: 500 }}>Spend treemap · {project.name}</h2>
           <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginLeft: 'auto' }}>area = New Budget · color = % variance vs estimated · hover for details</span>
         </div>
         {/* Color legend */}
@@ -1254,10 +1252,8 @@ function CategoriesView({ onBack }: { onBack: () => void }) {
       <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginBottom: 12, display: 'flex', gap: 6, alignItems: 'center' }}>
         <button onClick={onBack} style={{ background: 'none', border: 'none', color: 'var(--color-text-info)', cursor: 'pointer', padding: 0, fontSize: 12, fontFamily: 'inherit' }}>Portfolio</button>
         <i className="ti ti-chevron-right" style={{ fontSize: 14, opacity: 0.6 }} />
-        <span>800 Brady Ave · Budget</span>
+        <span>{project.name} · Categories</span>
       </div>
-
-      <ProjectHeroCard onBack={onBack} />
 
       {/* 3-step KPI flow */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 0, marginBottom: '1.25rem', flexWrap: 'wrap' }}>
@@ -1387,41 +1383,77 @@ function CategoriesView({ onBack }: { onBack: () => void }) {
 // ──────────────────────────────────────────────────────────────
 // MAIN
 // ──────────────────────────────────────────────────────────────
-type BudgetMode = 'table' | 'variance' | 'treemap' | 'categories';
-type BudgetTableView = 'overview' | 'detailed' | 'matrix';
+type ProjectTab = 'table' | 'variance' | 'treemap' | 'categories';
 
-export function BudgetDashboard() {
-  const [mode, setMode] = useState<BudgetMode>('table');
-  const [tableView, setTableView] = useState<BudgetTableView>('overview');
-  const [drawerTrade, setDrawerTrade] = useState<BudgetTrade | null>(null);
+const PROJECT_TABS: { id: ProjectTab; label: string; icon: string }[] = [
+  { id: 'table',      label: 'Table',      icon: 'ti-list-details' },
+  { id: 'variance',   label: 'Variance',   icon: 'ti-chart-bar' },
+  { id: 'treemap',    label: 'Treemap',    icon: 'ti-layout-grid' },
+  { id: 'categories', label: 'Categories', icon: 'ti-list-tree' },
+];
+
+export function BudgetDashboard({ projectId }: { projectId?: string } = {}) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const tab = (searchParams?.get('tab') ?? 'table') as ProjectTab;
   const [search, setSearch] = useState('');
-  const [selectedProject, setSelectedProject] = useState<string>('');
+  const [drawerTrade, setDrawerTrade] = useState<BudgetTrade | null>(null);
   const closeDrawer = useCallback(() => setDrawerTrade(null), []);
 
-  // Auto-switch view when project selection changes.
-  useEffect(() => {
-    if (selectedProject) {
-      setMode('table');
-      setTableView('detailed');
-    } else {
-      setMode('table');
-      setTableView('overview');
+  const navigateToProject = useCallback(
+    (id: string) => router.push(`/budget/${encodeURIComponent(id)}`),
+    [router],
+  );
+  const navigateToPortfolio = useCallback(() => router.push('/budget'), [router]);
+  const setTab = useCallback(
+    (newTab: ProjectTab) => {
+      if (!projectId) return;
+      const params = new URLSearchParams(searchParams?.toString() ?? '');
+      params.set('tab', newTab);
+      router.push(`/budget/${encodeURIComponent(projectId)}?${params.toString()}`);
+    },
+    [router, projectId, searchParams],
+  );
+
+  // Portfolio data — only fetched in portfolio mode
+  const { data: portfolioData, isLoading: portfolioLoading } = useSWR<BudgetPortfolioPayload>(
+    projectId ? null : '/api/budget/portfolio',
+    portfolioFetcher,
+    { refreshInterval: 300_000, revalidateOnFocus: false, dedupingInterval: 60_000 },
+  );
+
+  // Per-project data — only fetched in project mode
+  const { data: projectData, isLoading: projectLoading } = useSWR<BudgetPayload>(
+    projectId ? `/api/budget/project/${encodeURIComponent(projectId)}` : null,
+    fetcher,
+    { refreshInterval: 300_000, revalidateOnFocus: false, dedupingInterval: 60_000 },
+  );
+
+  const isLoading = projectId ? projectLoading : portfolioLoading;
+
+  const syncedAt = projectId
+    ? (projectData?.syncedAt ?? null)
+    : (portfolioData?.syncedAt ?? null);
+
+  const subtitle = useMemo(() => {
+    if (projectId) {
+      if (!projectData) return 'Loading…';
+      const bs = computeStats(projectData.project.trades);
+      return `${projectData.project.name} · ${projectData.project.trades.length} trades · ${fmt$(bs.newv)} new budget`;
     }
-  }, [selectedProject]);
+    if (!portfolioData) return 'Loading…';
+    return `${portfolioData.projects.length} projects · live from ClickUp`;
+  }, [projectId, projectData, portfolioData]);
 
-  // SWR URL includes projectId once the user has picked a project.
-  const swrUrl = selectedProject
-    ? `/api/budget?projectId=${encodeURIComponent(selectedProject)}`
-    : '/api/budget';
+  // Project names for the picker — populated from whichever payload is available
+  const allProjectNames = useMemo(() => {
+    if (projectData) return projectData.portfolioProjects.map((p) => p.name);
+    if (portfolioData) return portfolioData.projects.map((p) => p.name);
+    return [];
+  }, [projectData, portfolioData]);
 
-  const { data, isLoading } = useSWR<BudgetPayload>(swrUrl, fetcher, {
-    refreshInterval: 300_000,
-    revalidateOnFocus: false,
-    dedupingInterval: 60_000,
-  });
-
-
-  if (isLoading || !data) {
+  // Loading skeleton
+  if (isLoading || (projectId ? !projectData : !portfolioData)) {
     return (
       <div className="dashboard-shell">
         <LogoHeader title="Budget Dashboard" subtitleOverride="Loading from ClickUp…" syncedAt={null} />
@@ -1433,64 +1465,47 @@ export function BudgetDashboard() {
     );
   }
 
-  if (data.warning) {
+  // No-token warning (portfolio mode)
+  if (!projectId && portfolioData!.source === 'empty') {
     return (
       <div className="dashboard-shell">
-        <LogoHeader title="Budget Dashboard" subtitleOverride={data.warning} syncedAt={null} />
+        <LogoHeader title="Budget Dashboard" subtitleOverride="No ClickUp token" syncedAt={null} />
         <div style={{ padding: '32px 24px', color: 'var(--color-text-secondary)', fontSize: 13, lineHeight: 1.6 }}>
-          <strong>No data available.</strong> {data.warning}
+          <strong>No data available.</strong> Add <code>CLICKUP_API_TOKEN</code> to{' '}
+          <code>.env.local</code> to load live data.
         </div>
       </div>
     );
   }
 
-  const { project, portfolioProjects } = data;
-  const n = project.trades.length;
-
-  const titleMap: Record<BudgetMode, string> = {
-    table: 'Budget Dashboard',
-    variance: 'Budget · Variance Ranking',
-    treemap: 'Budget · Spend Treemap',
-    categories: 'Budget · Category Rollup',
-  };
-
-  const subtitleMap: Record<BudgetMode, string> = {
-    table: `${portfolioProjects.length} active projects · live from ClickUp`,
-    variance: `${project.name} · ${n} trades · sorted by $ delta`,
-    treemap: `${project.name} · ${n} trades · area = New Budget · color = Δ vs estimated`,
-    categories: `${project.name} · ${n} trades grouped into 8 work-packages`,
-  };
-
-  const MODE_TABS: { id: BudgetMode; icon: string; label: string }[] = [
-    { id: 'table',      icon: 'ti-grid-dots',   label: 'Table' },
-    { id: 'variance',   icon: 'ti-chart-bar',   label: 'Variance' },
-    { id: 'treemap',    icon: 'ti-layout-grid', label: 'Treemap' },
-    { id: 'categories', icon: 'ti-list-tree',   label: 'Categories' },
-  ];
-
-  const TABLE_TABS: { id: BudgetTableView; icon: string; label: string }[] = [
-    { id: 'overview', icon: 'ti-grid-dots',    label: 'Overview' },
-    { id: 'detailed', icon: 'ti-list-details', label: 'Detailed' },
-    { id: 'matrix',   icon: 'ti-table',        label: 'Matrix' },
-  ];
+  // No-token warning (project mode)
+  if (projectId && projectData!.warning) {
+    return (
+      <div className="dashboard-shell">
+        <LogoHeader title="Budget Dashboard" subtitleOverride={projectData!.warning} syncedAt={null} />
+        <div style={{ padding: '32px 24px', color: 'var(--color-text-secondary)', fontSize: 13, lineHeight: 1.6 }}>
+          <strong>No data available.</strong> {projectData!.warning}
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <BudgetCtx.Provider value={data}>
     <div className="dashboard-shell">
       <LogoHeader
-        title={titleMap[mode]}
-        subtitleOverride={subtitleMap[mode]}
-        syncedAt={data.syncedAt || null}
+        title="Budget Dashboard"
+        subtitleOverride={subtitle}
+        syncedAt={syncedAt}
       />
 
-      {/* Filter bar */}
+      {/* Filter / navigation bar */}
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: '1.25rem' }}>
         {/* Search */}
         <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
           <i className="ti ti-search" style={{ position: 'absolute', left: 8, fontSize: 13, color: 'var(--color-text-tertiary)', pointerEvents: 'none' }} />
           <input
             type="search"
-            placeholder={mode === 'table' ? 'Search projects, trades…' : 'Search trades…'}
+            placeholder={projectId ? 'Search trades…' : 'Search trades, projects…'}
             value={search}
             onChange={e => setSearch(e.target.value)}
             style={{
@@ -1504,74 +1519,82 @@ export function BudgetDashboard() {
           />
         </div>
 
-        {/* Portfolio dropdown */}
+        {/* Project picker */}
         <select
-          style={{ height: 32, padding: '0 10px', border: '0.5px solid var(--color-border-secondary)', borderRadius: 'var(--border-radius-md)', background: 'var(--color-background-primary)', color: 'var(--color-text-primary)', fontFamily: 'inherit', fontSize: 13, minWidth: 200, fontWeight: 500 }}
-          value={selectedProject}
-          onChange={e => setSelectedProject(e.target.value)}
+          value={projectId ?? ''}
+          onChange={(e) => {
+            if (!e.target.value) navigateToPortfolio();
+            else navigateToProject(e.target.value);
+          }}
+          style={{
+            height: 32, padding: '0 10px',
+            border: '0.5px solid var(--color-border-secondary)',
+            borderRadius: 'var(--border-radius-md)',
+            background: 'var(--color-background-primary)',
+            color: 'var(--color-text-primary)',
+            fontFamily: 'inherit', fontSize: 13, minWidth: 200, fontWeight: 500,
+          }}
         >
-          <option value="">All projects</option>
-          {portfolioProjects.filter(p => p.real).map(p => (
-            <option key={p.name} value={p.name}>★ {p.name}</option>
+          <option value="">★ All projects</option>
+          {allProjectNames.map(name => (
+            <option key={name} value={name}>{name}</option>
           ))}
         </select>
 
-        {/* Primary mode tabs */}
-        <div style={{ display: 'flex', gap: 4, padding: 4, background: 'var(--color-background-secondary)', borderRadius: 'var(--border-radius-md)' }}>
-          {MODE_TABS.map(tab => (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => setMode(tab.id)}
-              style={{
-                padding: '6px 14px', fontSize: 13, borderRadius: 'var(--border-radius-md)',
-                cursor: 'pointer', border: mode === tab.id ? '0.5px solid var(--color-border-secondary)' : '0.5px solid transparent',
-                background: mode === tab.id ? 'var(--color-background-primary)' : 'transparent',
-                color: mode === tab.id ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
-                fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 4,
-                fontWeight: mode === tab.id ? 500 : 400,
-              }}
-            >
-              <i className={`ti ${tab.icon}`} style={{ fontSize: 14 }} />
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Size tabs — only in Table mode */}
-        {mode === 'table' && (
-          <div style={{ display: 'flex', gap: 4, padding: 4, background: 'var(--color-background-secondary)', borderRadius: 'var(--border-radius-md)', marginLeft: 'auto' }}>
-            {TABLE_TABS.map(tab => (
+        {/* Tab strip — per-project mode only */}
+        {projectId && (
+          <div style={{
+            display: 'flex', gap: 4, padding: 4,
+            background: 'var(--color-background-secondary)',
+            borderRadius: 'var(--border-radius-md)',
+            marginLeft: 'auto',
+          }}>
+            {PROJECT_TABS.map(t => (
               <button
-                key={tab.id}
+                key={t.id}
                 type="button"
-                onClick={() => setTableView(tab.id)}
+                onClick={() => setTab(t.id)}
                 style={{
                   padding: '6px 14px', fontSize: 13, borderRadius: 'var(--border-radius-md)',
-                  cursor: 'pointer', border: tableView === tab.id ? '0.5px solid var(--color-border-secondary)' : '0.5px solid transparent',
-                  background: tableView === tab.id ? 'var(--color-background-primary)' : 'transparent',
-                  color: tableView === tab.id ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
+                  cursor: 'pointer',
+                  border: tab === t.id ? '0.5px solid var(--color-border-secondary)' : '0.5px solid transparent',
+                  background: tab === t.id ? 'var(--color-background-primary)' : 'transparent',
+                  color: tab === t.id ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
                   fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 4,
-                  fontWeight: tableView === tab.id ? 500 : 400,
+                  fontWeight: tab === t.id ? 500 : 400,
                 }}
               >
-                <i className={`ti ${tab.icon}`} style={{ fontSize: 14 }} />
-                {tab.label}
+                <i className={`ti ${t.icon}`} style={{ fontSize: 14 }} />
+                {t.label}
               </button>
             ))}
           </div>
         )}
       </div>
 
-      {/* Mode content */}
-      {mode === 'table' && tableView === 'overview' && (
-        <OverviewView onGoProject={(name) => { setSelectedProject(name); }} />
+      {/* Content — portfolio mode */}
+      {!projectId && (
+        <PortfolioBudgetView
+          portfolioData={portfolioData!}
+          onNavigateToProject={navigateToProject}
+          search={search}
+        />
       )}
-      {mode === 'table' && tableView === 'detailed' && <DetailedView onGoOverview={() => { setSelectedProject(''); }} onTradeClick={setDrawerTrade} />}
-      {mode === 'table' && tableView === 'matrix' && <MatrixView onGoDetailed={() => setTableView('detailed')} />}
-      {mode === 'variance'   && <VarianceView   onBack={() => setMode('table')} />}
-      {mode === 'treemap'    && <TreemapView    onBack={() => setMode('table')} />}
-      {mode === 'categories' && <CategoriesView onBack={() => setMode('table')} />}
+
+      {/* Content — per-project mode */}
+      {projectId && projectData && (
+        <BudgetCtx.Provider value={projectData}>
+          {tab === 'table' && (
+            <DetailedView
+              onGoOverview={navigateToPortfolio}
+              onTradeClick={setDrawerTrade}
+            />
+          )}
+          {tab === 'variance' && <VarianceView onBack={navigateToPortfolio} />}
+          {tab === 'treemap' && <TreemapView onBack={navigateToPortfolio} />}
+          {tab === 'categories' && <CategoriesView onBack={navigateToPortfolio} />}
+        </BudgetCtx.Provider>
+      )}
 
       {/* Footer */}
       <div style={{ marginTop: '1.5rem', textAlign: 'center', padding: '14px 0 6px', fontSize: 11.5, color: 'var(--color-text-tertiary)', lineHeight: 1.6 }}>
@@ -1583,6 +1606,6 @@ export function BudgetDashboard() {
 
       <Drawer open={drawerTrade !== null} trade={drawerTrade} onClose={closeDrawer} />
     </div>
-    </BudgetCtx.Provider>
   );
 }
+
