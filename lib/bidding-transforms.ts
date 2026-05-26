@@ -77,6 +77,28 @@ function getCurrencyByName(task: ClickUpTask, name: string): number | null {
   return Number.isFinite(n) && n >= 0 ? n : null;
 }
 
+// ── Link field trade fallback ─────────────────────────────────────────────
+
+// Extracts the trade name from the "🔗 Link" SharePoint URL (field b0da1f9e).
+// URL pattern: .../Bids/{Trade Folder}/{Sub Name}
+// Returns the second-to-last decoded path segment, or null if not parseable.
+function extractTradeFromLink(task: ClickUpTask): string | null {
+  const f = task.custom_fields?.find(cf => cf.id === 'b0da1f9e');
+  if (!f || typeof f.value !== 'string' || !f.value) return null;
+  try {
+    const url = new URL(f.value);
+    const segments = url.pathname.split('/').map(s => decodeURIComponent(s)).filter(Boolean);
+    const bidsIdx = segments.findLastIndex(s => s.toLowerCase() === 'bids');
+    if (bidsIdx !== -1 && bidsIdx + 1 < segments.length - 1) {
+      return segments[bidsIdx + 1] || null;
+    }
+    if (segments.length >= 2) return segments[segments.length - 2] || null;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 // ── Trade dropdown helpers (field ID is global/shared across all lists) ───
 
 type TradeOption = { name: string; orderindex: number };
@@ -178,7 +200,7 @@ export function transformBiddingTasksByName(
   // Group bid tasks by trade name, preserving insertion order.
   const byTrade = new Map<string, ClickUpTask[]>();
   for (const task of tasks) {
-    const tradeName = resolveTradeForTask(task, tradeOptionMap);
+    const tradeName = resolveTradeForTask(task, tradeOptionMap) ?? extractTradeFromLink(task);
     if (!tradeName) {
       console.warn(`[bidding] task "${task.name}" (${task.id}) has no Trade set — skipping`);
       continue;

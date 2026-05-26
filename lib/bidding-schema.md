@@ -51,7 +51,10 @@ Because each task = one sub bid, the `transformBiddingTasksByName` function
 
 1. Extract the `Trade` dropdown's `orderindex → name` map from `CLICKUP.FIELD.TRADE`
    (`f3cef4fb-a5bc-4a61-8ddd-048df2475b20`) — same field ID across all project lists
-2. Skip tasks where Trade is unset (logged as `console.warn`)
+2. For tasks where Trade dropdown is unset: fall back to extracting the trade
+   name from the `🔗 Link` SharePoint URL (field `b0da1f9e`), using the path
+   segment immediately after `Bids/` (e.g. `.../Bids/Foundation/Elite Concrete`
+   → `"Foundation"`). Only skip with `console.warn` if both are null.
 3. For each trade group: assemble up to 5 subs in insertion order
    - Sub name  = `task.name`
    - Sub amount = `"Bid/Contracted Amount"` field (by name)
