@@ -45,11 +45,20 @@ async function buildBudgetPayload(projectId: string | null): Promise<BudgetPaylo
     getTasksInList(CLICKUP.BUDGET_BIDDING_DB_LIST_ID, true),
   ]);
 
-  const portfolioProjects: BudgetPortfolioStub[] = portfolioTasks.map(t => ({
-    name: t.name,
-    loc: '',
-    real: true,
-  }));
+  // Only surface projects that actually have rows in the Budget-Bidding Database.
+  const projectsWithData = new Set(
+    allTradeTasks
+      .map(task => getFieldText(task, F.PROJECT_ID))
+      .filter((name): name is string => name !== null),
+  );
+
+  const portfolioProjects: BudgetPortfolioStub[] = portfolioTasks
+    .filter(t => projectsWithData.has(t.name))
+    .map(t => ({
+      name: t.name,
+      loc: '',
+      real: true,
+    }));
 
   // Resolve the target project name from the query param, defaulting to the first portfolio entry.
   const targetName = projectId

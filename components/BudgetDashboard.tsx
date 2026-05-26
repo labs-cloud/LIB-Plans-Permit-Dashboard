@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useCallback, useContext, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 import useSWR from 'swr';
 import Link from 'next/link';
 import { LogoHeader } from '@/components/LogoHeader';
@@ -1440,7 +1440,18 @@ export function BudgetDashboard() {
   const [selectedProject, setSelectedProject] = useState<string>('');
   const closeDrawer = useCallback(() => setDrawerTrade(null), []);
 
-  // SWR URL includes projectId once the user (or the first-load effect) has picked a project.
+  // Auto-switch view when project selection changes.
+  useEffect(() => {
+    if (selectedProject) {
+      setMode('table');
+      setTableView('detailed');
+    } else {
+      setMode('table');
+      setTableView('overview');
+    }
+  }, [selectedProject]);
+
+  // SWR URL includes projectId once the user has picked a project.
   const swrUrl = selectedProject
     ? `/api/budget?projectId=${encodeURIComponent(selectedProject)}`
     : '/api/budget';
