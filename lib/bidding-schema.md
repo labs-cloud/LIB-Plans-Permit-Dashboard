@@ -23,10 +23,7 @@ Folder: 1931-1935 Bedford Ave  (folder id: 90177597601)
 **Root tasks** (`task.parent = null`, `task_type = "Trade"`) → one row per **trade**  
 **Subtasks** (`task.parent = <trade task ID>`, `task_type = "Contact"`) → one row per **subcontractor bid**
 
-> **Critical note**: Before this was confirmed, the dashboard was incorrectly using the
-> "Trade" dropdown field (F.TRADE / `f3cef4fb`) to resolve trade names. That field is
-> **NOT set on subtask rows** — all subtasks have it unset. Trade name must be derived
-> from the parent task's `name` property.
+> **Two schemas coexist** across projects. See "Schema Detection" below.
 
 ## Task Fields — Subcontractor (Subtask) Rows
 
@@ -62,6 +59,41 @@ ClickUp returns these in lowercase. They map to the dashboard 8-color palette:
 | `awarded`              | `fnl`                 | green — finalized     |
 | `no bid / declined`    | `hld`                 | red — hold/declined   |
 | `no bid`               | `hld`                 | red — hold/declined   |
+
+## Schema B — Flat ("Bid" tasks, e.g. 3930 Carpenter)
+
+Some older projects use a flat structure with no parent/subtask hierarchy:
+
+```
+└── 02. Bidding  (list id: 901712788833)
+    ├── task "NY Design"        (task_type="Bid", parent=null, Trade dropdown → "Expediter")
+    ├── task "Slate Windows"    (task_type="Bid", parent=null, Trade dropdown → "Windows")
+    ├── task "Pinnacle Roofing" (task_type="Bid", parent=null, Trade dropdown → "Roofing")
+    └── ...
+```
+
+**All tasks are root-level** (`task.parent = null`, `task_type = "Bid"`).
+Trade name comes from the **Trade dropdown field** (`F.TRADE` / `f3cef4fb-...`), resolved via `orderindex → name`.
+
+| Field               | Source                             | Notes                                                    |
+|---------------------|------------------------------------|----------------------------------------------------------|
+| **Sub name**        | `task.name`                        | e.g. "NY Design", "Slate Windows"                        |
+| **Trade**           | `F.TRADE` dropdown (`f3cef4fb-...`)| Same global field ID as central DB; value = orderindex   |
+| **Bidding status**  | `task.status.status`               | Same native status strings as Schema A                   |
+| **Bid amount**      | `"Bid/Contracted Amount"` field    | Same field name as Schema A                              |
+
+## Schema Detection
+
+`transformBiddingTasksByName` auto-detects which schema a list uses:
+
+```
+const listTaskIds = new Set(tasks.map(t => t.id));
+const hasHierarchy = tasks.some(t => t.parent != null && listTaskIds.has(t.parent));
+// hasHierarchy=true → Schema A; hasHierarchy=false → Schema B
+```
+
+This is safe because both schemas correctly fetch with `includeSubtasks=true` — Schema A needs
+the subtasks fetched; Schema B has none, so the flag is a no-op.
 
 ## API Fetch Requirements
 

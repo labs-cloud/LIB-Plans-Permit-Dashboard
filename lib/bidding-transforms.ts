@@ -77,6 +77,37 @@ function getCurrencyByName(task: ClickUpTask, name: string): number | null {
   return Number.isFinite(n) && n >= 0 ? n : null;
 }
 
+// ── Trade dropdown helpers (flat "Bid" schema — e.g. 3930 Carpenter) ──────
+//
+// Some per-project "02. Bidding" lists use a flat schema where:
+//   - Each task is a sub bid (task_type = "Bid", parent = null)
+//   - Trade is stored in the global Trade dropdown field (F.TRADE)
+//
+// These helpers group flat tasks by Trade dropdown value.
+
+type TradeOption = { name: string; orderindex: number };
+
+function buildTradeOptionMap(tasks: ClickUpTask[]): Map<number, string> {
+  const map = new Map<number, string>();
+  for (const task of tasks) {
+    const f = getFieldById(task, F.TRADE);
+    if (!f?.type_config?.options) continue;
+    for (const opt of f.type_config.options as TradeOption[]) {
+      map.set(opt.orderindex, opt.name);
+    }
+    break; // all tasks share the same field schema
+  }
+  return map;
+}
+
+function resolveTradeForTask(task: ClickUpTask, optionMap: Map<number, string>): string | null {
+  const f = getFieldById(task, F.TRADE);
+  if (!f || f.value == null) return null;
+  const numVal = Number(f.value);
+  if (!Number.isFinite(numVal)) return null;
+  return optionMap.get(numVal) ?? null;
+}
+
 // ── Transforms ────────────────────────────────────────────────────────────
 
 export function transformBiddingTasks(
@@ -124,17 +155,21 @@ export function transformBiddingTasks(
 
 // Transforms tasks from a per-project "02. Bidding" list.
 //
-// Confirmed schema (live ClickUp data, May 2026):
-//   • The list uses a parent/subtask hierarchy:
-//       – Root tasks  (task.parent = null,       task_type = "Trade")   → one row per trade
-//       – Subtasks    (task.parent = trade ID,   task_type = "Contact") → one row per sub bid
-//   • Trade name        = parent task.name (e.g. "Plumbing & Sprinkler")
-//   • Sub name          = subtask.name    (e.g. "Quality Piping")
-//   • Bidding status    = task.status.status (native ClickUp status, lowercase)
-//   • Bid amount        = custom field "Bid/Contracted Amount" (currency, by name)
+// Two confirmed schemas exist across projects (live ClickUp data, May 2026):
 //
-// The Trade dropdown field (F.TRADE / f3cef4fb) is NOT set on subtasks in these lists.
-// getTasksInList must be called with includeSubtasks=true to receive the sub rows.
+// Schema A — Hierarchy (e.g. 1931-1935 Bedford Ave):
+//   • Root tasks  (task.parent = null,       task_type = "Trade")   → one row per trade
+//   • Subtasks    (task.parent = trade ID,   task_type = "Contact") → one row per sub bid
+//   • Trade name from parent task.name; sub name from subtask.name
+//   • Requires getTasksInList(..., includeSubtasks=true)
+//
+// Schema B — Flat (e.g. 3930 Carpenter):
+//   • All tasks are root-level (task_type = "Bid", parent = null)
+//   • Each task = one sub bid; trade resolved from Trade dropdown (F.TRADE)
+//   • Sub name = task.name; grouping key = Trade dropdown option name
+//
+// Detection: if any task points to another task in the same list as its parent
+// → Schema A (hierarchy). Otherwise → Schema B (flat).
 export function transformBiddingTasksByName(
   tasks: ClickUpTask[],
   projectName: string,
@@ -143,36 +178,47 @@ export function transformBiddingTasksByName(
   coordInitials: string,
   coordName: string,
 ): BiddingProject {
-  // Build a map of trade parent task ID → trade name, preserving list order.
-  const parentIdToName = new Map<string, string>();
-  for (const task of tasks) {
-    if (!task.parent) {
-      parentIdToName.set(task.id, task.name.trim());
-    }
-  }
+  const listTaskIds = new Set(tasks.map(t => t.id));
+  const hasHierarchy = tasks.some(t => t.parent != null && listTaskIds.has(t.parent));
 
-  // Pre-populate trade buckets in parent-task order so the matrix row order
-  // matches the order trades appear in ClickUp.
   const byTrade = new Map<string, ClickUpTask[]>();
-  for (const tradeName of parentIdToName.values()) {
-    byTrade.set(tradeName, []);
-  }
 
-  // Assign each subtask to its trade bucket.
-  for (const task of tasks) {
-    if (!task.parent) continue; // skip root trade rows
-    const tradeName = parentIdToName.get(task.parent);
-    if (!tradeName) {
-      // Parent is outside this list (e.g. tasks nested deeper than expected) — skip.
-      console.warn(`[bidding] subtask "${task.name}" (${task.id}) parent=${task.parent} not in list — skipping`);
-      continue;
+  if (hasHierarchy) {
+    // ── Schema A: parent/subtask hierarchy ──────────────────────────────────
+    const parentIdToName = new Map<string, string>();
+    for (const task of tasks) {
+      if (!task.parent) parentIdToName.set(task.id, task.name.trim());
     }
-    byTrade.get(tradeName)!.push(task);
+    // Pre-populate buckets in ClickUp list order.
+    for (const tradeName of parentIdToName.values()) {
+      byTrade.set(tradeName, []);
+    }
+    for (const task of tasks) {
+      if (!task.parent) continue;
+      const tradeName = parentIdToName.get(task.parent);
+      if (!tradeName) {
+        console.warn(`[bidding] subtask "${task.name}" (${task.id}) parent=${task.parent} not in list — skipping`);
+        continue;
+      }
+      byTrade.get(tradeName)!.push(task);
+    }
+  } else {
+    // ── Schema B: flat "Bid" tasks grouped by Trade dropdown ────────────────
+    const tradeOptionMap = buildTradeOptionMap(tasks);
+    for (const task of tasks) {
+      const tradeName = resolveTradeForTask(task, tradeOptionMap);
+      if (!tradeName) {
+        console.warn(`[bidding] task "${task.name}" (${task.id}) has no Trade set — skipping`);
+        continue;
+      }
+      if (!byTrade.has(tradeName)) byTrade.set(tradeName, []);
+      byTrade.get(tradeName)!.push(task);
+    }
   }
 
   const trades: BidTrade[] = [];
   for (const [tradeName, bidTasks] of byTrade) {
-    if (bidTasks.length === 0) continue; // omit trades with no subs yet
+    if (bidTasks.length === 0) continue;
 
     const subs: BidSub[] = bidTasks.slice(0, 5).map(task => ({
       name: task.name.trim(),
