@@ -2842,7 +2842,9 @@ export function BiddingDashboard({ projectId }: { projectId?: string } = {}) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const tab = ((searchParams?.get('tab') ?? 'matrix') as ProjectTab);
+  const isEmbed = searchParams?.get('embed') === '1';
   const [search, setSearch] = useState('');
+  const [embedCopied, setEmbedCopied] = useState(false);
 
   const navigateToProject = useCallback(
     (id: string) => router.push(`/bidding/${encodeURIComponent(id)}`),
@@ -2902,7 +2904,7 @@ export function BiddingDashboard({ projectId }: { projectId?: string } = {}) {
   if (isLoading || (projectId ? !projectData : !portfolioData)) {
     return (
       <>
-        <LogoHeader title="Bidding Dashboard" subtitleOverride="Loading from ClickUp…" syncedAt={null} />
+        {!isEmbed && <LogoHeader title="Bidding Dashboard" subtitleOverride="Loading from ClickUp…" syncedAt={null} />}
         <div
           style={{
             display: 'flex',
@@ -2927,7 +2929,7 @@ export function BiddingDashboard({ projectId }: { projectId?: string } = {}) {
   if (!projectId && portfolioData!.source === 'empty') {
     return (
       <>
-        <LogoHeader title="Bidding Dashboard" subtitleOverride="No ClickUp token" syncedAt={null} />
+        {!isEmbed && <LogoHeader title="Bidding Dashboard" subtitleOverride="No ClickUp token" syncedAt={null} />}
         <div style={{ padding: '32px 24px', color: 'var(--color-text-secondary)', fontSize: 13 }}>
           <strong>No data available.</strong> Add <code>CLICKUP_API_TOKEN</code> to{' '}
           <code>.env.local</code> to load live data.
@@ -2940,7 +2942,7 @@ export function BiddingDashboard({ projectId }: { projectId?: string } = {}) {
   if (projectId && projectData!.warning) {
     return (
       <>
-        <LogoHeader title="Bidding Dashboard" subtitleOverride={projectData!.warning} syncedAt={null} />
+        {!isEmbed && <LogoHeader title="Bidding Dashboard" subtitleOverride={projectData!.warning} syncedAt={null} />}
         <div style={{ padding: '32px 24px', color: 'var(--color-text-secondary)', fontSize: 13 }}>
           <strong>No data available.</strong> {projectData!.warning}
         </div>
@@ -2950,11 +2952,13 @@ export function BiddingDashboard({ projectId }: { projectId?: string } = {}) {
 
   return (
     <>
-      <LogoHeader
-        title="Bidding Dashboard"
-        subtitleOverride={subtitle}
-        syncedAt={syncedAt}
-      />
+      {!isEmbed && (
+        <LogoHeader
+          title="Bidding Dashboard"
+          subtitleOverride={subtitle}
+          syncedAt={syncedAt}
+        />
+      )}
 
       {/* Filter / navigation bar */}
       <div
@@ -3001,31 +3005,71 @@ export function BiddingDashboard({ projectId }: { projectId?: string } = {}) {
         </div>
 
         {/* Project picker — "★ All projects" is always first */}
-        <select
-          value={projectId ?? ''}
-          onChange={(e) => {
-            if (!e.target.value) navigateToPortfolio();
-            else navigateToProject(e.target.value);
-          }}
-          style={{
-            height: 32,
-            padding: '0 10px',
+        {isEmbed && projectId ? (
+          <span style={{
+            height: 32, padding: '0 10px',
             border: '0.5px solid var(--color-border-secondary)',
             borderRadius: 'var(--border-radius-md)',
-            background: 'var(--color-background-primary)',
+            background: 'var(--color-background-secondary)',
             color: 'var(--color-text-primary)',
-            fontSize: 12.5,
-            fontFamily: 'inherit',
-            minWidth: 220,
-          }}
-        >
-          <option value="">★ All projects</option>
-          {allProjectNames.map((name) => (
-            <option key={name} value={name}>
-              {name}
-            </option>
-          ))}
-        </select>
+            fontFamily: 'inherit', fontSize: 12.5, minWidth: 220, fontWeight: 500,
+            display: 'inline-flex', alignItems: 'center',
+          }}>
+            {projectId}
+          </span>
+        ) : (
+          <select
+            value={projectId ?? ''}
+            onChange={(e) => {
+              if (!e.target.value) navigateToPortfolio();
+              else navigateToProject(e.target.value);
+            }}
+            style={{
+              height: 32,
+              padding: '0 10px',
+              border: '0.5px solid var(--color-border-secondary)',
+              borderRadius: 'var(--border-radius-md)',
+              background: 'var(--color-background-primary)',
+              color: 'var(--color-text-primary)',
+              fontSize: 12.5,
+              fontFamily: 'inherit',
+              minWidth: 220,
+            }}
+          >
+            <option value="">★ All projects</option>
+            {allProjectNames.map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
+          </select>
+        )}
+
+        {/* Copy embed link — per-project, non-embed mode only */}
+        {!isEmbed && projectId && (
+          <button
+            type="button"
+            onClick={() => {
+              const url = `${window.location.origin}/bidding/${encodeURIComponent(projectId)}?embed=1`;
+              navigator.clipboard.writeText(url).then(() => {
+                setEmbedCopied(true);
+                setTimeout(() => setEmbedCopied(false), 2000);
+              });
+            }}
+            style={{
+              height: 32, padding: '0 12px',
+              border: '0.5px solid var(--color-border-secondary)',
+              borderRadius: 'var(--border-radius-md)',
+              background: embedCopied ? 'var(--color-background-secondary)' : 'var(--color-background-primary)',
+              color: embedCopied ? 'var(--good-strong)' : 'var(--color-text-secondary)',
+              fontFamily: 'inherit', fontSize: 12.5, cursor: 'pointer',
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+            }}
+          >
+            <i className={`ti ${embedCopied ? 'ti-check' : 'ti-link'}`} style={{ fontSize: 14 }} />
+            {embedCopied ? 'Copied!' : 'Copy embed link'}
+          </button>
+        )}
 
         {/* Tab strip — per-project mode only */}
         {projectId && (

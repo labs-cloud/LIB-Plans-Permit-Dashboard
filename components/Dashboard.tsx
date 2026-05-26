@@ -106,6 +106,7 @@ function sortProjects(list: Project[], key: SortKey): Project[] {
 export function Dashboard({ initial, initialError }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const isEmbed = searchParams?.get('embed') === '1';
 
   // The user's saved "open this view on launch" preference. Tracked in state
   // so the FilterBar pin button reflects updates without a refresh; persisted
@@ -259,13 +260,15 @@ export function Dashboard({ initial, initialError }: Props) {
         borderRadius: 'var(--border-radius-lg)',
       }}
     >
-      <LogoHeader
-        shownCount={sorted.length}
-        totalCount={payload.projects.length}
-        syncedAt={payload.syncedAt}
-        filterLine={filterTag}
-        warning={warning}
-      />
+      {!isEmbed && (
+        <LogoHeader
+          shownCount={sorted.length}
+          totalCount={payload.projects.length}
+          syncedAt={payload.syncedAt}
+          filterLine={filterTag}
+          warning={warning}
+        />
+      )}
 
       <FilterBar
         search={searchInput}
