@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { unstable_cache } from 'next/cache';
-import { hasClickUpToken, getTasksInList } from '@/lib/clickup';
+import { hasClickUpToken, getFoldersInSpace, getTasksInList } from '@/lib/clickup';
 import { transformBudgetTasks } from '@/lib/budget-transforms';
 import type { BudgetPortfolioPayload, BudgetProject } from '@/lib/budget-types';
 import { CLICKUP, CACHE_TTL_SECONDS } from '@/lib/constants';
@@ -40,21 +40,22 @@ async function buildPortfolioPayload(): Promise<BudgetPortfolioPayload> {
     };
   }
 
-  // Fetch all portfolio tasks from the Master Projects Board and all trade rows
-  // from the central Budget-Bidding Database list in parallel.
-  const [portfolioTasks, allTradeTasks] = await Promise.all([
-    getTasksInList(CLICKUP.MASTER_PROJECTS_BOARD_LIST_ID),
+  // Use project folders from the Active Projects space — same source as the bidding
+  // portfolio. Folder names match the PROJECT_ID short-text field on trade tasks.
+  // The Master Projects Board has duplicate entries so we do NOT use it here.
+  const [folders, allTradeTasks] = await Promise.all([
+    getFoldersInSpace(CLICKUP.ACTIVE_PROJECTS_SPACE_ID),
     getTasksInList(CLICKUP.BUDGET_BIDDING_DB_LIST_ID, true),
   ]);
 
-  if (portfolioTasks.length === 0) {
+  if (folders.length === 0) {
     return { projects: [], syncedAt: Date.now(), source: 'live' };
   }
 
-  // For each portfolio project, filter trade rows by Project ID field and transform.
+  // For each project folder, filter trade rows by Project ID field and transform.
   const results = await Promise.allSettled(
-    portfolioTasks.map(async (task): Promise<BudgetProject> => {
-      const name = task.name;
+    folders.map(async (folder): Promise<BudgetProject> => {
+      const name = folder.name;
       const projectTrades = allTradeTasks.filter(
         (t) => getFieldText(t, F.PROJECT_ID) === name,
       );
@@ -67,10 +68,10 @@ async function buildPortfolioPayload(): Promise<BudgetPortfolioPayload> {
       return result.value;
     }
     console.error(
-      `[budget/portfolio] Failed to process project "${portfolioTasks[i].name}":`,
+      `[budget/portfolio] Failed to process project "${folders[i].name}":`,
       result.reason,
     );
-    return { ...EMPTY_PROJECT, name: portfolioTasks[i].name };
+    return { ...EMPTY_PROJECT, name: folders[i].name };
   });
 
   return { projects, syncedAt: Date.now(), source: 'live' };
@@ -79,7 +80,7 @@ async function buildPortfolioPayload(): Promise<BudgetPortfolioPayload> {
 // Cache with a fixed key — no per-project variation — with 60 s TTL.
 const getCachedPortfolioPayload = unstable_cache(
   buildPortfolioPayload,
-  ['lib-budget-portfolio:v4'],
+  ['lib-budget-portfolio:v5'],
   { revalidate: CACHE_TTL_SECONDS, tags: [BUDGET_CACHE_TAG] },
 );
 

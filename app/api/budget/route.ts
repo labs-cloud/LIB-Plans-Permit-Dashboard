@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { unstable_cache } from 'next/cache';
-import { hasClickUpToken, getTasksInList } from '@/lib/clickup';
+import { hasClickUpToken, getFoldersInSpace, getTasksInList } from '@/lib/clickup';
 import { transformBudgetTasks } from '@/lib/budget-transforms';
 import type { BudgetPayload, BudgetProject, BudgetPortfolioStub } from '@/lib/budget-types';
 import { CLICKUP, CACHE_TTL_SECONDS } from '@/lib/constants';
@@ -38,29 +38,31 @@ async function buildBudgetPayload(projectId: string | null): Promise<BudgetPaylo
     };
   }
 
-  // Fetch portfolio (Master Projects Board) and all trade rows (Budget-Bidding Database) in parallel.
-  // includeClosed=true so AWARDED (completed) trade tasks are included.
-  const [portfolioTasks, allTradeTasks] = await Promise.all([
-    getTasksInList(CLICKUP.MASTER_PROJECTS_BOARD_LIST_ID),
+  // Use project folders from the Active Projects space — folder names match the
+  // PROJECT_ID short-text field on trade tasks. The Master Projects Board has
+  // duplicate entries and its task names may differ from the PROJECT_ID field values.
+  const [folders, allTradeTasks] = await Promise.all([
+    getFoldersInSpace(CLICKUP.ACTIVE_PROJECTS_SPACE_ID),
     getTasksInList(CLICKUP.BUDGET_BIDDING_DB_LIST_ID, true),
   ]);
 
-  const portfolioProjects: BudgetPortfolioStub[] = portfolioTasks.map(t => ({
-    name: t.name,
+  const portfolioProjects: BudgetPortfolioStub[] = folders.map(f => ({
+    name: f.name,
     loc: '',
     real: true,
   }));
 
-  // Resolve the target project name from the query param, defaulting to the first portfolio entry.
+  // Resolve the target project name from the query param, defaulting to the first folder.
   const targetName = projectId
-    ? (portfolioTasks.find(t => t.name === projectId)?.name ?? portfolioTasks[0]?.name)
-    : portfolioTasks[0]?.name;
+    ? (folders.find(f => f.name === projectId)?.name ?? folders[0]?.name)
+    : folders[0]?.name;
 
   if (!targetName) {
     return { project: EMPTY_PROJECT, portfolioProjects, syncedAt: Date.now(), source: 'live' };
   }
 
-  // Filter Budget-Bidding Database rows for this project via the Project ID short-text field.
+  // Filter central Budget-Bidding Database rows for this project by the
+  // PROJECT_ID short-text field, which stores the folder name.
   const projectTrades = allTradeTasks.filter(task =>
     getFieldText(task, F.PROJECT_ID) === targetName,
   );
@@ -73,7 +75,7 @@ async function buildBudgetPayload(projectId: string | null): Promise<BudgetPaylo
 // Cache keyed on projectId so each project gets its own 60s TTL entry.
 const getCachedBudgetPayload = unstable_cache(
   buildBudgetPayload,
-  ['lib-budget:v3'],
+  ['lib-budget:v4'],
   { revalidate: CACHE_TTL_SECONDS, tags: [BUDGET_CACHE_TAG] },
 );
 
