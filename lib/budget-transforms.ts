@@ -17,6 +17,17 @@ function getFieldById(task: ClickUpTask, id: string): ClickUpCustomFieldValue | 
   return task.custom_fields?.find(f => f.id === id);
 }
 
+function getCostType(task: ClickUpTask): 'hard' | 'soft' {
+  const f = getFieldById(task, F.COST_TYPE);
+  if (!f || f.value == null) return 'hard';
+  const options = (f.type_config?.options ?? []) as Array<{ id: string; name: string; orderindex: number }>;
+  const numVal = Number(f.value);
+  const opt = Number.isFinite(numVal)
+    ? options.find(o => o.orderindex === numVal)
+    : options.find(o => o.id === String(f.value));
+  return (opt?.name ?? '').toLowerCase().includes('soft') ? 'soft' : 'hard';
+}
+
 function getCurrency(task: ClickUpTask, id: string): number | null {
   const f = getFieldById(task, id);
   if (!f || f.value == null) return null;
@@ -53,7 +64,8 @@ export function transformBudgetTasks(
     // MANUAL trades keep verbatim values; non-manual apply the auto-rule
     const newv = deriveNewv(est, fin);
 
-    return { trade: tradeName, est, fin, newv, manual: isManual || undefined };
+    const costType = getCostType(task);
+    return { trade: tradeName, est, fin, newv, manual: isManual || undefined, costType };
   });
 
   return { name: projectName, location: projectLocation, id: projectId, phase: 'Budgeting', coordInitials, coordName, trades };
