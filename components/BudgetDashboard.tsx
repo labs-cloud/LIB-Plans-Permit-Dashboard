@@ -715,10 +715,25 @@ function DetailedView({
 
   function handleShareLink() {
     const url = `${window.location.origin}/budget/${encodeURIComponent(project.name)}/report`;
-    navigator.clipboard.writeText(url).then(() => {
+    const onSuccess = () => {
       setShareCopied(true);
       setTimeout(() => setShareCopied(false), 2500);
-    });
+    };
+    const execFallback = () => {
+      const ta = document.createElement('textarea');
+      ta.value = url;
+      ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;pointer-events:none;';
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      try { document.execCommand('copy'); onSuccess(); } catch (_) { /* silent */ }
+      document.body.removeChild(ta);
+    };
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(url).then(onSuccess).catch(execFallback);
+    } else {
+      execFallback();
+    }
   }
 
   return (
