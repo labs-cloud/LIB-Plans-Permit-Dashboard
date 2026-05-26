@@ -26,6 +26,8 @@ function mapBiddingStatusName(name: string): BidStatus {
   }
 }
 
+// ── ID-based helpers (used by central Budget-Bidding DB fallback) ──────────
+
 function getFieldById(task: ClickUpTask, id: string): ClickUpCustomFieldValue | undefined {
   return task.custom_fields?.find(f => f.id === id);
 }
@@ -61,6 +63,43 @@ function getBiddingStatus(task: ClickUpTask): BidStatus {
   }
 
   return mapBiddingStatusName(opt?.name ?? '');
+}
+
+// ── Name-based helpers (used by per-project 02. Bidding lists) ────────────
+// Field IDs differ per list; look up by the human-readable field name instead.
+
+function getFieldByName(task: ClickUpTask, name: string): ClickUpCustomFieldValue | undefined {
+  const lower = name.toLowerCase();
+  return task.custom_fields?.find(f => f.name.toLowerCase() === lower);
+}
+
+function getStringByName(task: ClickUpTask, name: string): string | null {
+  const f = getFieldByName(task, name);
+  if (!f || f.value == null) return null;
+  return typeof f.value === 'string' ? f.value.trim() || null : null;
+}
+
+function getCurrencyByName(task: ClickUpTask, name: string): number | null {
+  const f = getFieldByName(task, name);
+  if (!f || f.value == null) return null;
+  const n = Number(f.value);
+  return Number.isFinite(n) && n >= 0 ? n : null;
+}
+
+// Resolves bidding status from the task's own status field (per-project lists
+// use ClickUp task status as the bidding stage, not a custom field).
+// Falls back to a "Bidding Status" custom field if present for compatibility.
+function getBiddingStatusByName(task: ClickUpTask): BidStatus {
+  const f = getFieldByName(task, 'Bidding Status');
+  if (f && f.value != null) {
+    const options = (f.type_config?.options ?? []) as Array<{ id: string; name: string; orderindex: number }>;
+    let opt: typeof options[0] | undefined;
+    const numVal = Number(f.value);
+    if (Number.isFinite(numVal)) opt = options.find(o => o.orderindex === numVal);
+    if (!opt && typeof f.value === 'string') opt = options.find(o => o.id === f.value);
+    if (opt) return mapBiddingStatusName(opt.name);
+  }
+  return mapBiddingStatusName(task.status?.status ?? '');
 }
 
 export function transformBiddingTasks(
@@ -100,6 +139,53 @@ export function transformBiddingTasks(
       low = getCurrency(task, F.BEST_BID)
         ?? getCurrency(task, F.LOWEST_BID)
         ?? getCurrency(task, F.CONTRACT);
+    }
+
+    return { trade: tradeName, annot: null, subs, low };
+  });
+
+  return { name: projectName, location: projectLocation, id: projectId, phase: 'Bidding', coordInitials, coordName, trades };
+}
+
+// Transforms tasks from a per-project "02. Bidding" list where field IDs differ
+// per list. Looks up Sub 1-5 / amounts / status by field NAME instead of ID.
+// Task name is the trade name; task status is the bidding stage.
+export function transformBiddingTasksByName(
+  tasks: ClickUpTask[],
+  projectName: string,
+  projectLocation: string,
+  projectId: string,
+  coordInitials: string,
+  coordName: string,
+): BiddingProject {
+  const SUB_SLOTS: [string, string][] = [
+    ['Sub 1', 'Sub 1 Amount'],
+    ['Sub 2', 'Sub 2 Amount'],
+    ['Sub 3', 'Sub 3 Amount'],
+    ['Sub 4', 'Sub 4 Amount'],
+    ['Sub 5', 'Sub 5 Amount'],
+  ];
+
+  const trades: BidTrade[] = tasks.map(task => {
+    const tradeName = task.name;
+    const tradeStatus = getBiddingStatusByName(task);
+
+    const subs: BidSub[] = [];
+    for (const [nameField, amtField] of SUB_SLOTS) {
+      const name = getStringByName(task, nameField);
+      if (!name) continue;
+      subs.push({ name, amount: getCurrencyByName(task, amtField), status: tradeStatus });
+    }
+
+    let low: number | null = null;
+    if (subs.length > 0) {
+      const amounts = subs.map(s => s.amount).filter((a): a is number => a !== null);
+      if (amounts.length > 0) low = Math.min(...amounts);
+    }
+    if (low === null) {
+      low = getCurrencyByName(task, 'Best Bid')
+        ?? getCurrencyByName(task, 'Lowest Bid')
+        ?? getCurrencyByName(task, 'Contract');
     }
 
     return { trade: tradeName, annot: null, subs, low };
