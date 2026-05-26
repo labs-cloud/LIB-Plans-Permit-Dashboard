@@ -39,15 +39,6 @@ function shortDate(ts: number | null): string {
   return `${MONTH_SHORT[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
 }
 
-function agencyClass(agency: string): string {
-  const a = agency.toLowerCase();
-  if (a.startsWith('dob')) return 'agency-tag dob';
-  if (a.startsWith('dot')) return 'agency-tag dot';
-  if (a.startsWith('fdny')) return 'agency-tag fdny';
-  if (a.startsWith('dep')) return 'agency-tag dep';
-  return 'agency-tag';
-}
-
 function statusLabel(row: DetailedPermitRow): string {
   if (row.status === 'expired') {
     const d = row.daysLeft;
@@ -201,7 +192,6 @@ function ProjectGroup({ group }: { group: DetailedProjectGroup }) {
 
       <table className="proj-permits">
         <colgroup>
-          <col className="col-agency" />
           <col className="col-name" />
           <col className="col-issued" />
           <col className="col-expires" />
@@ -210,7 +200,6 @@ function ProjectGroup({ group }: { group: DetailedProjectGroup }) {
         </colgroup>
         <thead>
           <tr>
-            <th>Agency</th>
             <th>Permit</th>
             <th>Issued</th>
             <th>Expires</th>
@@ -225,9 +214,6 @@ function ProjectGroup({ group }: { group: DetailedProjectGroup }) {
               className={p.status}
               onClick={() => window.open(taskUrl(p.id), '_blank', 'noopener')}
             >
-              <td>
-                <span className={agencyClass(p.agency)}>{p.agency}</span>
-              </td>
               <td>
                 <div className="permit-name">{p.name}</div>
               </td>
