@@ -753,15 +753,6 @@ function DetailedView({
           href={`${CLICKUP.BASE_URL}/${CLICKUP.WORKSPACE_ID}/v/f/${project.id}`}
           target="_blank"
           rel="noopener noreferrer"
-          style={{ display: 'inline-flex', alignItems: 'center', gap: 5, height: 28, padding: '0 10px', border: '0.5px solid var(--color-border-secondary)', borderRadius: 'var(--border-radius-md)', background: 'var(--color-background-secondary)', color: 'var(--color-text-secondary)', fontSize: 11, textDecoration: 'none' }}
-        >
-          <i className="ti ti-folder" style={{ fontSize: 13 }} />
-          ClickUp folder
-        </a>
-        <a
-          href={`${CLICKUP.BASE_URL}/${CLICKUP.WORKSPACE_ID}/v/f/${project.id}`}
-          target="_blank"
-          rel="noopener noreferrer"
           style={{ display: 'inline-flex', alignItems: 'center', gap: 5, height: 28, padding: '0 10px', border: '0.5px solid var(--lib-black)', borderRadius: 'var(--border-radius-md)', background: 'var(--lib-black)', color: '#fff', fontSize: 11, textDecoration: 'none' }}
         >
           <i className="ti ti-external-link" style={{ fontSize: 13 }} />
