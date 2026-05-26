@@ -2771,7 +2771,7 @@ export function BiddingDashboard({ projectId }: { projectId?: string } = {}) {
 
   // Per-project data — only fetched in project mode
   const { data: projectData, isLoading: projectLoading } = useSWR<BiddingPayload>(
-    projectId ? `/api/bidding?projectId=${encodeURIComponent(projectId)}` : null,
+    projectId ? `/api/bidding/project/${encodeURIComponent(projectId)}` : null,
     fetcher,
     { refreshInterval: 300_000, revalidateOnFocus: false, dedupingInterval: 60_000 },
   );
