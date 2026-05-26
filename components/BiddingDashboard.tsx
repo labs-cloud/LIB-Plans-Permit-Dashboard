@@ -2477,28 +2477,6 @@ export function BiddingDashboard() {
           />
         </div>
 
-        {/* Portfolio filter dropdown — drives the active project fetch */}
-        <select
-          style={{
-            height: 32,
-            padding: '0 10px',
-            border: '0.5px solid var(--color-border-secondary)',
-            borderRadius: 'var(--border-radius-md)',
-            background: 'var(--color-background-primary)',
-            color: 'var(--color-text-primary)',
-            fontSize: 12.5,
-            fontFamily: 'inherit',
-          }}
-          value={selectedProject}
-          onChange={(e) => setSelectedProject(e.target.value)}
-        >
-          {portfolioProjects.filter((p) => p.isReal).map((p) => (
-            <option key={p.name} value={p.name}>
-              ★ {p.name}
-            </option>
-          ))}
-        </select>
-
         {/* Project picker */}
         <select
           value={selectedProject}
