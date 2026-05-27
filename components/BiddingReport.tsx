@@ -19,9 +19,7 @@ const STATUS: Record<BidStatus, { bg: string; fg: string; ring: string; label: s
 
 function fmt$(n: number | null): string {
   if (n === null) return '—';
-  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(2)}M`;
-  if (n >= 1_000) return `$${Math.round(n / 1_000)}K`;
-  return `$${Math.round(n)}`;
+  return '$' + Math.round(n).toLocaleString('en-US');
 }
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
