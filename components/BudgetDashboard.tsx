@@ -631,7 +631,7 @@ function DetailedView({
   onGoOverview: () => void;
   onTradeClick: (t: BudgetTrade) => void;
   search?: string;
-  tradeTypeFilter?: 'all' | 'biddable' | 'set';
+  tradeTypeFilter?: 'all' | 'biddable' | 'set' | 'pending';
 }) {
   const { project } = useBudget();
   const q = search?.toLowerCase().trim() || '';
@@ -898,6 +898,34 @@ function DetailedView({
               click a row to see bid history
             </span>
           </h2>
+          {tradeTypeFilter === 'pending' && (
+            <div style={{
+              marginBottom: 12, padding: '10px 14px',
+              background: '#fef3c7', border: '0.5px solid #fcd34d',
+              borderRadius: 'var(--border-radius-md)',
+              display: 'flex', alignItems: 'flex-start', gap: 10,
+              fontSize: 12, color: '#78350f', lineHeight: 1.5,
+            }}>
+              <i className="ti ti-alert-triangle" style={{ fontSize: 14, marginTop: 1, flexShrink: 0, color: '#92400e' }} />
+              <span style={{ flex: 1 }}>
+                These trades have no Trade Type assigned in ClickUp. Set them to Biddable or Set in the 01. Budget list.
+              </span>
+              <a
+                href={`${CLICKUP.BASE_URL}/${CLICKUP.WORKSPACE_ID}/v/f/${project.id}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={e => e.stopPropagation()}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 4,
+                  fontSize: 11.5, fontWeight: 600, whiteSpace: 'nowrap',
+                  color: '#92400e', textDecoration: 'underline', flexShrink: 0,
+                }}
+              >
+                <i className="ti ti-external-link" style={{ fontSize: 12 }} />
+                Open in ClickUp
+              </a>
+            </div>
+          )}
           <div style={{ maxHeight: 680, overflowY: 'auto', background: 'var(--color-background-primary)', borderRadius: 8, border: '0.5px solid var(--color-border-tertiary)' }}>
             <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, fontSize: 12.5 }}>
               <colgroup>
@@ -938,6 +966,15 @@ function DetailedView({
                       <td style={{ padding: '10px 12px', borderBottom: '0.5px solid var(--color-border-tertiary)', verticalAlign: 'middle', fontSize: 13, fontWeight: 500 }}>
                         <span style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                           {r.trade}
+                          {r.tradeType === 'biddable' && (
+                            <span title="Trade Type: Biddable" style={{ fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 3, background: '#dcfce7', color: '#15803d', flexShrink: 0, letterSpacing: '0.03em' }}>B</span>
+                          )}
+                          {r.tradeType === 'set' && (
+                            <span title="Trade Type: Set" style={{ fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 3, background: 'var(--info-bg)', color: 'var(--info-strong)', flexShrink: 0, letterSpacing: '0.03em' }}>S</span>
+                          )}
+                          {r.tradeType === 'pending' && (
+                            <span title="Trade Type: Not set in ClickUp" style={{ fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 3, background: '#fef3c7', color: '#92400e', flexShrink: 0, letterSpacing: '0.03em' }}>P</span>
+                          )}
                           {r.finMismatch && (
                             <span
                               title={`Updated Budget ($${r.fin?.toLocaleString()}) differs from awarded bid ($${r.awardedBid?.toLocaleString()} — ${r.awardedSubName}). Open Reconcile to resolve.`}
@@ -1148,7 +1185,7 @@ function DetailedView({
 // ──────────────────────────────────────────────────────────────
 // VarianceView
 // ──────────────────────────────────────────────────────────────
-function VarianceView({ onBack, search, tradeTypeFilter = 'all' }: { onBack: () => void; search?: string; tradeTypeFilter?: 'all' | 'biddable' | 'set' }) {
+function VarianceView({ onBack, search, tradeTypeFilter = 'all' }: { onBack: () => void; search?: string; tradeTypeFilter?: 'all' | 'biddable' | 'set' | 'pending' }) {
   const { project } = useBudget();
   const q = search?.toLowerCase().trim() || '';
   const trades = project.trades
@@ -1363,7 +1400,7 @@ function VarianceView({ onBack, search, tradeTypeFilter = 'all' }: { onBack: () 
 // ──────────────────────────────────────────────────────────────
 // TreemapView
 // ──────────────────────────────────────────────────────────────
-function TreemapView({ onBack, search, tradeTypeFilter = 'all' }: { onBack: () => void; search?: string; tradeTypeFilter?: 'all' | 'biddable' | 'set' }) {
+function TreemapView({ onBack, search, tradeTypeFilter = 'all' }: { onBack: () => void; search?: string; tradeTypeFilter?: 'all' | 'biddable' | 'set' | 'pending' }) {
   const { project } = useBudget();
   const q = search?.toLowerCase().trim() || '';
   const trades = project.trades
@@ -1632,7 +1669,7 @@ const WORK_PACKAGES = [
   },
 ];
 
-function CategoriesView({ onBack, search, tradeTypeFilter = 'all' }: { onBack: () => void; search?: string; tradeTypeFilter?: 'all' | 'biddable' | 'set' }) {
+function CategoriesView({ onBack, search, tradeTypeFilter = 'all' }: { onBack: () => void; search?: string; tradeTypeFilter?: 'all' | 'biddable' | 'set' | 'pending' }) {
   const { project } = useBudget();
   const q = search?.toLowerCase().trim() || '';
   const trades = project.trades
@@ -1834,7 +1871,7 @@ export function BudgetDashboard({ projectId }: { projectId?: string } = {}) {
   const isEmbed = searchParams?.get('embed') === '1';
   const [search, setSearch] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const [tradeTypeFilter, setTradeTypeFilter] = useState<'all' | 'biddable' | 'set'>('all');
+  const [tradeTypeFilter, setTradeTypeFilter] = useState<'all' | 'biddable' | 'set' | 'pending'>('all');
   const [drawerTrade, setDrawerTrade] = useState<BudgetTrade | null>(null);
   const [embedCopied, setEmbedCopied] = useState(false);
   const closeDrawer = useCallback(() => setDrawerTrade(null), []);
@@ -1898,6 +1935,7 @@ export function BudgetDashboard({ projectId }: { projectId?: string } = {}) {
       all: trades.length,
       biddable: trades.filter(t => t.tradeType === 'biddable').length,
       set: trades.filter(t => t.tradeType === 'set').length,
+      pending: trades.filter(t => t.tradeType === 'pending').length,
     };
   }, [projectData]);
 
@@ -2019,11 +2057,14 @@ export function BudgetDashboard({ projectId }: { projectId?: string } = {}) {
             overflow: 'hidden',
           }}>
             {([
-              { id: 'all',      label: 'All',      count: tradeTypeCounts.all },
-              { id: 'biddable', label: 'Biddable', count: tradeTypeCounts.biddable },
-              { id: 'set',      label: 'Set',      count: tradeTypeCounts.set },
-            ] as const).map(opt => {
+              { id: 'all',      label: 'All',      count: tradeTypeCounts.all,      amber: false },
+              { id: 'biddable', label: 'Biddable', count: tradeTypeCounts.biddable, amber: false },
+              { id: 'set',      label: 'Set',      count: tradeTypeCounts.set,      amber: false },
+              { id: 'pending',  label: 'Pending',  count: tradeTypeCounts.pending,  amber: true  },
+            ] as const).map((opt, idx, arr) => {
               const active = tradeTypeFilter === opt.id;
+              const isLast = idx === arr.length - 1;
+              const amberActive = opt.amber && active;
               return (
                 <button
                   key={opt.id}
@@ -2032,9 +2073,9 @@ export function BudgetDashboard({ projectId }: { projectId?: string } = {}) {
                   style={{
                     height: 32, padding: '0 11px', fontSize: 12.5, cursor: 'pointer',
                     fontFamily: 'inherit', border: 'none',
-                    borderRight: opt.id !== 'set' ? '0.5px solid var(--color-border-secondary)' : 'none',
-                    background: active ? 'var(--lib-black)' : 'var(--color-background-primary)',
-                    color: active ? '#fff' : 'var(--color-text-secondary)',
+                    borderRight: !isLast ? '0.5px solid var(--color-border-secondary)' : 'none',
+                    background: amberActive ? '#92400e' : active ? 'var(--lib-black)' : 'var(--color-background-primary)',
+                    color: active ? '#fff' : opt.amber ? '#92400e' : 'var(--color-text-secondary)',
                     fontWeight: active ? 500 : 400,
                     transition: 'background 0.15s, color 0.15s',
                     display: 'inline-flex', alignItems: 'center', gap: 5,
@@ -2043,8 +2084,8 @@ export function BudgetDashboard({ projectId }: { projectId?: string } = {}) {
                   {opt.label}
                   <span style={{
                     fontSize: 10.5, fontWeight: 500,
-                    background: active ? 'rgba(255,255,255,0.18)' : 'var(--color-background-secondary)',
-                    color: active ? '#fff' : 'var(--color-text-tertiary)',
+                    background: active ? 'rgba(255,255,255,0.18)' : opt.amber ? '#fef3c7' : 'var(--color-background-secondary)',
+                    color: active ? '#fff' : opt.amber ? '#92400e' : 'var(--color-text-tertiary)',
                     padding: '1px 5px', borderRadius: 999,
                   }}>{opt.count}</span>
                 </button>
