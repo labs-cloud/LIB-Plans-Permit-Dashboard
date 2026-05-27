@@ -63,9 +63,7 @@ const STATUS_META: Record<BidStatus, StatusMeta> = {
 
 function fmt$(n: number | null): string {
   if (n === null) return '—';
-  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(2)}M`;
-  if (n >= 1_000) return `$${(n / 1_000).toFixed(0)}K`;
-  return `$${n.toLocaleString()}`;
+  return '$' + Math.round(n).toLocaleString('en-US');
 }
 
 function fmtLong$(n: number): string {
@@ -1071,15 +1069,13 @@ function DetailedView({ onBack, search = '' }: { onBack: () => void; search?: st
         if (!sub) return `<td style="padding:6px 8px;border-bottom:0.5px solid #f0f0ec;text-align:center;color:#ccc;font-size:10px;background:${rowBg};">—</td>`;
         const s = PRINT_STATUS[sub.status as BidStatus] ?? PRINT_STATUS.ntb;
         const isLow = sub.amount !== null && sub.amount === trade.low;
-        const amt = sub.amount !== null ? (sub.amount >= 1000000 ? '$' + (sub.amount / 1e6).toFixed(2) + 'M' : '$' + Math.round(sub.amount / 1000) + 'K') : '—';
+        const amt = sub.amount !== null ? '$' + Math.round(sub.amount).toLocaleString('en-US') : '—';
         return `<td style="padding:5px 6px;border-bottom:0.5px solid #f0f0ec;vertical-align:top;background:${rowBg};">
           <div style="background:${s.bg};color:${s.fg};border:1px solid ${s.ring};border-radius:4px 4px 0 0;border-bottom:none;padding:3px 6px;font-size:9.5px;text-align:center;font-weight:${isLow ? 700 : 500};line-height:1.3;">${sub.name}</div>
           <div style="background:${isLow ? '#e8f5e9' : '#f8f8f6'};color:${isLow ? '#1F7A38' : '#555'};border:1px solid ${isLow ? '#81c784' : '#e0e0dc'};border-top:none;border-radius:0 0 4px 4px;padding:2px 6px;font-size:9.5px;text-align:right;font-weight:${isLow ? 700 : 400};">${amt}</div>
         </td>`;
       }).join('');
-      const lowStr = trade.low !== null
-        ? (trade.low >= 1000000 ? '$' + (trade.low / 1e6).toFixed(2) + 'M' : '$' + Math.round(trade.low / 1000) + 'K')
-        : '—';
+      const lowStr = trade.low !== null ? '$' + Math.round(trade.low).toLocaleString('en-US') : '—';
       return `<tr>
         <td style="padding:8px 12px;border-bottom:0.5px solid #f0f0ec;font-weight:600;font-size:11px;background:${rowBg};">
           ${trade.trade}
@@ -1090,9 +1086,7 @@ function DetailedView({ onBack, search = '' }: { onBack: () => void; search?: st
       </tr>`;
     }).join('');
 
-    const totalStr = runningLowTotal >= 1000000
-      ? '$' + (runningLowTotal / 1e6).toFixed(2) + 'M'
-      : '$' + Math.round(runningLowTotal / 1000) + 'K';
+    const totalStr = '$' + Math.round(runningLowTotal).toLocaleString('en-US');
 
     const legendHtml = (Object.entries(PRINT_STATUS) as [BidStatus, typeof PRINT_STATUS[BidStatus]][])
       .map(([, s]) => `<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:4px;background:${s.bg};color:${s.fg};border:1px solid ${s.ring};font-size:9px;font-weight:500;">${s.label}</span>`)

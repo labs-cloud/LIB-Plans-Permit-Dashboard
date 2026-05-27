@@ -47,9 +47,7 @@ function fmt$(v: MoneyVal): string {
   if (v === null || v === undefined) return '$–';
   if (v === 'INC') return 'Included';
   if (v === 'NA') return 'NA';
-  if (Math.abs(v) >= 1e6) return '$' + (v / 1e6).toFixed(2) + 'M';
-  if (Math.abs(v) >= 1e4) return '$' + (v / 1e3).toFixed(0) + 'k';
-  return '$' + v.toLocaleString('en-US', { maximumFractionDigits: 0 });
+  return '$' + Math.round(v).toLocaleString('en-US', { maximumFractionDigits: 0 });
 }
 
 function fmtFull$(v: MoneyVal): string {
@@ -587,9 +585,7 @@ function DetailedView({
       if (v === null || v === undefined) return '–';
       if (v === 'INC') return 'Included';
       if (v === 'NA') return 'NA';
-      if (Math.abs(v) >= 1e6) return '$' + (v / 1e6).toFixed(2) + 'M';
-      if (Math.abs(v) >= 1e4) return '$' + (v / 1e3).toFixed(0) + 'k';
-      return '$' + v.toLocaleString('en-US', { maximumFractionDigits: 0 });
+      return '$' + Math.round(v).toLocaleString('en-US', { maximumFractionDigits: 0 });
     };
     const fmtFull = (v: number): string =>
       '$' + v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
