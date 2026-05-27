@@ -309,12 +309,17 @@ function Drawer({
                 Full bid history available in ClickUp
               </div>
               <div style={{ marginTop: 8 }}>
-                <button style={{
-                  width: '100%', height: 34, borderRadius: 'var(--border-radius-md)',
-                  border: '0.5px solid var(--lib-black)', background: 'var(--lib-black)', color: '#fff',
-                  fontSize: 12.5, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                  cursor: 'pointer', fontFamily: 'inherit',
-                }}>
+                <button
+                  onClick={() => trade.taskId && window.open(`https://app.clickup.com/t/${trade.taskId}`, '_blank', 'noopener')}
+                  disabled={!trade.taskId}
+                  style={{
+                    width: '100%', height: 34, borderRadius: 'var(--border-radius-md)',
+                    border: '0.5px solid var(--lib-black)', background: 'var(--lib-black)', color: '#fff',
+                    fontSize: 12.5, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                    cursor: trade.taskId ? 'pointer' : 'not-allowed', fontFamily: 'inherit',
+                    opacity: trade.taskId ? 1 : 0.4,
+                  }}
+                >
                   <i className="ti ti-external-link" style={{ fontSize: 13 }} /> Open in ClickUp
                 </button>
               </div>
