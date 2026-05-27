@@ -24,12 +24,6 @@ function getTradeType(task: ClickUpTask): 'biddable' | 'set' | undefined {
   return undefined;
 }
 
-// When the explicit Trade Type field isn't set, derive from the workflow status.
-function deriveTradeTypeFromStatus(status: string): 'biddable' | 'set' {
-  const s = status.toLowerCase();
-  return s === 'budget set' || s === 'bid received' ? 'set' : 'biddable';
-}
-
 function getCostType(task: ClickUpTask): 'hard' | 'soft' {
   const f = getFieldById(task, F.COST_TYPE);
   if (!f || f.value == null) return 'hard';
@@ -62,7 +56,7 @@ interface RawEntry {
   newv: MoneyVal;
   costType: 'hard' | 'soft';
   status: string;
-  tradeType: 'biddable' | 'set' | undefined;
+  tradeType: 'biddable' | 'set' | 'pending';
   dateUpdated: string | null | undefined;
   awardedBid: number | null;
   awardedSubName: string | null;
@@ -170,7 +164,7 @@ export function transformBudgetTasks(
     const newv = deriveNewv(est, fin);
     const costType = getCostType(task);
     const status = task.status?.status ?? '';
-    const tradeType = getTradeType(task) ?? deriveTradeTypeFromStatus(status);
+    const tradeType = getTradeType(task) ?? 'pending';
 
     return {
       taskId: task.id,
