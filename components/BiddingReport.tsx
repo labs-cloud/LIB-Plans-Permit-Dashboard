@@ -62,10 +62,23 @@ export function BiddingReport({ projectId }: { projectId: string }) {
   });
 
   function handleCopyLink() {
-    navigator.clipboard.writeText(window.location.href).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2500);
-    });
+    const url = window.location.href;
+    const onSuccess = () => { setCopied(true); setTimeout(() => setCopied(false), 2500); };
+    const execFallback = () => {
+      const ta = document.createElement('textarea');
+      ta.value = url;
+      ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;pointer-events:none;';
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      try { document.execCommand('copy'); onSuccess(); } catch (_) { /* silent */ }
+      document.body.removeChild(ta);
+    };
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(url).then(onSuccess).catch(execFallback);
+    } else {
+      execFallback();
+    }
   }
 
   if (isLoading || !data) {
@@ -93,11 +106,14 @@ export function BiddingReport({ projectId }: { projectId: string }) {
         body { background: #f7f7f5; }
         @page { size: landscape; margin: 10mm 12mm; }
         @media print {
+          * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
           body { background: #fff !important; }
           .no-print { display: none !important; }
+          .print-only { display: flex !important; }
           .report-wrap { padding: 0 !important; background: #fff !important; }
-          .report-card { box-shadow: none !important; border: none !important; }
+          .report-card { box-shadow: none !important; }
         }
+        .print-only { display: none; }
         @keyframes spin { to { transform: rotate(360deg); } }
       `}</style>
 
@@ -506,6 +522,32 @@ export function BiddingReport({ projectId }: { projectId: string }) {
             Live from ClickUp · auto-refreshes every 5 min
             {minsAgo !== null && ` · synced ${minsAgo < 1 ? 'just now' : `${minsAgo}m ago`}`}
           </span>
+        </div>
+
+        {/* ── Print-only live link ───────────────────────────────────── */}
+        <div
+          className="print-only"
+          style={{
+            marginTop: 12,
+            paddingTop: 10,
+            borderTop: '0.5px solid #e8e8e4',
+            fontSize: 9.5,
+            color: '#888',
+            alignItems: 'center',
+            gap: 6,
+          }}
+        >
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#F47832" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" /><path d="M21 3v5h-5" />
+          </svg>
+          <span style={{ color: '#555' }}>Live report:</span>
+          <a
+            href={typeof window !== 'undefined' ? window.location.href : ''}
+            style={{ color: '#F47832', fontWeight: 600, wordBreak: 'break-all' }}
+          >
+            {typeof window !== 'undefined' ? window.location.href : ''}
+          </a>
+          <span style={{ marginLeft: 'auto', color: '#bbb' }}>Open this URL to refresh · data updates every 5 min</span>
         </div>
       </div>
     </>
