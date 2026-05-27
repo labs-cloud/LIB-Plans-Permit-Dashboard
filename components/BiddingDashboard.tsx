@@ -968,6 +968,7 @@ function DetailedView({ onBack, search = '' }: { onBack: () => void; search?: st
   const [filter, setFilter] = useState<FilterKey>('all');
   const [drawer, setDrawer] = useState<DrawerPayload | null>(null);
   const [shareCopied, setShareCopied] = useState(false);
+  const [embedCopied, setEmbedCopied] = useState(false);
 
   const kpis = useMemo(() => {
     const fnlCount = trades.filter((t) => t.subs.some((s) => s.status === 'fnl')).length;
@@ -1169,6 +1170,26 @@ function DetailedView({ onBack, search = '' }: { onBack: () => void; search?: st
     w.document.close();
   }
 
+  function handleCopyEmbedLink() {
+    const url = `https://lib-plans-permit-dashboard.vercel.app/bidding/${encodeURIComponent(project.name)}?embed=1`;
+    const onSuccess = () => { setEmbedCopied(true); setTimeout(() => setEmbedCopied(false), 2500); };
+    const execFallback = () => {
+      const ta = document.createElement('textarea');
+      ta.value = url;
+      ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;pointer-events:none;';
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      try { document.execCommand('copy'); onSuccess(); } catch (_) { /* silent */ }
+      document.body.removeChild(ta);
+    };
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(url).then(onSuccess).catch(execFallback);
+    } else {
+      execFallback();
+    }
+  }
+
   function handleShareLink() {
     const url = `${window.location.origin}/bidding/${encodeURIComponent(project.name)}/report`;
     const onSuccess = () => {
@@ -1268,6 +1289,21 @@ function DetailedView({ onBack, search = '' }: { onBack: () => void; search?: st
           >
             <i className={`ti ${shareCopied ? 'ti-check' : 'ti-link'}`} style={{ fontSize: 13 }} />
             {shareCopied ? 'Copied!' : 'Share'}
+          </button>
+          <button
+            type="button"
+            onClick={handleCopyEmbedLink}
+            title="Copy stable embed URL for ClickUp"
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 10px',
+              background: embedCopied ? 'var(--bid-fnl-bg)' : 'var(--color-background-secondary)',
+              color: embedCopied ? 'var(--bid-fnl-fg)' : 'var(--color-text-secondary)',
+              fontSize: 11, cursor: 'pointer', fontFamily: 'inherit', border: 'none',
+              transition: 'background 0.2s, color 0.2s',
+            }}
+          >
+            <i className={`ti ${embedCopied ? 'ti-check' : 'ti-brand-clickup'}`} style={{ fontSize: 13 }} />
+            {embedCopied ? 'Copied!' : 'Copy embed link'}
           </button>
         </div>
       </div>
