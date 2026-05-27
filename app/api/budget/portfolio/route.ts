@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { unstable_cache } from 'next/cache';
 import { hasClickUpToken, getFoldersInSpace, getListsInFolder, getTasksInList } from '@/lib/clickup';
 import { transformBudgetTasks } from '@/lib/budget-transforms';
+import { findBiddingList, computeBiddingLows } from '@/lib/bidding-lows';
 import type { BudgetPortfolioPayload, BudgetProject } from '@/lib/budget-types';
 import type { ClickUpList } from '@/lib/clickup';
 import { CLICKUP, CACHE_TTL_SECONDS } from '@/lib/constants';
@@ -70,8 +71,13 @@ async function buildPortfolioPayload(): Promise<BudgetPortfolioPayload> {
         return { ...EMPTY_PROJECT, name: folder.name };
       }
 
-      const tasks = await getTasksInList(budgetList.id, true);
-      return transformBudgetTasks(tasks, folder.name, '', folder.id, '', '');
+      const biddingListInFolder = findBiddingList(listsResult.value);
+      const [tasks, biddingTasks] = await Promise.all([
+        getTasksInList(budgetList.id, true),
+        biddingListInFolder ? getTasksInList(biddingListInFolder.id, true, true) : Promise.resolve([]),
+      ]);
+      const biddingLows = computeBiddingLows(biddingTasks);
+      return transformBudgetTasks(tasks, folder.name, '', folder.id, '', '', biddingLows);
     }),
   );
 

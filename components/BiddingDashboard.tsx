@@ -2206,15 +2206,17 @@ function PipelineView({ search = '' }: { search?: string }) {
             {col.items.map((trade, i) => (
               <div
                 key={i}
+                onClick={() => trade.taskId && window.open(`https://app.clickup.com/t/${trade.taskId}`, '_blank', 'noopener')}
                 style={{
                   background: 'var(--color-background-primary)',
                   borderRadius: 6,
                   padding: '8px 10px',
                   marginBottom: 6,
                   border: `0.5px solid ${m.ring}`,
+                  cursor: trade.taskId ? 'pointer' : 'default',
                 }}
               >
-                <div style={{ fontSize: 12, fontWeight: 500 }}>{trade.trade}</div>
+                <div style={{ fontSize: 12, fontWeight: 500 }}>{trade.trade}{trade.taskId && <i className="ti ti-external-link" style={{ fontSize: 9, opacity: 0.4, marginLeft: 4 }} />}</div>
                 {trade.low !== null && (
                   <div
                     style={{

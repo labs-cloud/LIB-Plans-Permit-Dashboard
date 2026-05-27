@@ -104,10 +104,13 @@ export function transformBudgetTasks(
   projectId: string,
   coordInitials: string,
   coordName: string,
+  biddingLows?: Map<string, number>,
 ): BudgetProject {
   const entries: RawEntry[] = tasks.map(task => {
     const est: MoneyVal = getCurrency(task, F.BUDGET_ALLOC);
-    const fin: MoneyVal = getCurrency(task, F.UPDATED_BUDGET);
+    const updatedBudget: MoneyVal = getCurrency(task, F.UPDATED_BUDGET);
+    const biddingLow: number | null = biddingLows?.get(task.name.trim()) ?? null;
+    const fin: MoneyVal = updatedBudget !== null ? updatedBudget : biddingLow;
     const newv = deriveNewv(est, fin);
     const costType = getCostType(task);
     const status = task.status?.status ?? '';

@@ -13,6 +13,7 @@ export interface BidTrade {
   annot: string | null;
   subs: BidSub[];
   low: number | null;
+  taskId?: string;
 }
 
 export interface PortfolioProjectStub {
