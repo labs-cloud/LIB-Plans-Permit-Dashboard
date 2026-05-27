@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
+import { SupportBubble } from '@/components/SupportBubble';
 
 export const metadata: Metadata = {
   title: 'Plans Dashboard · Lead It Builders',
@@ -23,7 +24,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.47.0/tabler-icons.min.css"
         />
       </head>
-      <body>{children}</body>
+      <body>
+        {children}
+        <SupportBubble />
+      </body>
     </html>
   );
 }
