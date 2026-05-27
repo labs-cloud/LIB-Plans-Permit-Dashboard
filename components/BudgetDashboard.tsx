@@ -1,13 +1,20 @@
 'use client';
 
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
 import useSWR from 'swr';
-import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { LogoHeader } from '@/components/LogoHeader';
-import type { BudgetTrade, BudgetPayload, MoneyVal } from '@/lib/budget-types';
+import { CLICKUP } from '@/lib/constants';
+import type {
+  BudgetTrade,
+  BudgetPayload,
+  BudgetPortfolioPayload,
+  BudgetProject,
+  MoneyVal,
+} from '@/lib/budget-types';
 
 // ──────────────────────────────────────────────────────────────
-// Data context (replaces static fixture import)
+// Data context (per-project mode)
 // ──────────────────────────────────────────────────────────────
 const BudgetCtx = createContext<BudgetPayload | null>(null);
 
@@ -23,6 +30,12 @@ async function fetcher(url: string): Promise<BudgetPayload> {
   return res.json() as Promise<BudgetPayload>;
 }
 
+async function portfolioFetcher(url: string): Promise<BudgetPortfolioPayload> {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`fetch ${url} → ${res.status}`);
+  return res.json() as Promise<BudgetPortfolioPayload>;
+}
+
 // ──────────────────────────────────────────────────────────────
 // helpers
 // ──────────────────────────────────────────────────────────────
@@ -34,9 +47,7 @@ function fmt$(v: MoneyVal): string {
   if (v === null || v === undefined) return '$–';
   if (v === 'INC') return 'Included';
   if (v === 'NA') return 'NA';
-  if (Math.abs(v) >= 1e6) return '$' + (v / 1e6).toFixed(2) + 'M';
-  if (Math.abs(v) >= 1e4) return '$' + (v / 1e3).toFixed(0) + 'k';
-  return '$' + v.toLocaleString('en-US', { maximumFractionDigits: 0 });
+  return '$' + Math.round(v).toLocaleString('en-US', { maximumFractionDigits: 0 });
 }
 
 function fmtFull$(v: MoneyVal): string {
@@ -46,17 +57,12 @@ function fmtFull$(v: MoneyVal): string {
   return '$' + v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-function siblingEstM(idx: number): number {
-  const seed = ((idx + 7) * 173) % 100;
-  return 4 + (seed / 100) * 18;
-}
-
 // ──────────────────────────────────────────────────────────────
 // stats
 // ──────────────────────────────────────────────────────────────
 function computeStats(trades: BudgetTrade[]) {
   let est = 0, fin = 0, newv = 0;
-  let withBids = 0, eo = 0, inc = 0, na = 0, manual = 0;
+  let withBids = 0, eo = 0, inc = 0, na = 0;
   for (const r of trades) {
     if (isMoney(r.est)) est += r.est;
     if (isMoney(r.fin)) fin += r.fin;
@@ -65,9 +71,34 @@ function computeStats(trades: BudgetTrade[]) {
     if (isMoney(r.est) && !isMoney(r.fin) && r.newv !== 'INC' && r.newv !== 'NA') eo++;
     if (r.est === 'INC' || r.fin === 'INC' || r.newv === 'INC') inc++;
     if (r.est === 'NA' || r.newv === 'NA') na++;
-    if (r.manual) manual++;
   }
-  return { est, fin, newv, withBids, eo, inc, na, manual, count: trades.length };
+  return { est, fin, newv, withBids, eo, inc, na, count: trades.length };
+}
+
+// Construction-sequence sort order — trades are displayed in this order.
+// Trades not listed here sort to the end alphabetically.
+const TRADE_PHASE_ORDER: readonly string[] = [
+  'Special Inspector', 'Superintendent', 'MEP Shop Drawings', 'Surveyor',
+  'Construction Fence', 'Site safety coordination',
+  'Demolition',
+  'Excavation', 'Structure', 'Bricks / CMU', 'Steel',
+  'Framing', 'Windows', 'Roofing', 'Scaffolding / Shed',
+  'Plumbing & Sprinkler', 'Watermain', 'HVAC', 'PTAC Units',
+  'Electrical', 'Fire Alarm', 'Low Voltage',
+  'Tile Supply', 'Kitchens', 'Plumbing Fixtures Bathtubs',
+  'Signage', 'Garbage Chutes', 'Garage Door',
+  'Lighting Material',
+];
+
+function sortByPhase(trades: BudgetTrade[]): BudgetTrade[] {
+  return [...trades].sort((a, b) => {
+    const ai = TRADE_PHASE_ORDER.indexOf(a.trade);
+    const bi = TRADE_PHASE_ORDER.indexOf(b.trade);
+    const ar = ai === -1 ? 9999 : ai;
+    const br = bi === -1 ? 9999 : bi;
+    if (ar !== br) return ar - br;
+    return a.trade.localeCompare(b.trade);
+  });
 }
 
 // ──────────────────────────────────────────────────────────────
@@ -179,26 +210,6 @@ function VarBar({ r }: { r: BudgetTrade }) {
   );
 }
 
-function SparkBar({ ghost, finalized, total }: { ghost?: boolean; finalized?: number; total?: number }) {
-  const bars = Array.from({ length: 14 }, (_, i) => {
-    const filled = !ghost && i < (finalized ?? 0);
-    return (
-      <div key={i} style={{
-        flex: 1, borderRadius: 1,
-        background: ghost ? 'var(--color-border-tertiary)' : filled ? 'var(--var-under)' : 'var(--var-zero)',
-        minHeight: 2,
-        height: `${60 + (i * 137) % 40}%`,
-        alignSelf: 'flex-end',
-      }} />
-    );
-  });
-  return (
-    <div style={{ display: 'flex', gap: 1, height: 18, alignItems: 'flex-end', width: 96 }}>
-      {bars}
-    </div>
-  );
-}
-
 function SideCard({ title, icon, children }: { title: string; icon: string; children: ReactNode }) {
   return (
     <div style={{
@@ -218,23 +229,6 @@ function SideCard({ title, icon, children }: { title: string; icon: string; chil
       </h3>
       {children}
     </div>
-  );
-}
-
-// ──────────────────────────────────────────────────────────────
-// ManualBadge — shared
-// ──────────────────────────────────────────────────────────────
-function ManualBadge() {
-  return (
-    <span style={{
-      display: 'inline-flex', alignItems: 'center', gap: 3,
-      marginLeft: 8, padding: '1px 6px', borderRadius: 999,
-      background: 'var(--warn-bg)', color: 'var(--warn-fg)',
-      fontSize: 9, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase',
-      border: '1px solid rgba(186,117,23,0.35)',
-    }}>
-      <i className="ti ti-settings-2" style={{ fontSize: 9 }} /> Manual
-    </span>
   );
 }
 
@@ -285,50 +279,6 @@ function ReconcileButton({ label, taskId, value, onSuccess }: {
       {state === 'error' && <i className="ti ti-alert-triangle" style={{ fontSize: 13 }} />}
       {state === 'idle' ? label : state === 'loading' ? 'Saving…' : state === 'done' ? 'Saved!' : 'Error'}
     </button>
-  );
-}
-
-// ──────────────────────────────────────────────────────────────
-// ProjectHeroCard — shared
-// ──────────────────────────────────────────────────────────────
-function ProjectHeroCard({ onBack }: { onBack: () => void }) {
-  const { project } = useBudget();
-  return (
-    <div style={{
-      display: 'grid', gridTemplateColumns: '1fr auto', gap: 24, alignItems: 'flex-start',
-      paddingBottom: 14, borderBottom: '0.5px solid var(--color-border-tertiary)', marginBottom: 14,
-    }}>
-      <div>
-        <h1 style={{ fontSize: 22, fontWeight: 500, letterSpacing: '-0.015em', margin: '0 0 6px' }}>{project.name}</h1>
-        <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'center', fontSize: 12.5, color: 'var(--color-text-secondary)' }}>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: 999, background: 'var(--c-sol-bg)', color: 'var(--c-sol-dark)' }}>
-            <span style={{ width: 18, height: 18, borderRadius: '50%', background: '#fff', color: 'var(--c-sol-dark)', fontSize: 9, fontWeight: 700, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>{project.coordInitials}</span>
-            {project.coordName}
-          </span>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: 999, background: 'var(--info-bg)', color: 'var(--info-fg)' }}>
-            <i className="ti ti-calculator" style={{ fontSize: 13 }} />{project.phase}
-          </span>
-          <span><i className="ti ti-map-pin" style={{ fontSize: 13, verticalAlign: '-2px' }} /> {project.location}</span>
-          <span><i className="ti ti-id" style={{ fontSize: 13, verticalAlign: '-2px' }} /> {project.id}</span>
-        </div>
-      </div>
-      <div style={{ display: 'flex', gap: 8 }}>
-        <button
-          onClick={onBack}
-          style={{ height: 32, padding: '0 13px', borderRadius: 'var(--border-radius-md)', border: '0.5px solid var(--color-border-secondary)', fontSize: 12.5, display: 'inline-flex', alignItems: 'center', gap: 6, background: 'var(--color-background-primary)', color: 'var(--color-text-primary)', cursor: 'pointer', fontFamily: 'inherit' }}
-        >
-          <i className="ti ti-arrow-left" /> Standard view
-        </button>
-        <a
-          href="https://app.clickup.com/9017603275/v/l/90173230172"
-          target="_blank"
-          rel="noopener noreferrer"
-          style={{ height: 32, padding: '0 13px', borderRadius: 'var(--border-radius-md)', border: '0.5px solid var(--lib-black)', fontSize: 12.5, display: 'inline-flex', alignItems: 'center', gap: 6, background: 'var(--lib-black)', color: '#fff', textDecoration: 'none', fontFamily: 'inherit' }}
-        >
-          <i className="ti ti-external-link" /> Open in ClickUp
-        </a>
-      </div>
-    </div>
   );
 }
 
@@ -404,7 +354,7 @@ function Drawer({
                   </div>
                 );
               })()}
-              {trade.finMismatch && trade.awardedBid !== undefined && (
+              {(trade as any).finMismatch && (trade as any).awardedBid !== undefined && (
                 <>
                   <h4 style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#92400e', margin: '16px 0 8px', background: '#fef3c7', padding: '4px 8px', borderRadius: 4 }}>
                     ⚠ Mismatch detected
@@ -415,28 +365,20 @@ function Drawer({
                       <span style={{ fontWeight: 600 }}>${(trade.fin as number).toLocaleString()}</span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '0.5px solid var(--color-border-tertiary)' }}>
-                      <span>Awarded bid ({trade.awardedSubName})</span>
-                      <span style={{ fontWeight: 600 }}>${trade.awardedBid.toLocaleString()}</span>
+                      <span>Awarded bid ({(trade as any).awardedSubName})</span>
+                      <span style={{ fontWeight: 600 }}>${(trade as any).awardedBid.toLocaleString()}</span>
                     </div>
                     <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 6 }}>
-                      Diff: {((trade.fin as number) - trade.awardedBid) > 0 ? '+' : ''}${Math.abs((trade.fin as number) - trade.awardedBid).toLocaleString()}
+                      Diff: {((trade.fin as number) - (trade as any).awardedBid) > 0 ? '+' : ''}${Math.abs((trade.fin as number) - (trade as any).awardedBid).toLocaleString()}
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
                     <ReconcileButton
                       label="Use awarded bid"
-                      taskId={trade.taskId!}
-                      value={trade.awardedBid}
+                      taskId={(trade as any).taskId!}
+                      value={(trade as any).awardedBid}
                       onSuccess={() => { /* drawer will refresh on next SWR poll */ }}
                     />
-                  </div>
-                </>
-              )}
-              {trade.manual && (
-                <>
-                  <h4 style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--color-text-tertiary)', margin: '16px 0 8px' }}>Note</h4>
-                  <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', lineHeight: 1.55 }}>
-                    This row has a <strong style={{ color: 'var(--warn-fg)' }}>manual override</strong> — the auto-rule (finalized → use finalized; no bid → carry-forward estimated) does not apply. The New Budget value was set directly by Sol Klein.
                   </div>
                 </>
               )}
@@ -445,12 +387,17 @@ function Drawer({
                 Full bid history available in ClickUp
               </div>
               <div style={{ marginTop: 8 }}>
-                <button style={{
-                  width: '100%', height: 34, borderRadius: 'var(--border-radius-md)',
-                  border: '0.5px solid var(--lib-black)', background: 'var(--lib-black)', color: '#fff',
-                  fontSize: 12.5, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                  cursor: 'pointer', fontFamily: 'inherit',
-                }}>
+                <button
+                  onClick={() => trade.taskId && window.open(`https://app.clickup.com/t/${trade.taskId}`, '_blank', 'noopener')}
+                  disabled={!trade.taskId}
+                  style={{
+                    width: '100%', height: 34, borderRadius: 'var(--border-radius-md)',
+                    border: '0.5px solid var(--lib-black)', background: 'var(--lib-black)', color: '#fff',
+                    fontSize: 12.5, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                    cursor: trade.taskId ? 'pointer' : 'not-allowed', fontFamily: 'inherit',
+                    opacity: trade.taskId ? 1 : 0.4,
+                  }}
+                >
                   <i className="ti ti-external-link" style={{ fontSize: 13 }} /> Open in ClickUp
                 </button>
               </div>
@@ -463,177 +410,237 @@ function Drawer({
 }
 
 // ──────────────────────────────────────────────────────────────
-// VIEWS
+// PortfolioBudgetView — Trade × Project matrix
 // ──────────────────────────────────────────────────────────────
-function OverviewView({ onGoBrady }: { onGoBrady: () => void }) {
-  const { project, portfolioProjects } = useBudget();
-  const bs = computeStats(project.trades);
-  const bDelta = bs.newv - bs.est;
-  const bDp = bs.est > 0 ? (bDelta / bs.est * 100) : 0;
+function PortfolioBudgetView({
+  portfolioData,
+  onNavigateToProject,
+  search,
+}: {
+  portfolioData: BudgetPortfolioPayload;
+  onNavigateToProject: (id: string) => void;
+  search: string;
+}) {
+  const projects = portfolioData.projects;
 
-  let pfEst = bs.est;
-  portfolioProjects.forEach((p, i) => {
-    if (!p.real) pfEst += siblingEstM(i) * 1e6;
-  });
-  const pfDelta = bs.newv - bs.est;
-  const pfDp = bs.est > 0 ? (pfDelta / bs.est * 100) : 0;
+  const projectTradeMap = useMemo(() => {
+    const map = new Map<string, Map<string, BudgetTrade>>();
+    for (const proj of projects) {
+      const tm = new Map<string, BudgetTrade>();
+      for (const t of proj.trades) tm.set(t.trade, t);
+      map.set(proj.name, tm);
+    }
+    return map;
+  }, [projects]);
 
-  const over = bs.newv > bs.est ? 1 : 0;
-  const under = bs.newv < bs.est ? 1 : 0;
+  const allTradeNames = useMemo(() => {
+    const names = new Set<string>();
+    for (const [, tm] of projectTradeMap) for (const n of tm.keys()) names.add(n);
+    const sorted = [...names].sort();
+    if (!search.trim()) return sorted;
+    const q = search.toLowerCase();
+    return sorted.filter((n) => n.toLowerCase().includes(q));
+  }, [projectTradeMap, search]);
 
-  const th: React.CSSProperties = {
-    position: 'sticky', top: 0, zIndex: 2,
-    background: 'var(--color-background-secondary)',
-    padding: '10px 12px',
-    fontSize: 9.5, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase',
+  // Per-project summary stats for the header
+  const projectStats = useMemo(() => {
+    const stats = new Map<string, ReturnType<typeof computeStats>>();
+    for (const proj of projects) {
+      stats.set(proj.name, computeStats(proj.trades));
+    }
+    return stats;
+  }, [projects]);
+
+  const thStyle: React.CSSProperties = {
+    textAlign: 'left',
+    padding: '8px 12px',
+    fontSize: 10,
+    letterSpacing: '0.06em',
+    textTransform: 'uppercase',
     color: 'var(--color-text-tertiary)',
-    borderBottom: '0.5px solid var(--color-border-tertiary)',
-    whiteSpace: 'nowrap', textAlign: 'left',
+    fontWeight: 600,
+    background: 'var(--color-background-secondary)',
+    border: '0.5px solid var(--color-border-tertiary)',
+    position: 'sticky',
+    left: 0,
+    zIndex: 2,
+    whiteSpace: 'nowrap',
   };
 
   return (
-    <div>
-      {/* KPI strip */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 10, marginBottom: '1.25rem' }}>
-        <KpiCard label="Total New Budget" value={fmt$(bs.newv)} sub="active job value · Brady" icon="ti-wallet" tone="good" />
-        <KpiCard
-          label="Δ vs Estimated"
-          value={(bDelta < 0 ? '−' : bDelta > 0 ? '+' : '') + fmt$(Math.abs(bDelta))}
-          sub={bDp.toFixed(1) + '% · Brady-anchored'}
-          icon="ti-trending-down"
-          tone="danger"
-        />
-        <KpiCard label="Projects over budget" value={String(over)} sub="New > Estimated" icon="ti-arrow-up-right" tone="amber" />
-        <KpiCard label="Projects under budget" value={String(under)} sub="savings vs estimate" icon="ti-arrow-down-right" tone="good" />
-        <KpiCard label="Trades awaiting bids" value={String(bs.eo)} sub="on Brady · 42 siblings pending sync" icon="ti-hourglass" tone="info" />
-      </div>
-
-      {/* Projects matrix */}
-      <div style={{
-        background: 'var(--color-background-primary)',
-        border: '0.5px solid var(--color-border-tertiary)',
-        borderRadius: 'var(--border-radius-lg)',
-        padding: '18px 20px',
-        marginBottom: '1.25rem',
-      }}>
-        <h2 style={{ margin: '0 0 14px', fontSize: 13, fontWeight: 500, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <i className="ti ti-table" />
-          Projects matrix
-          <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--color-text-tertiary)', fontWeight: 400 }}>
-            click{' '}
-            <button
-              onClick={onGoBrady}
-              style={{ background: 'none', border: 'none', color: 'var(--color-text-info)', cursor: 'pointer', padding: 0, fontSize: 11, fontFamily: 'inherit' }}
-            >
-              800 Brady
-            </button>
-            {' '}for the per-trade drill-in · ghost rows = pending ClickUp sync
-          </span>
-        </h2>
-        <div style={{ maxHeight: 600, overflowY: 'auto', background: 'var(--color-background-primary)', borderRadius: 8, border: '0.5px solid var(--color-border-tertiary)' }}>
-          <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, fontSize: 12.5 }}>
-            <thead>
-              <tr>
-                {['Project', 'Estimated', 'Committed', 'New Budget', 'Δ $', 'Δ %', '# trades finalized'].map((h, i) => (
-                  <th key={h} style={{ ...th, textAlign: i === 0 ? 'left' : i === 6 ? 'center' : 'right' }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {/* Real row: 800 Brady */}
-              <tr style={{ cursor: 'pointer' }} onClick={onGoBrady}>
-                {[
-                  <td key="name" style={{ padding: '9px 12px', borderBottom: '0.5px solid var(--color-border-tertiary)', verticalAlign: 'middle' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontWeight: 500, color: 'var(--lib-orange)' }}>800 Brady Ave</span>
-                      <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>Bronx, NY · Sol</span>
-                    </div>
-                  </td>,
-                  <td key="est" style={{ padding: '9px 12px', borderBottom: '0.5px solid var(--color-border-tertiary)', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{fmt$(bs.est)}</td>,
-                  <td key="fin" style={{ padding: '9px 12px', borderBottom: '0.5px solid var(--color-border-tertiary)', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{fmt$(bs.fin)}</td>,
-                  <td key="new" style={{ padding: '9px 12px', borderBottom: '0.5px solid var(--color-border-tertiary)', textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}>{fmt$(bs.newv)}</td>,
-                  <td key="delta$" style={{ padding: '9px 12px', borderBottom: '0.5px solid var(--color-border-tertiary)', textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: bDelta < 0 ? 'var(--var-under)' : bDelta > 0 ? 'var(--var-over)' : undefined }}>
-                    {(bDelta < 0 ? '−' : bDelta > 0 ? '+' : '')}{fmt$(Math.abs(bDelta))}
-                  </td>,
-                  <td key="deltaP" style={{ padding: '9px 12px', borderBottom: '0.5px solid var(--color-border-tertiary)', textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: bDelta < 0 ? 'var(--var-under)' : bDelta > 0 ? 'var(--var-over)' : undefined }}>
-                    {bDp.toFixed(1)}%
-                  </td>,
-                  <td key="spark" style={{ padding: '9px 12px', borderBottom: '0.5px solid var(--color-border-tertiary)', textAlign: 'center' }}>
-                    <SparkBar finalized={bs.withBids} total={bs.count - bs.na - bs.inc} />
-                  </td>,
-                ]}
-              </tr>
-              {/* Ghost rows */}
-              {portfolioProjects.filter(p => !p.real).map((p, i) => {
-                const estM = siblingEstM(i);
+    <div style={{
+      background: 'var(--color-background-primary)',
+      border: '0.5px solid var(--color-border-tertiary)',
+      borderRadius: 'var(--border-radius-lg)',
+      padding: '18px 20px',
+    }}>
+      <h2 style={{ margin: '0 0 14px', fontSize: 13, fontWeight: 500, display: 'flex', alignItems: 'center', gap: 8 }}>
+        <i className="ti ti-table" />
+        Portfolio budget matrix
+        <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--color-text-tertiary)', fontWeight: 400 }}>
+          click a project column header to view its full budget detail
+        </span>
+      </h2>
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+          <colgroup>
+            <col style={{ minWidth: 200 }} />
+            {projects.map((_, i) => (
+              <col key={i} style={{ minWidth: 130 }} />
+            ))}
+          </colgroup>
+          <thead>
+            {/* Project name row — clickable */}
+            <tr>
+              <th style={thStyle}>Trade</th>
+              {projects.map((proj) => {
+                const ps = projectStats.get(proj.name);
                 return (
-                  <tr key={p.name}>
-                    <td style={{ padding: '9px 12px', borderBottom: '0.5px solid var(--color-border-tertiary)', verticalAlign: 'middle' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span style={{ fontWeight: 500 }}>{p.name}</span>
-                        <span style={{
-                          fontSize: 9, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase',
-                          padding: '1px 6px', borderRadius: 999,
-                          background: 'var(--color-background-tertiary)', color: 'var(--color-text-tertiary)',
-                          border: '1px solid var(--color-border-tertiary)',
-                          display: 'inline-flex', alignItems: 'center', gap: 3,
-                        }}>
-                          <i className="ti ti-cloud-off" style={{ fontSize: 9 }} /> pending sync
-                        </span>
+                  <th
+                    key={proj.name}
+                    title={`View ${proj.name} budget`}
+                    onClick={() => onNavigateToProject(proj.name)}
+                    style={{
+                      textAlign: 'center',
+                      padding: '7px 8px',
+                      fontSize: 10,
+                      color: 'var(--color-text-primary)',
+                      fontWeight: 600,
+                      background: 'var(--color-background-secondary)',
+                      border: '0.5px solid var(--color-border-tertiary)',
+                      whiteSpace: 'nowrap',
+                      cursor: 'pointer',
+                      letterSpacing: '0.02em',
+                      maxWidth: 130,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                    }}
+                  >
+                    <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 120 }}>{proj.name}</div>
+                    {ps && (
+                      <div style={{ fontSize: 9, fontWeight: 400, color: 'var(--color-text-tertiary)', marginTop: 2 }}>
+                        {fmt$(ps.newv)}
                       </div>
-                      <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 1 }}>{p.loc}</div>
-                    </td>
-                    {['$' + estM.toFixed(1) + 'M est', '—', '—', '—', '—'].map((v, ci) => (
-                      <td key={ci} style={{ padding: '9px 12px', borderBottom: '0.5px solid var(--color-border-tertiary)', textAlign: 'right', color: 'var(--color-text-tertiary)', fontStyle: 'italic', opacity: 0.55, fontVariantNumeric: 'tabular-nums' }}>{v}</td>
-                    ))}
-                    <td style={{ padding: '9px 12px', borderBottom: '0.5px solid var(--color-border-tertiary)', textAlign: 'center' }}>
-                      <SparkBar ghost />
-                    </td>
-                  </tr>
+                    )}
+                  </th>
                 );
               })}
-            </tbody>
-            <tfoot>
+            </tr>
+          </thead>
+          <tbody>
+            {allTradeNames.length === 0 ? (
               <tr>
-                <td style={{ position: 'sticky', bottom: 0, zIndex: 2, background: 'var(--color-background-secondary)', borderTop: '1.5px solid var(--color-border-secondary)', padding: '14px 12px', fontWeight: 600 }}>
-                  Portfolio total{' '}
-                  <span style={{ fontWeight: 400, color: 'var(--color-text-tertiary)', fontSize: 11 }}>· est = Brady + ghosted siblings · committed/new = Brady only</span>
-                </td>
-                {[fmt$(pfEst), fmt$(bs.fin), fmt$(bs.newv)].map((v, i) => (
-                  <td key={i} style={{ position: 'sticky', bottom: 0, zIndex: 2, background: 'var(--color-background-secondary)', borderTop: '1.5px solid var(--color-border-secondary)', padding: '14px 12px', textAlign: 'right', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{v}</td>
-                ))}
-                <td style={{ position: 'sticky', bottom: 0, zIndex: 2, background: 'var(--color-background-secondary)', borderTop: '1.5px solid var(--color-border-secondary)', padding: '14px 12px', textAlign: 'right', fontWeight: 600, fontVariantNumeric: 'tabular-nums', color: pfDelta < 0 ? 'var(--var-under)' : pfDelta > 0 ? 'var(--var-over)' : undefined }}>
-                  {(pfDelta < 0 ? '−' : pfDelta > 0 ? '+' : '')}{fmt$(Math.abs(pfDelta))}
-                </td>
-                <td style={{ position: 'sticky', bottom: 0, zIndex: 2, background: 'var(--color-background-secondary)', borderTop: '1.5px solid var(--color-border-secondary)', padding: '14px 12px', textAlign: 'right', fontWeight: 600 }}>
-                  {pfDp.toFixed(1)}%
-                </td>
-                <td style={{ position: 'sticky', bottom: 0, zIndex: 2, background: 'var(--color-background-secondary)', borderTop: '1.5px solid var(--color-border-secondary)', padding: '14px 12px', fontSize: 11, color: 'var(--color-text-tertiary)', textAlign: 'center' }}>
-                  1 real · 42 pending
+                <td
+                  colSpan={projects.length + 1}
+                  style={{
+                    padding: 24,
+                    textAlign: 'center',
+                    color: 'var(--color-text-tertiary)',
+                    fontSize: 12,
+                  }}
+                >
+                  {search ? 'No trades match your search.' : 'No budget data yet.'}
                 </td>
               </tr>
-            </tfoot>
-          </table>
-        </div>
+            ) : (
+              allTradeNames.map((tradeName, ti) => (
+                <tr key={ti}>
+                  <td
+                    style={{
+                      padding: '7px 12px',
+                      border: '0.5px solid var(--color-border-tertiary)',
+                      fontWeight: 500,
+                      background: 'var(--color-background-primary)',
+                      position: 'sticky',
+                      left: 0,
+                      zIndex: 1,
+                      fontSize: 12.5,
+                    }}
+                  >
+                    {tradeName}
+                  </td>
+                  {projects.map((proj) => {
+                    const trade = projectTradeMap.get(proj.name)?.get(tradeName);
+                    if (!trade) {
+                      return (
+                        <td
+                          key={proj.name}
+                          style={{
+                            padding: '6px 8px',
+                            border: '0.5px solid var(--color-border-tertiary)',
+                            textAlign: 'center',
+                            color: 'var(--color-text-tertiary)',
+                            fontSize: 11,
+                          }}
+                        >
+                          —
+                        </td>
+                      );
+                    }
+
+                    // Determine cell coloring based on variance
+                    let bg: string | undefined;
+                    let textColor: string | undefined;
+                    if (isMoney(trade.newv) && isMoney(trade.est) && trade.est > 0) {
+                      if ((trade.newv as number) < (trade.est as number)) {
+                        bg = '#e8f5e9';
+                        textColor = '#1F7A38';
+                      } else if ((trade.newv as number) > (trade.est as number)) {
+                        bg = '#fdecea';
+                        textColor = '#A82828';
+                      }
+                    }
+
+                    return (
+                      <td
+                        key={proj.name}
+                        style={{
+                          padding: '6px 8px',
+                          border: '0.5px solid var(--color-border-tertiary)',
+                          textAlign: 'right',
+                          background: bg,
+                          color: textColor ?? 'var(--color-text-primary)',
+                          fontVariantNumeric: 'tabular-nums',
+                          fontSize: 12,
+                          fontWeight: isMoney(trade.newv) ? 500 : 400,
+                        }}
+                      >
+                        {fmt$(trade.newv)}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
       </div>
     </div>
   );
 }
 
+// ──────────────────────────────────────────────────────────────
+// DetailedView
+// ──────────────────────────────────────────────────────────────
 function DetailedView({
   onGoOverview,
   onTradeClick,
+  search,
 }: {
   onGoOverview: () => void;
   onTradeClick: (t: BudgetTrade) => void;
+  search?: string;
 }) {
   const { project } = useBudget();
-  const bs = computeStats(project.trades);
+  const q = search?.toLowerCase().trim() || '';
+  const filteredTrades = q ? project.trades.filter(r => r.trade.toLowerCase().includes(q)) : project.trades;
+  const bs = computeStats(filteredTrades);
   const d = bs.newv - bs.est;
   const dp = bs.est > 0 ? (d / bs.est * 100) : 0;
+  const [shareCopied, setShareCopied] = useState(false);
 
   // "where budget moved"
-  const movers = project.trades
+  const movers = filteredTrades
     .filter(r => isMoney(r.est) && isMoney(r.fin))
     .map(r => ({ trade: r.trade, d: (r.fin as number) - (r.est as number) }));
   movers.sort((a, b) => a.d - b.d);
@@ -647,11 +654,166 @@ function DetailedView({
     position: 'sticky', top: 0, zIndex: 3,
     background: 'var(--color-background-secondary)',
     padding: '10px 12px',
-    fontSize: 9.5, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase',
-    color: 'var(--color-text-tertiary)',
+    fontSize: 9.5, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase',
+    color: 'var(--color-text-secondary)',
     borderBottom: '0.5px solid var(--color-border-tertiary)',
     whiteSpace: 'nowrap',
   };
+
+  function handlePrint() {
+    const date = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+    const delta = bs.newv - bs.est;
+    const deltaPct = bs.est > 0 ? (delta / bs.est * 100) : 0;
+    const fmtNum = (v: MoneyVal): string => {
+      if (v === null || v === undefined) return '–';
+      if (v === 'INC') return 'Included';
+      if (v === 'NA') return 'NA';
+      return '$' + Math.round(v).toLocaleString('en-US', { maximumFractionDigits: 0 });
+    };
+    const fmtFull = (v: number): string =>
+      '$' + v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    const printTrades = sortByPhase(filteredTrades);
+    const hardTrades = printTrades.filter(r => r.costType !== 'soft');
+    const softTrades = printTrades.filter(r => r.costType === 'soft');
+    const hasBothGroups = hardTrades.length > 0 && softTrades.length > 0;
+
+    const renderPrintRows = (trades: BudgetTrade[], startIdx: number) =>
+      trades.map((r, ti) => {
+        const rowBg = (startIdx + ti) % 2 === 0 ? '#fff' : '#fafaf8';
+        const rd = (isMoney(r.newv) && isMoney(r.est)) ? (r.newv - r.est) : null;
+        const rdp = (rd !== null && isMoney(r.est) && r.est > 0) ? (rd / r.est * 100) : null;
+        const varColor = rd === null ? '#aaa' : rd < 0 ? '#1F7A38' : rd > 0 ? '#A82828' : '#555';
+        const varText = rd === null ? '–'
+          : (rd < 0 ? '−' : rd > 0 ? '+' : '') + fmtNum(Math.abs(rd))
+            + (rdp !== null ? ` (${rdp < 0 ? '−' : '+'}${Math.abs(rdp).toFixed(1)}%)` : '');
+        return `<tr>
+          <td style="padding:7px 14px;border-bottom:0.5px solid #f0f0ec;font-weight:500;font-size:11.5px;background:${rowBg};">${r.trade}</td>
+          <td style="padding:7px 14px;border-bottom:0.5px solid #f0f0ec;text-align:right;font-size:11px;background:${rowBg};color:${r.est === null ? '#aaa' : '#1a1a1a'};font-variant-numeric:tabular-nums;">${fmtNum(r.est)}</td>
+          <td style="padding:7px 14px;border-bottom:0.5px solid #f0f0ec;text-align:right;font-size:11px;background:${rowBg};color:${r.fin === null ? '#bbb' : '#1B7CB0'};font-variant-numeric:tabular-nums;">${fmtNum(r.fin)}</td>
+          <td style="padding:7px 14px;border-bottom:0.5px solid #f0f0ec;text-align:right;font-size:11px;font-weight:700;background:${rowBg};color:#1F7A38;font-variant-numeric:tabular-nums;">${fmtNum(r.newv)}</td>
+          <td style="padding:7px 14px;border-bottom:0.5px solid #f0f0ec;text-align:right;font-size:11px;font-weight:600;background:${rowBg};color:${varColor};font-variant-numeric:tabular-nums;">${varText}</td>
+        </tr>`;
+      }).join('');
+
+    const sectionHeader = (label: string) =>
+      `<tr><td colspan="5" style="padding:8px 14px 4px;font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#888;background:#f5f5f2;border-bottom:0.5px solid #e8e8e4;">${label}</td></tr>`;
+
+    const bodyRows = hasBothGroups
+      ? sectionHeader('Hard Costs') + renderPrintRows(hardTrades, 0)
+        + sectionHeader('Soft Costs') + renderPrintRows(softTrades, hardTrades.length)
+      : renderPrintRows(printTrades, 0);
+
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Budget Outlook · ${project.name}</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #1a1a1a; background: #fff; padding: 28px 32px; }
+    @page { size: landscape; margin: 12mm 14mm; }
+    @media print { body { padding: 0; } }
+    .header { display: flex; align-items: center; gap: 20px; border-bottom: 3px solid #F47832; padding-bottom: 16px; margin-bottom: 20px; }
+    .logo-crop { width: 62px; height: 67px; overflow: hidden; position: relative; flex-shrink: 0; }
+    .logo-img { position: absolute; width: 232px; height: auto; left: -19px; top: -1px; }
+    .header-main { flex: 1; }
+    .header-main h1 { font-size: 19px; font-weight: 700; letter-spacing: -0.015em; }
+    .header-main p { font-size: 12px; color: #888; margin-top: 4px; }
+    .header-kpis { display: flex; gap: 24px; }
+    .hkpi { text-align: right; }
+    .hkpi-val { font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .hkpi-label { font-size: 9px; color: #999; text-transform: uppercase; letter-spacing: 0.05em; margin-top: 1px; }
+    .legend { display: flex; gap: 18px; margin-bottom: 14px; font-size: 10px; color: #666; padding: 8px 14px; background: #fafaf8; border-radius: 6px; border: 0.5px solid #e8e8e4; }
+    table { width: 100%; border-collapse: collapse; border-radius: 8px; overflow: hidden; border: 0.5px solid #e8e8e4; }
+    th { padding: 9px 14px; font-size: 9px; letter-spacing: 0.07em; text-transform: uppercase; color: #555; background: #f0f0ec; border-bottom: 1px solid #e0e0dc; font-weight: 700; }
+    th:first-child { text-align: left; }
+    th:not(:first-child) { text-align: right; }
+    .total-row td { background: #edf7f0 !important; font-weight: 700; font-size: 11.5px; border-top: 2px solid #93c9a7; padding: 10px 14px; text-align: right; }
+    .total-row td:first-child { text-align: left; }
+    .footer { margin-top: 18px; font-size: 9.5px; color: #bbb; display: flex; justify-content: space-between; align-items: flex-end; }
+    .footer-brand { font-weight: 600; color: #F47832; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="logo-crop">
+      <img class="logo-img" src="${window.location.origin}/lib_brand/lead_it_builders_logo.png" alt="Lead It Builders" />
+    </div>
+    <div class="header-main">
+      <h1>Budget Outlook Report · ${project.name}</h1>
+      <p>${project.location ? project.location + ' · ' : ''}Generated ${date}</p>
+    </div>
+    <div class="header-kpis">
+      <div class="hkpi"><div class="hkpi-val">${fmtFull(bs.est)}</div><div class="hkpi-label">Estimated</div></div>
+      <div class="hkpi"><div class="hkpi-val" style="color:#1F7A38;">${fmtFull(bs.newv)}</div><div class="hkpi-label">New Budget</div></div>
+      <div class="hkpi"><div class="hkpi-val" style="color:${delta < 0 ? '#1F7A38' : '#A82828'};">${(delta < 0 ? '−' : '+') + fmtFull(Math.abs(delta))}</div><div class="hkpi-label">Δ vs Est (${deltaPct < 0 ? '−' : '+'}${Math.abs(deltaPct).toFixed(1)}%)</div></div>
+      <div class="hkpi"><div class="hkpi-val" style="color:#1B7CB0;">${bs.withBids}</div><div class="hkpi-label">Bids in</div></div>
+    </div>
+  </div>
+  <div class="legend">
+    <span><strong style="color:#1F7A38;">Green</strong> = under estimate · New Budget &lt; Estimated</span>
+    <span><strong style="color:#A82828;">Red</strong> = over estimate · New Budget &gt; Estimated</span>
+    <span><strong style="color:#1B7CB0;">Blue</strong> = bid or contract received</span>
+    <span><strong>–</strong> = not yet received</span>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th style="text-align:left;">Trade</th>
+        <th>Estimated Budget</th>
+        <th>Finalized / Lowest Bid</th>
+        <th>New Budget</th>
+        <th>Variance vs Estimated</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${bodyRows}
+      <tr class="total-row">
+        <td>Total · ${bs.count} trades</td>
+        <td>${fmtFull(bs.est)}</td>
+        <td>${bs.withBids > 0 ? fmtFull(bs.fin) : '–'}</td>
+        <td style="color:#1F7A38;">${fmtFull(bs.newv)}</td>
+        <td style="color:${delta < 0 ? '#1F7A38' : '#A82828'};">${(delta < 0 ? '−' : '+') + fmtFull(Math.abs(delta))} (${deltaPct < 0 ? '−' : '+'}${Math.abs(deltaPct).toFixed(1)}%)</td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="footer">
+    <span><span class="footer-brand">Lead It Builders</span> · Budget Outlook Report · ${date}</span>
+    <span>Live from ClickUp · New Budget = Finalized if available, otherwise Estimated carry-forward</span>
+  </div>
+  <script>window.onload = function() { window.print(); };<\/script>
+</body>
+</html>`;
+
+    const blob = new Blob([html], { type: 'text/html' });
+    const blobUrl = URL.createObjectURL(blob);
+    window.open(blobUrl, '_blank');
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
+  }
+
+  function handleShareLink() {
+    const url = `${window.location.origin}/budget/${encodeURIComponent(project.name)}/report`;
+    const onSuccess = () => {
+      setShareCopied(true);
+      setTimeout(() => setShareCopied(false), 2500);
+    };
+    const execFallback = () => {
+      const ta = document.createElement('textarea');
+      ta.value = url;
+      ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;pointer-events:none;';
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      try { document.execCommand('copy'); onSuccess(); } catch (_) { /* silent */ }
+      document.body.removeChild(ta);
+    };
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(url).then(onSuccess).catch(execFallback);
+    } else {
+      execFallback();
+    }
+  }
 
   return (
     <div>
@@ -659,7 +821,37 @@ function DetailedView({
       <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginBottom: 12, display: 'flex', gap: 6, alignItems: 'center' }}>
         <button onClick={onGoOverview} style={{ background: 'none', border: 'none', color: 'var(--color-text-info)', cursor: 'pointer', padding: 0, fontSize: 12, fontFamily: 'inherit' }}>Portfolio</button>
         <i className="ti ti-chevron-right" style={{ fontSize: 14, opacity: 0.6 }} />
-        <span>800 Brady Ave · Budget</span>
+        <span>{project.name} · Budget</span>
+        <span style={{ flex: 1 }} />
+        {/* Print / Share button group */}
+        <div style={{ display: 'inline-flex', borderRadius: 'var(--border-radius-md)', overflow: 'hidden', border: '0.5px solid var(--color-border-secondary)' }}>
+          <button
+            type="button"
+            onClick={handlePrint}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 10px', background: 'var(--color-background-secondary)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer', fontFamily: 'inherit', border: 'none', borderRight: '0.5px solid var(--color-border-secondary)' }}
+          >
+            <i className="ti ti-printer" style={{ fontSize: 13 }} />
+            Print
+          </button>
+          <button
+            type="button"
+            onClick={handleShareLink}
+            title="Copy live report link to clipboard"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 10px', background: shareCopied ? 'var(--bid-fnl-bg)' : 'var(--color-background-secondary)', color: shareCopied ? 'var(--bid-fnl-fg)' : 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer', fontFamily: 'inherit', border: 'none', transition: 'background 0.2s, color 0.2s' }}
+          >
+            <i className={`ti ${shareCopied ? 'ti-check' : 'ti-link'}`} style={{ fontSize: 13 }} />
+            {shareCopied ? 'Copied!' : 'Share'}
+          </button>
+        </div>
+        <a
+          href={`${CLICKUP.BASE_URL}/${CLICKUP.WORKSPACE_ID}/v/f/${project.id}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 5, height: 28, padding: '0 10px', border: '0.5px solid var(--lib-black)', borderRadius: 'var(--border-radius-md)', background: 'var(--lib-black)', color: '#fff', fontSize: 11, textDecoration: 'none' }}
+        >
+          <i className="ti ti-external-link" style={{ fontSize: 13 }} />
+          Open in ClickUp
+        </a>
       </div>
 
       {/* Project header */}
@@ -668,26 +860,12 @@ function DetailedView({
         paddingBottom: 14, borderBottom: '0.5px solid var(--color-border-tertiary)', marginBottom: 14,
       }}>
         <div>
-          <h1 style={{ fontSize: 22, fontWeight: 500, letterSpacing: '-0.015em', margin: '0 0 6px' }}>800 Brady Ave</h1>
-          <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'center', fontSize: 12.5, color: 'var(--color-text-secondary)' }}>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: 999, background: 'var(--c-sol-bg)', color: 'var(--c-sol-dark)' }}>
-              <span style={{ width: 18, height: 18, borderRadius: '50%', background: '#fff', color: 'var(--c-sol-dark)', fontSize: 9, fontWeight: 700, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>SK</span>
-              Sol Klein
-            </span>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: 999, background: 'var(--info-bg)', color: 'var(--info-fg)' }}>
-              <i className="ti ti-calculator" style={{ fontSize: 13 }} />Budgeting
-            </span>
-            <span><i className="ti ti-map-pin" style={{ fontSize: 13, verticalAlign: '-2px' }} /> Bronx, NY 10462</span>
-            <span><i className="ti ti-id" style={{ fontSize: 13, verticalAlign: '-2px' }} /> 800-BRDY-2025</span>
-          </div>
-        </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button style={{ height: 32, padding: '0 13px', borderRadius: 'var(--border-radius-md)', border: '0.5px solid var(--color-border-secondary)', fontSize: 12.5, display: 'inline-flex', alignItems: 'center', gap: 6, background: 'var(--color-background-primary)', color: 'var(--color-text-primary)', cursor: 'pointer', fontFamily: 'inherit' }}>
-            <i className="ti ti-folder" /> ClickUp folder
-          </button>
-          <button style={{ height: 32, padding: '0 13px', borderRadius: 'var(--border-radius-md)', border: '0.5px solid var(--lib-black)', fontSize: 12.5, display: 'inline-flex', alignItems: 'center', gap: 6, background: 'var(--lib-black)', color: '#fff', cursor: 'pointer', fontFamily: 'inherit' }}>
-            <i className="ti ti-external-link" /> Open in ClickUp
-          </button>
+          <h1 style={{ fontSize: 22, fontWeight: 500, letterSpacing: '-0.015em', margin: '0 0 6px' }}>{project.name}</h1>
+          {project.location && (
+            <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'center', fontSize: 12.5, color: 'var(--color-text-secondary)' }}>
+              <span><i className="ti ti-map-pin" style={{ fontSize: 13, verticalAlign: '-2px' }} /> {project.location}</span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -695,7 +873,7 @@ function DetailedView({
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', gap: 10, marginBottom: '1.25rem' }}>
         <KpiCard label="Total Estimated" value={fmt$(bs.est)} sub="baseline · all trades" icon="ti-clipboard-list" />
         <KpiCard label="Lowest received" value={fmt$(bs.fin)} sub="finalized + lowest in hand" icon="ti-target" tone="info" />
-        <KpiCard label="New Budget" value={fmt$(bs.newv)} sub="auto-rule + manual overrides" icon="ti-wallet" tone="good" />
+        <KpiCard label="New Budget" value={fmt$(bs.newv)} sub="finalized or carry-forward" icon="ti-wallet" tone="good" />
         <KpiCard label="Δ vs Estimated" value={(d < 0 ? '−' : d > 0 ? '+' : '') + fmt$(Math.abs(d))} sub={dp.toFixed(1) + '% vs estimate'} icon="ti-arrow-bounce" tone="amber" />
         <KpiCard label="Trades with bids in" value={String(bs.withBids)} sub="have a Finalized/lowest" icon="ti-checks" />
         <KpiCard label="Estimate-only" value={String(bs.eo)} sub="no bids yet · carry-forward" icon="ti-hourglass-low" />
@@ -713,7 +891,7 @@ function DetailedView({
           <h2 style={{ margin: '0 0 14px', fontSize: 13, fontWeight: 500, display: 'flex', alignItems: 'center', gap: 8 }}>
             <i className="ti ti-table" /> Per-trade budget
             <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--color-text-tertiary)', fontWeight: 400 }}>
-              click a row → bid history drawer · &quot;Manual&quot; = auto-rule overridden
+              click a row to see bid history
             </span>
           </h2>
           <div style={{ maxHeight: 680, overflowY: 'auto', background: 'var(--color-background-primary)', borderRadius: 8, border: '0.5px solid var(--color-border-tertiary)' }}>
@@ -725,52 +903,87 @@ function DetailedView({
               </colgroup>
               <thead>
                 <tr>
-                  <th style={{ ...th, textAlign: 'left' }}>Hard cost</th>
+                  <th style={{ ...th, textAlign: 'left' }}>Trade</th>
                   <th style={{ ...th, textAlign: 'right' }}>Estimated Budget</th>
-                  <th style={{ ...th, textAlign: 'right' }}>Finalized / lowest bid</th>
+                  <th style={{ ...th, textAlign: 'right' }}>Finalized / Lowest Bid</th>
                   <th style={{ ...th, textAlign: 'right' }}>New Budget</th>
                   <th style={{ ...th, textAlign: 'center' }}>Variance vs Estimated</th>
                 </tr>
               </thead>
               <tbody>
-                {project.trades.map((r, idx) => (
-                  <tr
-                    key={idx}
-                    style={{ cursor: 'pointer' }}
-                    onClick={() => onTradeClick(r)}
-                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-background-secondary)')}
-                    onMouseLeave={e => (e.currentTarget.style.background = '')}
-                  >
-                    <td style={{ padding: '10px 12px', borderBottom: '0.5px solid var(--color-border-tertiary)', verticalAlign: 'middle', fontSize: 13, fontWeight: 500 }}>
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                        <span>{r.trade}</span>
-                        {r.finMismatch && (
-                          <span
-                            title={`Updated Budget ($${r.fin?.toLocaleString()}) differs from awarded bid ($${r.awardedBid?.toLocaleString()} — ${r.awardedSubName}). Open Reconcile to resolve.`}
-                            style={{
-                              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                              width: 16, height: 16, borderRadius: 3, background: '#fef3c7',
-                              color: '#92400e', fontSize: 9.5, fontWeight: 700, flexShrink: 0, cursor: 'help',
-                            }}
-                          >!</span>
-                        )}
-                      </span>
-                      {r.manual && <ManualBadge />}
-                    </td>
-                    <td style={{ padding: '10px 12px', borderBottom: '0.5px solid var(--color-border-tertiary)', textAlign: 'right', verticalAlign: 'middle', fontVariantNumeric: 'tabular-nums', fontSize: 13 }}>
-                      <MoneyToken v={r.est} dim={!isMoney(r.est)} />
-                    </td>
-                    <td style={{ padding: '10px 12px', borderBottom: '0.5px solid var(--color-border-tertiary)', textAlign: 'right', verticalAlign: 'middle', fontVariantNumeric: 'tabular-nums', fontSize: 13 }}>
-                      <MoneyToken v={r.fin} dim={!isMoney(r.fin)} />
-                    </td>
-                    <td style={{ padding: '10px 12px', borderBottom: '0.5px solid var(--color-border-tertiary)', textAlign: 'right', verticalAlign: 'middle', fontVariantNumeric: 'tabular-nums', fontSize: 13 }}>
-                      <MoneyToken v={r.newv} bold dim={!isMoney(r.newv)} />
-                    </td>
-                    <td style={{ padding: '10px 12px', borderBottom: '0.5px solid var(--color-border-tertiary)', verticalAlign: 'middle' }}>
-                      <VarBar r={r} />
-                    </td>
-                  </tr>
-                ))}
+                {(() => {
+                  const sorted = sortByPhase(filteredTrades);
+                  const hard = sorted.filter(r => r.costType !== 'soft');
+                  const soft = sorted.filter(r => r.costType === 'soft');
+                  const hasBoth = hard.length > 0 && soft.length > 0;
+                  const sectionHdr = (label: string) => (
+                    <tr key={`hdr-${label}`}>
+                      <td colSpan={5} style={{ padding: '6px 12px 3px', fontSize: 9.5, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--color-text-tertiary)', background: 'var(--color-background-secondary)', borderBottom: '0.5px solid var(--color-border-tertiary)' }}>
+                        {label}
+                      </td>
+                    </tr>
+                  );
+                  const renderRow = (r: BudgetTrade, idx: number) => (
+                    <tr
+                      key={idx}
+                      style={{ cursor: 'pointer' }}
+                      onClick={() => onTradeClick(r)}
+                      onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-background-secondary)')}
+                      onMouseLeave={e => (e.currentTarget.style.background = '')}
+                    >
+                      <td style={{ padding: '10px 12px', borderBottom: '0.5px solid var(--color-border-tertiary)', verticalAlign: 'middle', fontSize: 13, fontWeight: 500 }}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                          {r.trade}
+                          {(r as any).finMismatch && (
+                            <span
+                              title={`Updated Budget ($${r.fin?.toLocaleString()}) differs from awarded bid ($${(r as any).awardedBid?.toLocaleString()} — ${(r as any).awardedSubName}). Open Reconcile to resolve.`}
+                              style={{
+                                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                                width: 16, height: 16, borderRadius: 3, background: '#fef3c7',
+                                color: '#92400e', fontSize: 9.5, fontWeight: 700, flexShrink: 0, cursor: 'help',
+                              }}
+                            >!</span>
+                          )}
+                          {r.hasDuplicate && r.duplicateTaskUrls && r.duplicateTaskUrls.length > 0 && (
+                            <a
+                              href={r.duplicateTaskUrls[0]}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={e => e.stopPropagation()}
+                              title={`${r.duplicateTaskUrls.length} duplicate trade row${r.duplicateTaskUrls.length > 1 ? 's' : ''} detected — click to review in ClickUp`}
+                              style={{
+                                display: 'inline-flex', alignItems: 'center', gap: 3,
+                                fontSize: 9.5, fontWeight: 600, letterSpacing: '0.04em',
+                                padding: '1px 6px', borderRadius: 4,
+                                background: '#FEF3C7', color: '#92400E',
+                                border: '0.5px solid #FCD34D',
+                                textDecoration: 'none', whiteSpace: 'nowrap',
+                              }}
+                            >
+                              <i className="ti ti-copy" style={{ fontSize: 9 }} />
+                              duplicate
+                            </a>
+                          )}
+                        </span>
+                      </td>
+                      <td style={{ padding: '10px 12px', borderBottom: '0.5px solid var(--color-border-tertiary)', textAlign: 'right', verticalAlign: 'middle', fontVariantNumeric: 'tabular-nums', fontSize: 13 }}>
+                        <MoneyToken v={r.est} dim={!isMoney(r.est)} />
+                      </td>
+                      <td style={{ padding: '10px 12px', borderBottom: '0.5px solid var(--color-border-tertiary)', textAlign: 'right', verticalAlign: 'middle', fontVariantNumeric: 'tabular-nums', fontSize: 13 }}>
+                        <MoneyToken v={r.fin} dim={!isMoney(r.fin)} />
+                      </td>
+                      <td style={{ padding: '10px 12px', borderBottom: '0.5px solid var(--color-border-tertiary)', textAlign: 'right', verticalAlign: 'middle', fontVariantNumeric: 'tabular-nums', fontSize: 13 }}>
+                        <MoneyToken v={r.newv} bold dim={!isMoney(r.newv)} />
+                      </td>
+                      <td style={{ padding: '10px 12px', borderBottom: '0.5px solid var(--color-border-tertiary)', verticalAlign: 'middle' }}>
+                        <VarBar r={r} />
+                      </td>
+                    </tr>
+                  );
+                  return hasBoth
+                    ? [sectionHdr('Hard Costs'), ...hard.map(renderRow), sectionHdr('Soft Costs'), ...soft.map(renderRow)]
+                    : sorted.map(renderRow);
+                })()}
               </tbody>
               <tfoot>
                 <tr>
@@ -818,22 +1031,64 @@ function DetailedView({
             )}
           </SideCard>
 
-          <SideCard title="Row composition" icon="ti-tag">
-            {[
-              { label: 'Trades with bids in', val: bs.withBids },
-              { label: 'Estimate-only', val: bs.eo },
-              { label: '"Included"', val: bs.inc, icon: 'ti-package' },
-              { label: '"NA"', val: bs.na, icon: 'ti-ban' },
-              { label: 'Manual overrides', val: bs.manual, icon: 'ti-edit' },
-            ].map(({ label, val, icon }, i) => (
-              <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '9px 0', fontSize: 13, borderTop: i === 0 ? 'none' : '0.5px solid var(--color-border-tertiary)' }}>
-                <span style={{ color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center', gap: 6 }}>
-                  {icon && <i className={`ti ${icon}`} style={{ fontSize: 11 }} />}
-                  {label}
-                </span>
-                <span style={{ fontWeight: 500 }}>{val}</span>
-              </div>
-            ))}
+          <SideCard title="Row composition" icon="ti-chart-donut-3">
+            {(() => {
+              const segments = [
+                { label: 'Bids in',        val: bs.withBids, color: '#4ade80' },
+                { label: 'Estimate-only',  val: bs.eo,       color: '#94a3b8' },
+                { label: 'Included',       val: bs.inc,      color: '#60a5fa' },
+                { label: 'NA',             val: bs.na,       color: '#f87171' },
+              ].filter(s => s.val > 0);
+              const total = segments.reduce((s, x) => s + x.val, 0);
+              if (total === 0) return <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', padding: '8px 0' }}>No data</div>;
+              // Build SVG donut arcs
+              const cx = 60, cy = 60, ro = 52, ri = 32;
+              function polar(cx: number, cy: number, r: number, angle: number) {
+                return [cx + r * Math.cos(angle - Math.PI / 2), cy + r * Math.sin(angle - Math.PI / 2)];
+              }
+              function arc(cx: number, cy: number, ro: number, ri: number, startAngle: number, endAngle: number, color: string, key: string) {
+                const large = endAngle - startAngle > Math.PI ? 1 : 0;
+                const [ox1, oy1] = polar(cx, cy, ro, startAngle);
+                const [ox2, oy2] = polar(cx, cy, ro, endAngle);
+                const [ix1, iy1] = polar(cx, cy, ri, endAngle);
+                const [ix2, iy2] = polar(cx, cy, ri, startAngle);
+                return (
+                  <path
+                    key={key}
+                    d={`M ${ox1} ${oy1} A ${ro} ${ro} 0 ${large} 1 ${ox2} ${oy2} L ${ix1} ${iy1} A ${ri} ${ri} 0 ${large} 0 ${ix2} ${iy2} Z`}
+                    fill={color}
+                    stroke="var(--color-background-primary)"
+                    strokeWidth={1.5}
+                  />
+                );
+              }
+              let angle = 0;
+              const paths = segments.map(s => {
+                const span = (s.val / total) * 2 * Math.PI;
+                const path = arc(cx, cy, ro, ri, angle, angle + span, s.color, s.label);
+                angle += span;
+                return path;
+              });
+              return (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                  <svg width={120} height={120} style={{ flexShrink: 0 }}>
+                    {paths}
+                    <text x={cx} y={cy - 6} textAnchor="middle" fontSize={18} fontWeight={700} fill="var(--color-text-primary)">{total}</text>
+                    <text x={cx} y={cy + 10} textAnchor="middle" fontSize={9} fill="var(--color-text-tertiary)">trades</text>
+                  </svg>
+                  <div style={{ flex: 1, fontSize: 12 }}>
+                    {segments.map(s => (
+                      <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 0' }}>
+                        <span style={{ width: 9, height: 9, borderRadius: 2, background: s.color, flexShrink: 0, display: 'inline-block' }} />
+                        <span style={{ flex: 1, color: 'var(--color-text-secondary)' }}>{s.label}</span>
+                        <span style={{ fontWeight: 600 }}>{s.val}</span>
+                        <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)', minWidth: 32, textAlign: 'right' }}>{(s.val / total * 100).toFixed(0)}%</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
           </SideCard>
 
           <SideCard title="New Budget rule" icon="ti-info-circle">
@@ -841,17 +1096,11 @@ function DetailedView({
               <div style={{ padding: '4px 0' }}><b style={{ color: 'var(--color-text-primary)' }}>Finalized exists</b> → New = Finalized</div>
               <div style={{ padding: '4px 0' }}><b style={{ color: 'var(--color-text-primary)' }}>No bid yet</b> → New = Estimated (carry-forward)</div>
               <div style={{ padding: '4px 0' }}><b style={{ color: 'var(--color-text-primary)' }}>Included / NA</b> → mirrors that token</div>
-              <div style={{ marginTop: 8, paddingTop: 8, borderTop: '0.5px solid var(--color-border-tertiary)', fontSize: 11.5 }}>
-                3 documented exceptions — rule does NOT auto-apply: Structure, Site safety coordination, Lighting Material. Flagged with{' '}
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, padding: '1px 6px', borderRadius: 999, background: 'var(--warn-bg)', color: 'var(--warn-fg)', fontSize: 9, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', border: '1px solid rgba(186,117,23,0.35)' }}>
-                  <i className="ti ti-edit" style={{ fontSize: 9 }} /> Manual
-                </span>.
-              </div>
             </div>
           </SideCard>
 
           {(() => {
-            const mismatches = project.trades.filter(t => t.finMismatch && t.awardedBid !== undefined && typeof t.fin === 'number');
+            const mismatches = filteredTrades.filter(t => (t as any).finMismatch && (t as any).awardedBid !== undefined && typeof t.fin === 'number');
             if (mismatches.length === 0) return null;
             return (
               <div style={{ background: 'var(--color-background-primary)', border: '0.5px solid var(--color-border-tertiary)', borderLeft: '3px solid #f59e0b', borderRadius: 'var(--border-radius-lg)', padding: '16px 18px', marginBottom: 14 }}>
@@ -864,21 +1113,21 @@ function DetailedView({
                 </div>
                 {mismatches.map(t => {
                   const fin = t.fin as number;
-                  const diff = fin - (t.awardedBid as number);
+                  const diff = fin - ((t as any).awardedBid as number);
                   return (
                     <div key={t.trade} style={{ padding: '8px 0', borderTop: '0.5px solid var(--color-border-tertiary)' }}>
                       <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.trade}</div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--color-text-secondary)', marginBottom: 6 }}>
                         <span>Override: ${fin.toLocaleString()}</span>
-                        <span>Awarded: ${(t.awardedBid as number).toLocaleString()}</span>
+                        <span>Awarded: ${((t as any).awardedBid as number).toLocaleString()}</span>
                       </div>
                       <div style={{ fontSize: 10, color: diff > 0 ? '#dc2626' : '#16a34a', marginBottom: 6 }}>
                         {diff > 0 ? '+' : ''}${Math.abs(diff).toLocaleString()} difference
                       </div>
                       <ReconcileButton
-                        label={`Use awarded ($${(t.awardedBid as number).toLocaleString()})`}
-                        taskId={t.taskId!}
-                        value={t.awardedBid as number}
+                        label={`Use awarded ($${((t as any).awardedBid as number).toLocaleString()})`}
+                        taskId={(t as any).taskId!}
+                        value={(t as any).awardedBid as number}
                       />
                     </div>
                   );
@@ -892,44 +1141,13 @@ function DetailedView({
   );
 }
 
-function MatrixView({ onGoDetailed }: { onGoDetailed: () => void }) {
-  return (
-    <div style={{ textAlign: 'center', padding: '48px 24px', maxWidth: 680, margin: '24px auto' }}>
-      <div style={{
-        width: 48, height: 48, borderRadius: 999,
-        background: 'var(--color-background-secondary)',
-        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-        marginBottom: 14,
-      }}>
-        <i className="ti ti-table-off" style={{ fontSize: 22, color: 'var(--color-text-tertiary)' }} />
-      </div>
-      <h2 style={{ margin: '0 0 8px', fontSize: 15, fontWeight: 500, justifyContent: 'center', display: 'block' }}>
-        Matrix view lives on the Bidding dashboard
-      </h2>
-      <p style={{ margin: '0 auto', fontSize: 12.5, color: 'var(--color-text-secondary)', lineHeight: 1.55, maxWidth: 480 }}>
-        Budget has a single source of truth — the per-trade table in{' '}
-        <button onClick={onGoDetailed} style={{ background: 'none', border: 'none', color: 'var(--color-text-info)', cursor: 'pointer', padding: 0, fontSize: 12.5, fontFamily: 'inherit' }}>Detailed view</button>
-        {' '}— so a separate matrix layout doesn&apos;t add a new angle. The Trade × Sub matrix with the 8-color status palette lives on the{' '}
-        <Link href="/bidding" style={{ color: 'var(--color-text-info)' }}>Bidding dashboard</Link>.
-      </p>
-      <div style={{ display: 'inline-flex', gap: 8, marginTop: 18 }}>
-        <button onClick={onGoDetailed} style={{ height: 32, padding: '0 13px', borderRadius: 'var(--border-radius-md)', border: '0.5px solid var(--color-border-secondary)', fontSize: 12.5, background: 'var(--color-background-primary)', color: 'var(--color-text-primary)', cursor: 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-          <i className="ti ti-list-details" /> Open Detailed view
-        </button>
-        <Link href="/bidding" style={{ height: 32, padding: '0 13px', borderRadius: 'var(--border-radius-md)', border: '0.5px solid var(--lib-black)', background: 'var(--lib-black)', color: '#fff', fontSize: 12.5, display: 'inline-flex', alignItems: 'center', gap: 6, textDecoration: 'none' }}>
-          <i className="ti ti-gavel" /> Switch to Bidding dashboard
-        </Link>
-      </div>
-    </div>
-  );
-}
-
 // ──────────────────────────────────────────────────────────────
 // VarianceView
 // ──────────────────────────────────────────────────────────────
-function VarianceView({ onBack }: { onBack: () => void }) {
+function VarianceView({ onBack, search }: { onBack: () => void; search?: string }) {
   const { project } = useBudget();
-  const trades = project.trades;
+  const q = search?.toLowerCase().trim() || '';
+  const trades = q ? project.trades.filter(r => r.trade.toLowerCase().includes(q)) : project.trades;
   const [drawerTrade, setDrawerTrade] = useState<BudgetTrade | null>(null);
   const closeDrawer = useCallback(() => setDrawerTrade(null), []);
 
@@ -980,9 +1198,9 @@ function VarianceView({ onBack }: { onBack: () => void }) {
       >
         <div style={{ fontSize: 12.5, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 6 }}>
           <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.trade}</span>
-          {r.finMismatch && (
+          {(r as any).finMismatch && (
             <span
-              title={`Updated Budget ($${r.fin?.toLocaleString()}) differs from awarded bid ($${r.awardedBid?.toLocaleString()} — ${r.awardedSubName}). Open Reconcile to resolve.`}
+              title={`Updated Budget ($${r.fin?.toLocaleString()}) differs from awarded bid ($${(r as any).awardedBid?.toLocaleString()} — ${(r as any).awardedSubName}). Open Reconcile to resolve.`}
               style={{
                 display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                 width: 16, height: 16, borderRadius: 3, background: '#fef3c7',
@@ -990,7 +1208,6 @@ function VarianceView({ onBack }: { onBack: () => void }) {
               }}
             >!</span>
           )}
-          {r.manual && <ManualBadge />}
         </div>
         {/* bar */}
         <div style={{ position: 'relative', height: 14 }}>
@@ -1018,10 +1235,8 @@ function VarianceView({ onBack }: { onBack: () => void }) {
       <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginBottom: 12, display: 'flex', gap: 6, alignItems: 'center' }}>
         <button onClick={onBack} style={{ background: 'none', border: 'none', color: 'var(--color-text-info)', cursor: 'pointer', padding: 0, fontSize: 12, fontFamily: 'inherit' }}>Portfolio</button>
         <i className="ti ti-chevron-right" style={{ fontSize: 14, opacity: 0.6 }} />
-        <span>800 Brady Ave · Budget</span>
+        <span>{project.name} · Variance</span>
       </div>
-
-      <ProjectHeroCard onBack={onBack} />
 
       {/* 4-KPI strip */}
       {(() => {
@@ -1117,7 +1332,6 @@ function VarianceView({ onBack }: { onBack: () => void }) {
               <span style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0, flex: 1 }}>{r.trade}</span>
               {pill}
               {isMoney(r.est) && <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', whiteSpace: 'nowrap' }}>est {fmt$(r.est)} → carries forward</span>}
-              {r.manual && <ManualBadge />}
             </div>
           );
         })}
@@ -1143,10 +1357,12 @@ function VarianceView({ onBack }: { onBack: () => void }) {
 // ──────────────────────────────────────────────────────────────
 // TreemapView
 // ──────────────────────────────────────────────────────────────
-function TreemapView({ onBack }: { onBack: () => void }) {
+function TreemapView({ onBack, search }: { onBack: () => void; search?: string }) {
   const { project } = useBudget();
-  const trades = project.trades;
+  const q = search?.toLowerCase().trim() || '';
+  const trades = q ? project.trades.filter(r => r.trade.toLowerCase().includes(q)) : project.trades;
   const bs = computeStats(trades);
+  const [tooltip, setTooltip] = useState<{text: string; x: number; y: number} | null>(null);
 
   // Numeric newv trades
   const numericTrades = trades.filter(r => isMoney(r.newv)).map(r => ({ r, val: r.newv as number }));
@@ -1211,10 +1427,8 @@ function TreemapView({ onBack }: { onBack: () => void }) {
       <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginBottom: 12, display: 'flex', gap: 6, alignItems: 'center' }}>
         <button onClick={onBack} style={{ background: 'none', border: 'none', color: 'var(--color-text-info)', cursor: 'pointer', padding: 0, fontSize: 12, fontFamily: 'inherit' }}>Portfolio</button>
         <i className="ti ti-chevron-right" style={{ fontSize: 14, opacity: 0.6 }} />
-        <span>800 Brady Ave · Budget</span>
+        <span>{project.name} · Treemap</span>
       </div>
-
-      <ProjectHeroCard onBack={onBack} />
 
       {/* 4-KPI strip */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, marginBottom: '1.25rem' }}>
@@ -1227,7 +1441,7 @@ function TreemapView({ onBack }: { onBack: () => void }) {
       {/* Treemap section */}
       <div style={{ background: 'var(--color-background-primary)', border: '0.5px solid var(--color-border-tertiary)', borderRadius: 'var(--border-radius-lg)', padding: '18px 20px', marginBottom: '1.25rem' }}>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 10 }}>
-          <h2 style={{ margin: 0, fontSize: 13, fontWeight: 500 }}>Spend treemap · 800 Brady</h2>
+          <h2 style={{ margin: 0, fontSize: 13, fontWeight: 500 }}>Spend treemap · {project.name}</h2>
           <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginLeft: 'auto' }}>area = New Budget · color = % variance vs estimated · hover for details</span>
         </div>
         {/* Color legend */}
@@ -1263,7 +1477,15 @@ function TreemapView({ onBack }: { onBack: () => void }) {
             return (
               <div
                 key={r.trade}
-                title={`${r.trade}\nNew Budget: ${fmt$(val)}\n${dp !== null ? `Δ vs est: ${dpStr}` : 'Estimate-only'}`}
+                onMouseEnter={(e) => {
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  setTooltip({
+                    text: `${r.trade}\n${fmt$(val)}${dp !== null ? `\n${dp < 0 ? '−' : '+'}${Math.abs(dp).toFixed(1)}% vs est` : '\nEstimate-only'}`,
+                    x: rect.left + rect.width / 2,
+                    y: rect.top,
+                  });
+                }}
+                onMouseLeave={() => setTooltip(null)}
                 style={{
                   flexBasis: `max(4%, ${flexBasis}%)`,
                   flexGrow: val,
@@ -1274,7 +1496,7 @@ function TreemapView({ onBack }: { onBack: () => void }) {
                   borderRadius: 4,
                   padding: isLarge ? '8px 10px' : '4px 6px',
                   overflow: 'hidden',
-                  cursor: 'default',
+                  cursor: 'pointer',
                   border: '0.5px solid rgba(0,0,0,0.07)',
                 }}
               >
@@ -1290,6 +1512,28 @@ function TreemapView({ onBack }: { onBack: () => void }) {
             );
           })}
         </div>
+        {tooltip && (
+          <div style={{
+            position: 'fixed',
+            left: tooltip.x,
+            top: tooltip.y - 8,
+            transform: 'translate(-50%, -100%)',
+            background: 'rgba(20,20,20,0.95)',
+            color: '#fff',
+            padding: '7px 11px',
+            borderRadius: 7,
+            fontSize: 11.5,
+            pointerEvents: 'none',
+            zIndex: 9999,
+            whiteSpace: 'pre',
+            lineHeight: 1.65,
+            boxShadow: '0 4px 16px rgba(0,0,0,0.35)',
+            fontFamily: 'inherit',
+            letterSpacing: 0,
+          }}>
+            {tooltip.text}
+          </div>
+        )}
       </div>
 
       {/* Top 8 by $ value */}
@@ -1380,9 +1624,10 @@ const WORK_PACKAGES = [
   },
 ];
 
-function CategoriesView({ onBack }: { onBack: () => void }) {
+function CategoriesView({ onBack, search }: { onBack: () => void; search?: string }) {
   const { project } = useBudget();
-  const trades = project.trades;
+  const q = search?.toLowerCase().trim() || '';
+  const trades = q ? project.trades.filter(r => r.trade.toLowerCase().includes(q)) : project.trades;
   const [openPkg, setOpenPkg] = useState<string | null>(null);
   const [allOpen, setAllOpen] = useState(false);
 
@@ -1433,17 +1678,15 @@ function CategoriesView({ onBack }: { onBack: () => void }) {
       <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginBottom: 12, display: 'flex', gap: 6, alignItems: 'center' }}>
         <button onClick={onBack} style={{ background: 'none', border: 'none', color: 'var(--color-text-info)', cursor: 'pointer', padding: 0, fontSize: 12, fontFamily: 'inherit' }}>Portfolio</button>
         <i className="ti ti-chevron-right" style={{ fontSize: 14, opacity: 0.6 }} />
-        <span>800 Brady Ave · Budget</span>
+        <span>{project.name} · Categories</span>
       </div>
-
-      <ProjectHeroCard onBack={onBack} />
 
       {/* 3-step KPI flow */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 0, marginBottom: '1.25rem', flexWrap: 'wrap' }}>
         {[
           { label: 'TOTAL ESTIMATED', value: fmt$(bs.est), sub: 'baseline · all numeric trades', tone: 'default' as Tone },
           null,
-          { label: 'NEW BUDGET', value: fmt$(bs.newv), sub: 'auto-rule + manual overrides', tone: 'good' as Tone },
+          { label: 'NEW BUDGET', value: fmt$(bs.newv), sub: 'finalized or carry-forward', tone: 'good' as Tone },
           null,
           { label: 'NET Δ VS ESTIMATED', value: (netDelta < 0 ? '−' : netDelta > 0 ? '+' : '') + fmt$(Math.abs(netDelta)), sub: netPct.toFixed(1) + '% vs estimated', tone: (netDelta < 0 ? 'good' : netDelta > 0 ? 'danger' : 'default') as Tone },
         ].map((item, i) => {
@@ -1542,7 +1785,6 @@ function CategoriesView({ onBack }: { onBack: () => void }) {
                   <div key={r.trade} style={{ display: 'grid', gridTemplateColumns: '1fr 110px 110px 120px', alignItems: 'center', gap: 8, padding: '6px 0', borderBottom: '0.5px solid var(--color-border-tertiary)', fontSize: 12 }}>
                     <span style={{ fontWeight: 500 }}>
                       {r.trade}
-                      {r.manual && <ManualBadge />}
                     </span>
                     <span style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}><MoneyToken v={r.est} dim={!isMoney(r.est)} /></span>
                     <span style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}><MoneyToken v={r.newv} bold dim={!isMoney(r.newv)} /></span>
@@ -1566,37 +1808,88 @@ function CategoriesView({ onBack }: { onBack: () => void }) {
 // ──────────────────────────────────────────────────────────────
 // MAIN
 // ──────────────────────────────────────────────────────────────
-type BudgetMode = 'table' | 'variance' | 'treemap' | 'categories';
-type BudgetTableView = 'overview' | 'detailed' | 'matrix';
+type ProjectTab = 'table' | 'variance' | 'treemap' | 'categories';
 
-export function BudgetDashboard() {
-  const [mode, setMode] = useState<BudgetMode>('table');
-  const [tableView, setTableView] = useState<BudgetTableView>('overview');
-  const [drawerTrade, setDrawerTrade] = useState<BudgetTrade | null>(null);
+const PROJECT_TABS: { id: ProjectTab; label: string; icon: string }[] = [
+  { id: 'table',      label: 'Table',      icon: 'ti-list-details' },
+  { id: 'variance',   label: 'Variance',   icon: 'ti-chart-bar' },
+  { id: 'treemap',    label: 'Treemap',    icon: 'ti-layout-grid' },
+  { id: 'categories', label: 'Categories', icon: 'ti-list-tree' },
+];
+
+export function BudgetDashboard({ projectId }: { projectId?: string } = {}) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const tab = (searchParams?.get('tab') ?? 'table') as ProjectTab;
   const [search, setSearch] = useState('');
-  const [selectedProject, setSelectedProject] = useState<string>('');
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [drawerTrade, setDrawerTrade] = useState<BudgetTrade | null>(null);
   const closeDrawer = useCallback(() => setDrawerTrade(null), []);
 
-  // SWR URL includes projectId once the user (or the first-load effect) has picked a project.
-  const swrUrl = selectedProject
-    ? `/api/budget?projectId=${encodeURIComponent(selectedProject)}`
-    : '/api/budget';
+  const navigateToProject = useCallback(
+    (id: string) => router.push(`/budget/${encodeURIComponent(id)}`),
+    [router],
+  );
+  const navigateToPortfolio = useCallback(() => router.push('/budget'), [router]);
+  const setTab = useCallback(
+    (newTab: ProjectTab) => {
+      if (!projectId) return;
+      const params = new URLSearchParams(searchParams?.toString() ?? '');
+      params.set('tab', newTab);
+      router.push(`/budget/${encodeURIComponent(projectId)}?${params.toString()}`);
+    },
+    [router, projectId, searchParams],
+  );
 
-  const { data, isLoading } = useSWR<BudgetPayload>(swrUrl, fetcher, {
-    refreshInterval: 300_000,
-    revalidateOnFocus: false,
-    dedupingInterval: 60_000,
-  });
+  // Portfolio data — only fetched in portfolio mode
+  const { data: portfolioData, isLoading: portfolioLoading } = useSWR<BudgetPortfolioPayload>(
+    projectId ? null : '/api/budget/portfolio',
+    portfolioFetcher,
+    { refreshInterval: 300_000, revalidateOnFocus: false, dedupingInterval: 60_000 },
+  );
 
-  // Lock in the first real project after the initial load.
-  useEffect(() => {
-    if (data && !selectedProject) {
-      const first = data.portfolioProjects.find(p => p.real) ?? data.portfolioProjects[0];
-      if (first) setSelectedProject(first.name);
+  // Per-project data — only fetched in project mode
+  const { data: projectData, isLoading: projectLoading } = useSWR<BudgetPayload>(
+    projectId ? `/api/budget/project/${encodeURIComponent(projectId)}` : null,
+    fetcher,
+    { refreshInterval: 300_000, revalidateOnFocus: false, dedupingInterval: 60_000 },
+  );
+
+  const isLoading = projectId ? projectLoading : portfolioLoading;
+
+  const syncedAt = projectId
+    ? (projectData?.syncedAt ?? null)
+    : (portfolioData?.syncedAt ?? null);
+
+  const subtitle = useMemo(() => {
+    if (projectId) {
+      if (!projectData) return 'Loading…';
+      const bs = computeStats(projectData.project.trades);
+      return `${projectData.project.name} · ${projectData.project.trades.length} trades · ${fmt$(bs.newv)} new budget`;
     }
-  }, [data, selectedProject]);
+    if (!portfolioData) return 'Loading…';
+    return `${portfolioData.projects.length} projects · live from ClickUp`;
+  }, [projectId, projectData, portfolioData]);
 
-  if (isLoading || !data) {
+  // Project names for the picker — populated from whichever payload is available
+  const allProjectNames = useMemo(() => {
+    if (projectData) return projectData.portfolioProjects.map((p) => p.name);
+    if (portfolioData) return portfolioData.projects.map((p) => p.name);
+    return [];
+  }, [projectData, portfolioData]);
+
+  // Trade name suggestions for search autocomplete (per-project mode only)
+  const suggestions = useMemo(() => {
+    if (!search.trim() || !projectId || !projectData) return [];
+    const q = search.toLowerCase();
+    return projectData.project.trades
+      .map(t => t.trade)
+      .filter(name => name.toLowerCase().includes(q))
+      .slice(0, 8);
+  }, [search, projectId, projectData]);
+
+  // Loading skeleton
+  if (isLoading || (projectId ? !projectData : !portfolioData)) {
     return (
       <div className="dashboard-shell">
         <LogoHeader title="Budget Dashboard" subtitleOverride="Loading from ClickUp…" syncedAt={null} />
@@ -1608,66 +1901,51 @@ export function BudgetDashboard() {
     );
   }
 
-  if (data.warning) {
+  // No-token warning (portfolio mode)
+  if (!projectId && portfolioData!.source === 'empty') {
     return (
       <div className="dashboard-shell">
-        <LogoHeader title="Budget Dashboard" subtitleOverride={data.warning} syncedAt={null} />
+        <LogoHeader title="Budget Dashboard" subtitleOverride="No ClickUp token" syncedAt={null} />
         <div style={{ padding: '32px 24px', color: 'var(--color-text-secondary)', fontSize: 13, lineHeight: 1.6 }}>
-          <strong>No data available.</strong> {data.warning}
+          <strong>No data available.</strong> Add <code>CLICKUP_API_TOKEN</code> to{' '}
+          <code>.env.local</code> to load live data.
         </div>
       </div>
     );
   }
 
-  const { project, portfolioProjects } = data;
-  const n = project.trades.length;
-
-  const titleMap: Record<BudgetMode, string> = {
-    table: 'Budget Dashboard',
-    variance: 'Budget · Variance Ranking',
-    treemap: 'Budget · Spend Treemap',
-    categories: 'Budget · Category Rollup',
-  };
-
-  const subtitleMap: Record<BudgetMode, string> = {
-    table: `${portfolioProjects.length} active projects · live from ClickUp`,
-    variance: `${project.name} · ${n} trades · sorted by $ delta`,
-    treemap: `${project.name} · ${n} trades · area = New Budget · color = Δ vs estimated`,
-    categories: `${project.name} · ${n} trades grouped into 8 work-packages`,
-  };
-
-  const MODE_TABS: { id: BudgetMode; icon: string; label: string }[] = [
-    { id: 'table',      icon: 'ti-grid-dots',   label: 'Table' },
-    { id: 'variance',   icon: 'ti-chart-bar',   label: 'Variance' },
-    { id: 'treemap',    icon: 'ti-layout-grid', label: 'Treemap' },
-    { id: 'categories', icon: 'ti-list-tree',   label: 'Categories' },
-  ];
-
-  const TABLE_TABS: { id: BudgetTableView; icon: string; label: string }[] = [
-    { id: 'overview', icon: 'ti-grid-dots',    label: 'Overview' },
-    { id: 'detailed', icon: 'ti-list-details', label: 'Detailed' },
-    { id: 'matrix',   icon: 'ti-table',        label: 'Matrix' },
-  ];
+  // No-token warning (project mode)
+  if (projectId && projectData!.warning) {
+    return (
+      <div className="dashboard-shell">
+        <LogoHeader title="Budget Dashboard" subtitleOverride={projectData!.warning} syncedAt={null} />
+        <div style={{ padding: '32px 24px', color: 'var(--color-text-secondary)', fontSize: 13, lineHeight: 1.6 }}>
+          <strong>No data available.</strong> {projectData!.warning}
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <BudgetCtx.Provider value={data}>
     <div className="dashboard-shell">
       <LogoHeader
-        title={titleMap[mode]}
-        subtitleOverride={subtitleMap[mode]}
-        syncedAt={data.syncedAt || null}
+        title="Budget Dashboard"
+        subtitleOverride={subtitle}
+        syncedAt={syncedAt}
       />
 
-      {/* Filter bar */}
+      {/* Filter / navigation bar */}
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: '1.25rem' }}>
         {/* Search */}
         <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
           <i className="ti ti-search" style={{ position: 'absolute', left: 8, fontSize: 13, color: 'var(--color-text-tertiary)', pointerEvents: 'none' }} />
           <input
             type="search"
-            placeholder={mode === 'table' ? 'Search projects, trades…' : 'Search trades…'}
+            placeholder={projectId ? 'Search trades…' : 'Search trades, projects…'}
             value={search}
             onChange={e => setSearch(e.target.value)}
+            onFocus={() => setShowSuggestions(true)}
+            onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
             style={{
               height: 32, paddingLeft: 26, paddingRight: 8,
               border: '0.5px solid var(--color-border-secondary)',
@@ -1677,84 +1955,125 @@ export function BudgetDashboard() {
               fontFamily: 'inherit', fontSize: 13, width: 200, outline: 'none',
             }}
           />
+          {suggestions.length > 0 && showSuggestions && (
+            <div style={{
+              position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 4,
+              background: 'var(--color-background-primary)',
+              border: '0.5px solid var(--color-border-secondary)',
+              borderRadius: 'var(--border-radius-md)',
+              boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
+              zIndex: 100, overflow: 'hidden',
+            }}>
+              {suggestions.map(name => (
+                <button
+                  key={name}
+                  type="button"
+                  onMouseDown={() => { setSearch(name); setShowSuggestions(false); }}
+                  style={{
+                    display: 'block', width: '100%', textAlign: 'left',
+                    padding: '8px 12px', fontSize: 12.5,
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    color: 'var(--color-text-primary)', fontFamily: 'inherit',
+                    borderBottom: '0.5px solid var(--color-border-tertiary)',
+                  }}
+                  onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-background-secondary)')}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+                >
+                  {name}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
-        {/* Portfolio dropdown */}
+        {/* Project picker */}
         <select
-          style={{ height: 32, padding: '0 10px', border: '0.5px solid var(--color-border-secondary)', borderRadius: 'var(--border-radius-md)', background: 'var(--color-background-primary)', color: 'var(--color-text-primary)', fontFamily: 'inherit', fontSize: 13, minWidth: 200, fontWeight: 500 }}
-          value={selectedProject}
-          onChange={e => setSelectedProject(e.target.value)}
+          value={projectId ?? ''}
+          onChange={(e) => {
+            if (!e.target.value) navigateToPortfolio();
+            else navigateToProject(e.target.value);
+          }}
+          style={{
+            height: 32, padding: '0 10px',
+            border: '0.5px solid var(--color-border-secondary)',
+            borderRadius: 'var(--border-radius-md)',
+            background: 'var(--color-background-primary)',
+            color: 'var(--color-text-primary)',
+            fontFamily: 'inherit', fontSize: 13, minWidth: 200, fontWeight: 500,
+          }}
         >
-          {portfolioProjects.filter(p => p.real).map(p => (
-            <option key={p.name} value={p.name}>★ {p.name}</option>
+          <option value="">★ All projects</option>
+          {allProjectNames.map(name => (
+            <option key={name} value={name}>{name}</option>
           ))}
         </select>
 
-        {/* Primary mode tabs */}
-        <div style={{ display: 'flex', gap: 4, padding: 4, background: 'var(--color-background-secondary)', borderRadius: 'var(--border-radius-md)' }}>
-          {MODE_TABS.map(tab => (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => setMode(tab.id)}
-              style={{
-                padding: '6px 14px', fontSize: 13, borderRadius: 'var(--border-radius-md)',
-                cursor: 'pointer', border: mode === tab.id ? '0.5px solid var(--color-border-secondary)' : '0.5px solid transparent',
-                background: mode === tab.id ? 'var(--color-background-primary)' : 'transparent',
-                color: mode === tab.id ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
-                fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 4,
-                fontWeight: mode === tab.id ? 500 : 400,
-              }}
-            >
-              <i className={`ti ${tab.icon}`} style={{ fontSize: 14 }} />
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Size tabs — only in Table mode */}
-        {mode === 'table' && (
-          <div style={{ display: 'flex', gap: 4, padding: 4, background: 'var(--color-background-secondary)', borderRadius: 'var(--border-radius-md)', marginLeft: 'auto' }}>
-            {TABLE_TABS.map(tab => (
+        {/* Tab strip — per-project mode only */}
+        {projectId && (
+          <div style={{
+            display: 'flex', gap: 4, padding: 4,
+            background: 'var(--color-background-secondary)',
+            borderRadius: 'var(--border-radius-md)',
+            marginLeft: 'auto',
+          }}>
+            {PROJECT_TABS.map(t => (
               <button
-                key={tab.id}
+                key={t.id}
                 type="button"
-                onClick={() => setTableView(tab.id)}
+                onClick={() => setTab(t.id)}
                 style={{
                   padding: '6px 14px', fontSize: 13, borderRadius: 'var(--border-radius-md)',
-                  cursor: 'pointer', border: tableView === tab.id ? '0.5px solid var(--color-border-secondary)' : '0.5px solid transparent',
-                  background: tableView === tab.id ? 'var(--color-background-primary)' : 'transparent',
-                  color: tableView === tab.id ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
+                  cursor: 'pointer',
+                  border: tab === t.id ? '0.5px solid var(--color-border-secondary)' : '0.5px solid transparent',
+                  background: tab === t.id ? 'var(--color-background-primary)' : 'transparent',
+                  color: tab === t.id ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
                   fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 4,
-                  fontWeight: tableView === tab.id ? 500 : 400,
+                  fontWeight: tab === t.id ? 500 : 400,
                 }}
               >
-                <i className={`ti ${tab.icon}`} style={{ fontSize: 14 }} />
-                {tab.label}
+                <i className={`ti ${t.icon}`} style={{ fontSize: 14 }} />
+                {t.label}
               </button>
             ))}
           </div>
         )}
       </div>
 
-      {/* Mode content */}
-      {mode === 'table' && tableView === 'overview' && <OverviewView onGoBrady={() => setMode('variance')} />}
-      {mode === 'table' && tableView === 'detailed' && <DetailedView onGoOverview={() => setTableView('overview')} onTradeClick={setDrawerTrade} />}
-      {mode === 'table' && tableView === 'matrix' && <MatrixView onGoDetailed={() => setTableView('detailed')} />}
-      {mode === 'variance'   && <VarianceView   onBack={() => setMode('table')} />}
-      {mode === 'treemap'    && <TreemapView    onBack={() => setMode('table')} />}
-      {mode === 'categories' && <CategoriesView onBack={() => setMode('table')} />}
+      {/* Content — portfolio mode */}
+      {!projectId && (
+        <PortfolioBudgetView
+          portfolioData={portfolioData!}
+          onNavigateToProject={navigateToProject}
+          search={search}
+        />
+      )}
+
+      {/* Content — per-project mode */}
+      {projectId && projectData && (
+        <BudgetCtx.Provider value={projectData}>
+          {tab === 'table' && (
+            <DetailedView
+              onGoOverview={navigateToPortfolio}
+              onTradeClick={setDrawerTrade}
+              search={search}
+            />
+          )}
+          {tab === 'variance' && <VarianceView onBack={navigateToPortfolio} search={search} />}
+          {tab === 'treemap' && <TreemapView onBack={navigateToPortfolio} search={search} />}
+          {tab === 'categories' && <CategoriesView onBack={navigateToPortfolio} search={search} />}
+        </BudgetCtx.Provider>
+      )}
 
       {/* Footer */}
       <div style={{ marginTop: '1.5rem', textAlign: 'center', padding: '14px 0 6px', fontSize: 11.5, color: 'var(--color-text-tertiary)', lineHeight: 1.6 }}>
         Live from ClickUp · 60-second cache · click any trade row to open in ClickUp
         <span style={{ display: 'block', marginTop: 4, fontSize: 11 }}>
-          Variance bar = New − Estimated · &quot;Manual&quot; = auto-rule overridden
+          Variance bar = New Budget − Estimated
         </span>
       </div>
 
       <Drawer open={drawerTrade !== null} trade={drawerTrade} onClose={closeDrawer} />
     </div>
-    </BudgetCtx.Provider>
   );
 }
+
