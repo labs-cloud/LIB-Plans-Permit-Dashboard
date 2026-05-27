@@ -45,7 +45,7 @@ function getCurrency(task: ClickUpTask, id: string): number | null {
   const f = getFieldById(task, id);
   if (!f || f.value == null) return null;
   const n = Number(f.value);
-  return Number.isFinite(n) && n >= 0 ? n : null;
+  return Number.isFinite(n) && n > 0 ? n : null;
 }
 
 // Auto-rule: if an Updated Budget override exists use it; otherwise carry-forward the estimate.
