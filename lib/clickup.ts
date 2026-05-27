@@ -113,6 +113,19 @@ export async function getTask(taskId: string): Promise<ClickUpTask> {
   return clickupFetch<ClickUpTask>(`/task/${encodeURIComponent(taskId)}`);
 }
 
+// Update a single custom field on a task. Used by the budget reconcile endpoint
+// to write the chosen value back to ClickUp's "Updated Budget" field.
+export async function updateTaskCustomField(
+  taskId: string,
+  fieldId: string,
+  value: number,
+): Promise<void> {
+  await clickupFetch<unknown>(
+    `/task/${encodeURIComponent(taskId)}/field/${encodeURIComponent(fieldId)}`,
+    { method: 'POST', body: JSON.stringify({ value }) },
+  );
+}
+
 // includeSubtasks=true is required for per-project "02. Bidding" lists, which use a
 // parent/subtask hierarchy: root tasks = Trade rows, subtasks = Sub rows. Without it
 // only the Trade parent tasks are returned and all sub bid data is missing.

@@ -15,6 +15,12 @@ export interface BudgetTrade {
   hasDuplicate?: boolean;
   /** ClickUp URLs of the duplicate tasks that were dropped during dedup. */
   duplicateTaskUrls?: string[];
+  /** Bid amount of the sub with Awarded status in the bidding list. */
+  awardedBid?: number;
+  /** Name of the awarded sub. */
+  awardedSubName?: string;
+  /** True when the Updated Budget override exists but doesn't match the awarded sub's bid. */
+  finMismatch?: boolean;
 }
 
 export interface BudgetProject {

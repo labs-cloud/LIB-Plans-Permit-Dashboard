@@ -1,5 +1,6 @@
 import type { ClickUpCustomFieldValue, ClickUpTask } from './clickup';
 import type { BudgetTrade, BudgetProject, MoneyVal } from './budget-types';
+import type { AwardedBidEntry } from './bidding-lows';
 import { CLICKUP } from './constants';
 
 const F = CLICKUP.FIELD;
@@ -41,10 +42,13 @@ interface RawEntry {
   costType: 'hard' | 'soft';
   status: string;
   dateUpdated: string | null | undefined;
+  awardedBid: number | null;
+  awardedSubName: string | null;
+  finMismatch: boolean;
 }
 
 function taskUrl(taskId: string): string {
-  return `${CLICKUP.BASE_URL}/t/${taskId}`;
+  return `https://app.clickup.com/t/${taskId}`;
 }
 
 // Dedup by (costType, tradeName): prefer non-zero Budget Allocated; tie-break by most-recent date_updated.
@@ -69,6 +73,9 @@ function dedup(entries: RawEntry[]): BudgetTrade[] {
         costType: e.costType,
         status: e.status,
         taskId: e.taskId,
+        awardedBid: e.awardedBid ?? undefined,
+        awardedSubName: e.awardedSubName ?? undefined,
+        finMismatch: e.finMismatch || undefined,
       });
       continue;
     }
@@ -92,6 +99,9 @@ function dedup(entries: RawEntry[]): BudgetTrade[] {
       taskId: winner.taskId,
       hasDuplicate: true,
       duplicateTaskUrls: losers.map(l => taskUrl(l.taskId)),
+      awardedBid: winner.awardedBid ?? undefined,
+      awardedSubName: winner.awardedSubName ?? undefined,
+      finMismatch: winner.finMismatch || undefined,
     });
   }
   return result;
@@ -105,12 +115,34 @@ export function transformBudgetTasks(
   coordInitials: string,
   coordName: string,
   biddingLows?: Map<string, number>,
+  awardedBids?: Map<string, AwardedBidEntry>,
 ): BudgetProject {
   const entries: RawEntry[] = tasks.map(task => {
     const est: MoneyVal = getCurrency(task, F.BUDGET_ALLOC);
     const updatedBudget: MoneyVal = getCurrency(task, F.UPDATED_BUDGET);
     const biddingLow: number | null = biddingLows?.get(task.name.trim()) ?? null;
-    const fin: MoneyVal = updatedBudget !== null ? updatedBudget : biddingLow;
+    const awardedEntry = awardedBids?.get(task.name.trim());
+    const awardedBid: number | null = awardedEntry?.amount ?? null;
+    const awardedSubName: string | null = awardedEntry?.subName ?? null;
+
+    let fin: MoneyVal;
+    let finMismatch = false;
+
+    if (updatedBudget !== null) {
+      // Manual "Updated Budget" override takes priority.
+      fin = updatedBudget;
+      // Flag when the override diverges from the awarded sub's bid.
+      if (awardedBid !== null && Math.abs(updatedBudget - awardedBid) > 0.5) {
+        finMismatch = true;
+      }
+    } else if (awardedBid !== null) {
+      // No manual override — use awarded sub's bid as finalized value.
+      fin = awardedBid;
+    } else {
+      // Neither override nor awarded bid — fall back to mathematical minimum.
+      fin = biddingLow;
+    }
+
     const newv = deriveNewv(est, fin);
     const costType = getCostType(task);
     const status = task.status?.status ?? '';
@@ -124,6 +156,9 @@ export function transformBudgetTasks(
       costType,
       status,
       dateUpdated: task.date_updated,
+      awardedBid,
+      awardedSubName,
+      finMismatch,
     };
   });
 
