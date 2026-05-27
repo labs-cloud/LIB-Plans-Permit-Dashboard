@@ -354,7 +354,7 @@ function Drawer({
                   </div>
                 );
               })()}
-              {(trade as any).finMismatch && (trade as any).awardedBid !== undefined && (
+              {trade.finMismatch && trade.awardedBid !== undefined && (
                 <>
                   <h4 style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#92400e', margin: '16px 0 8px', background: '#fef3c7', padding: '4px 8px', borderRadius: 4 }}>
                     ⚠ Mismatch detected
@@ -365,18 +365,18 @@ function Drawer({
                       <span style={{ fontWeight: 600 }}>${(trade.fin as number).toLocaleString()}</span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '0.5px solid var(--color-border-tertiary)' }}>
-                      <span>Awarded bid ({(trade as any).awardedSubName})</span>
-                      <span style={{ fontWeight: 600 }}>${(trade as any).awardedBid.toLocaleString()}</span>
+                      <span>Awarded bid ({trade.awardedSubName})</span>
+                      <span style={{ fontWeight: 600 }}>${trade.awardedBid.toLocaleString()}</span>
                     </div>
                     <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 6 }}>
-                      Diff: {((trade.fin as number) - (trade as any).awardedBid) > 0 ? '+' : ''}${Math.abs((trade.fin as number) - (trade as any).awardedBid).toLocaleString()}
+                      Diff: {((trade.fin as number) - trade.awardedBid) > 0 ? '+' : ''}${Math.abs((trade.fin as number) - trade.awardedBid).toLocaleString()}
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
                     <ReconcileButton
                       label="Use awarded bid"
-                      taskId={(trade as any).taskId!}
-                      value={(trade as any).awardedBid}
+                      taskId={trade.taskId!}
+                      value={trade.awardedBid}
                       onSuccess={() => { /* drawer will refresh on next SWR poll */ }}
                     />
                   </div>
@@ -934,9 +934,9 @@ function DetailedView({
                       <td style={{ padding: '10px 12px', borderBottom: '0.5px solid var(--color-border-tertiary)', verticalAlign: 'middle', fontSize: 13, fontWeight: 500 }}>
                         <span style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                           {r.trade}
-                          {(r as any).finMismatch && (
+                          {r.finMismatch && (
                             <span
-                              title={`Updated Budget ($${r.fin?.toLocaleString()}) differs from awarded bid ($${(r as any).awardedBid?.toLocaleString()} — ${(r as any).awardedSubName}). Open Reconcile to resolve.`}
+                              title={`Updated Budget ($${r.fin?.toLocaleString()}) differs from awarded bid ($${r.awardedBid?.toLocaleString()} — ${r.awardedSubName}). Open Reconcile to resolve.`}
                               style={{
                                 display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                                 width: 16, height: 16, borderRadius: 3, background: '#fef3c7',
@@ -1100,7 +1100,7 @@ function DetailedView({
           </SideCard>
 
           {(() => {
-            const mismatches = filteredTrades.filter(t => (t as any).finMismatch && (t as any).awardedBid !== undefined && typeof t.fin === 'number');
+            const mismatches = filteredTrades.filter(t => t.finMismatch && t.awardedBid !== undefined && typeof t.fin === 'number');
             if (mismatches.length === 0) return null;
             return (
               <div style={{ background: 'var(--color-background-primary)', border: '0.5px solid var(--color-border-tertiary)', borderLeft: '3px solid #f59e0b', borderRadius: 'var(--border-radius-lg)', padding: '16px 18px', marginBottom: 14 }}>
@@ -1113,21 +1113,21 @@ function DetailedView({
                 </div>
                 {mismatches.map(t => {
                   const fin = t.fin as number;
-                  const diff = fin - ((t as any).awardedBid as number);
+                  const diff = fin - (t.awardedBid as number);
                   return (
                     <div key={t.trade} style={{ padding: '8px 0', borderTop: '0.5px solid var(--color-border-tertiary)' }}>
                       <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.trade}</div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--color-text-secondary)', marginBottom: 6 }}>
                         <span>Override: ${fin.toLocaleString()}</span>
-                        <span>Awarded: ${((t as any).awardedBid as number).toLocaleString()}</span>
+                        <span>Awarded: ${(t.awardedBid as number).toLocaleString()}</span>
                       </div>
                       <div style={{ fontSize: 10, color: diff > 0 ? '#dc2626' : '#16a34a', marginBottom: 6 }}>
                         {diff > 0 ? '+' : ''}${Math.abs(diff).toLocaleString()} difference
                       </div>
                       <ReconcileButton
-                        label={`Use awarded ($${((t as any).awardedBid as number).toLocaleString()})`}
-                        taskId={(t as any).taskId!}
-                        value={(t as any).awardedBid as number}
+                        label={`Use awarded ($${(t.awardedBid as number).toLocaleString()})`}
+                        taskId={t.taskId!}
+                        value={t.awardedBid as number}
                       />
                     </div>
                   );
@@ -1198,9 +1198,9 @@ function VarianceView({ onBack, search }: { onBack: () => void; search?: string 
       >
         <div style={{ fontSize: 12.5, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 6 }}>
           <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.trade}</span>
-          {(r as any).finMismatch && (
+          {r.finMismatch && (
             <span
-              title={`Updated Budget ($${r.fin?.toLocaleString()}) differs from awarded bid ($${(r as any).awardedBid?.toLocaleString()} — ${(r as any).awardedSubName}). Open Reconcile to resolve.`}
+              title={`Updated Budget ($${r.fin?.toLocaleString()}) differs from awarded bid ($${r.awardedBid?.toLocaleString()} — ${r.awardedSubName}). Open Reconcile to resolve.`}
               style={{
                 display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                 width: 16, height: 16, borderRadius: 3, background: '#fef3c7',
