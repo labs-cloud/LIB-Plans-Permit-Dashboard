@@ -9,6 +9,20 @@ function getFieldById(task: ClickUpTask, id: string): ClickUpCustomFieldValue | 
   return task.custom_fields?.find(f => f.id === id);
 }
 
+function getTradeType(task: ClickUpTask): 'biddable' | 'set' | undefined {
+  const f = getFieldById(task, F.TRADE_TYPE);
+  if (!f || f.value == null) return undefined;
+  const options = (f.type_config?.options ?? []) as Array<{ id: string; name: string; orderindex: number }>;
+  const numVal = Number(f.value);
+  const opt = Number.isFinite(numVal)
+    ? options.find(o => o.orderindex === numVal)
+    : options.find(o => o.id === String(f.value));
+  const name = (opt?.name ?? '').toLowerCase();
+  if (name.includes('biddable')) return 'biddable';
+  if (name.includes('set')) return 'set';
+  return undefined;
+}
+
 function getCostType(task: ClickUpTask): 'hard' | 'soft' {
   const f = getFieldById(task, F.COST_TYPE);
   if (!f || f.value == null) return 'hard';
@@ -41,6 +55,7 @@ interface RawEntry {
   newv: MoneyVal;
   costType: 'hard' | 'soft';
   status: string;
+  tradeType: 'biddable' | 'set' | undefined;
   dateUpdated: string | null | undefined;
   awardedBid: number | null;
   awardedSubName: string | null;
@@ -72,6 +87,7 @@ function dedup(entries: RawEntry[]): BudgetTrade[] {
         newv: e.newv,
         costType: e.costType,
         status: e.status,
+        tradeType: e.tradeType,
         taskId: e.taskId,
         awardedBid: e.awardedBid ?? undefined,
         awardedSubName: e.awardedSubName ?? undefined,
@@ -96,6 +112,7 @@ function dedup(entries: RawEntry[]): BudgetTrade[] {
       newv: winner.newv,
       costType: winner.costType,
       status: winner.status,
+      tradeType: winner.tradeType,
       taskId: winner.taskId,
       hasDuplicate: true,
       duplicateTaskUrls: losers.map(l => taskUrl(l.taskId)),
@@ -146,6 +163,7 @@ export function transformBudgetTasks(
     const newv = deriveNewv(est, fin);
     const costType = getCostType(task);
     const status = task.status?.status ?? '';
+    const tradeType = getTradeType(task);
 
     return {
       taskId: task.id,
@@ -155,6 +173,7 @@ export function transformBudgetTasks(
       newv,
       costType,
       status,
+      tradeType,
       dateUpdated: task.date_updated,
       awardedBid,
       awardedSubName,

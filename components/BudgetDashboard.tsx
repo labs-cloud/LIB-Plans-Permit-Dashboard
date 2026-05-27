@@ -626,14 +626,18 @@ function DetailedView({
   onGoOverview,
   onTradeClick,
   search,
+  tradeTypeFilter = 'all',
 }: {
   onGoOverview: () => void;
   onTradeClick: (t: BudgetTrade) => void;
   search?: string;
+  tradeTypeFilter?: 'all' | 'biddable' | 'set';
 }) {
   const { project } = useBudget();
   const q = search?.toLowerCase().trim() || '';
-  const filteredTrades = q ? project.trades.filter(r => r.trade.toLowerCase().includes(q)) : project.trades;
+  const filteredTrades = project.trades
+    .filter(r => tradeTypeFilter === 'all' || r.tradeType === tradeTypeFilter)
+    .filter(r => !q || r.trade.toLowerCase().includes(q));
   const bs = computeStats(filteredTrades);
   const d = bs.newv - bs.est;
   const dp = bs.est > 0 ? (d / bs.est * 100) : 0;
@@ -1144,10 +1148,12 @@ function DetailedView({
 // ──────────────────────────────────────────────────────────────
 // VarianceView
 // ──────────────────────────────────────────────────────────────
-function VarianceView({ onBack, search }: { onBack: () => void; search?: string }) {
+function VarianceView({ onBack, search, tradeTypeFilter = 'all' }: { onBack: () => void; search?: string; tradeTypeFilter?: 'all' | 'biddable' | 'set' }) {
   const { project } = useBudget();
   const q = search?.toLowerCase().trim() || '';
-  const trades = q ? project.trades.filter(r => r.trade.toLowerCase().includes(q)) : project.trades;
+  const trades = project.trades
+    .filter(r => tradeTypeFilter === 'all' || r.tradeType === tradeTypeFilter)
+    .filter(r => !q || r.trade.toLowerCase().includes(q));
   const [drawerTrade, setDrawerTrade] = useState<BudgetTrade | null>(null);
   const closeDrawer = useCallback(() => setDrawerTrade(null), []);
 
@@ -1357,10 +1363,12 @@ function VarianceView({ onBack, search }: { onBack: () => void; search?: string 
 // ──────────────────────────────────────────────────────────────
 // TreemapView
 // ──────────────────────────────────────────────────────────────
-function TreemapView({ onBack, search }: { onBack: () => void; search?: string }) {
+function TreemapView({ onBack, search, tradeTypeFilter = 'all' }: { onBack: () => void; search?: string; tradeTypeFilter?: 'all' | 'biddable' | 'set' }) {
   const { project } = useBudget();
   const q = search?.toLowerCase().trim() || '';
-  const trades = q ? project.trades.filter(r => r.trade.toLowerCase().includes(q)) : project.trades;
+  const trades = project.trades
+    .filter(r => tradeTypeFilter === 'all' || r.tradeType === tradeTypeFilter)
+    .filter(r => !q || r.trade.toLowerCase().includes(q));
   const bs = computeStats(trades);
   const [tooltip, setTooltip] = useState<{text: string; x: number; y: number} | null>(null);
 
@@ -1624,10 +1632,12 @@ const WORK_PACKAGES = [
   },
 ];
 
-function CategoriesView({ onBack, search }: { onBack: () => void; search?: string }) {
+function CategoriesView({ onBack, search, tradeTypeFilter = 'all' }: { onBack: () => void; search?: string; tradeTypeFilter?: 'all' | 'biddable' | 'set' }) {
   const { project } = useBudget();
   const q = search?.toLowerCase().trim() || '';
-  const trades = q ? project.trades.filter(r => r.trade.toLowerCase().includes(q)) : project.trades;
+  const trades = project.trades
+    .filter(r => tradeTypeFilter === 'all' || r.tradeType === tradeTypeFilter)
+    .filter(r => !q || r.trade.toLowerCase().includes(q));
   const [openPkg, setOpenPkg] = useState<string | null>(null);
   const [allOpen, setAllOpen] = useState(false);
 
@@ -1824,6 +1834,7 @@ export function BudgetDashboard({ projectId }: { projectId?: string } = {}) {
   const isEmbed = searchParams?.get('embed') === '1';
   const [search, setSearch] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [tradeTypeFilter, setTradeTypeFilter] = useState<'all' | 'biddable' | 'set'>('all');
   const [drawerTrade, setDrawerTrade] = useState<BudgetTrade | null>(null);
   const [embedCopied, setEmbedCopied] = useState(false);
   const closeDrawer = useCallback(() => setDrawerTrade(null), []);
@@ -1990,6 +2001,38 @@ export function BudgetDashboard({ projectId }: { projectId?: string } = {}) {
           )}
         </div>
 
+        {/* Trade type filter — Biddable / Set */}
+        {projectId && (
+          <div style={{
+            display: 'inline-flex', borderRadius: 'var(--border-radius-md)',
+            border: '0.5px solid var(--color-border-secondary)',
+            overflow: 'hidden',
+          }}>
+            {([
+              { id: 'all',      label: 'All types' },
+              { id: 'biddable', label: 'Biddable' },
+              { id: 'set',      label: 'Set' },
+            ] as const).map(opt => (
+              <button
+                key={opt.id}
+                type="button"
+                onClick={() => setTradeTypeFilter(opt.id)}
+                style={{
+                  height: 32, padding: '0 11px', fontSize: 12.5, cursor: 'pointer',
+                  fontFamily: 'inherit', border: 'none',
+                  borderRight: opt.id !== 'set' ? '0.5px solid var(--color-border-secondary)' : 'none',
+                  background: tradeTypeFilter === opt.id ? 'var(--lib-black)' : 'var(--color-background-primary)',
+                  color: tradeTypeFilter === opt.id ? '#fff' : 'var(--color-text-secondary)',
+                  fontWeight: tradeTypeFilter === opt.id ? 500 : 400,
+                  transition: 'background 0.15s, color 0.15s',
+                }}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* Project picker */}
         {isEmbed && projectId ? (
           <span style={{
@@ -2100,11 +2143,12 @@ export function BudgetDashboard({ projectId }: { projectId?: string } = {}) {
               onGoOverview={navigateToPortfolio}
               onTradeClick={setDrawerTrade}
               search={search}
+              tradeTypeFilter={tradeTypeFilter}
             />
           )}
-          {tab === 'variance' && <VarianceView onBack={navigateToPortfolio} search={search} />}
-          {tab === 'treemap' && <TreemapView onBack={navigateToPortfolio} search={search} />}
-          {tab === 'categories' && <CategoriesView onBack={navigateToPortfolio} search={search} />}
+          {tab === 'variance' && <VarianceView onBack={navigateToPortfolio} search={search} tradeTypeFilter={tradeTypeFilter} />}
+          {tab === 'treemap' && <TreemapView onBack={navigateToPortfolio} search={search} tradeTypeFilter={tradeTypeFilter} />}
+          {tab === 'categories' && <CategoriesView onBack={navigateToPortfolio} search={search} tradeTypeFilter={tradeTypeFilter} />}
         </BudgetCtx.Provider>
       )}
 
