@@ -43,10 +43,26 @@ const OPTIONS: Option[] = [
   },
 ];
 
+// Extract the project segment from the current path, e.g.
+// "/bidding/3930%20Carpenter" → "3930%20Carpenter"
+function extractProjectSegment(path: string): string | null {
+  const m = path.match(/^\/(?:budget|bidding)\/([^/]+)/);
+  return m ? m[1] : null;
+}
+
 export function DashboardSwitcher() {
   const pathname = usePathname() ?? '/';
   const activeId: Option['id'] = pathname.startsWith('/budget') ? 'budget' : pathname.startsWith('/bidding') ? 'bidding' : pathname.startsWith('/permits') ? 'permits' : 'plans';
   const active = OPTIONS.find((o) => o.id === activeId)!;
+
+  // If we're on a per-project page, carry the project over to budget/bidding.
+  const projectSegment = extractProjectSegment(pathname);
+  function hrefFor(opt: Option): string {
+    if (projectSegment && (opt.id === 'budget' || opt.id === 'bidding')) {
+      return `/${opt.id}/${projectSegment}`;
+    }
+    return opt.href;
+  };
 
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -130,7 +146,7 @@ export function DashboardSwitcher() {
             return (
               <Link
                 key={opt.id}
-                href={opt.href}
+                href={hrefFor(opt)}
                 role="menuitem"
                 onClick={() => setOpen(false)}
                 style={{
