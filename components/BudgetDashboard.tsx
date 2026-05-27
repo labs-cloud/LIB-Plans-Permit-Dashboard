@@ -1891,6 +1891,16 @@ export function BudgetDashboard({ projectId }: { projectId?: string } = {}) {
     return [];
   }, [projectData, portfolioData]);
 
+  // Trade-type counts for the filter button badges (per-project mode only)
+  const tradeTypeCounts = useMemo(() => {
+    const trades = projectData?.project.trades ?? [];
+    return {
+      all: trades.length,
+      biddable: trades.filter(t => t.tradeType === 'biddable').length,
+      set: trades.filter(t => t.tradeType === 'set').length,
+    };
+  }, [projectData]);
+
   // Trade name suggestions for search autocomplete (per-project mode only)
   const suggestions = useMemo(() => {
     if (!search.trim() || !projectId || !projectData) return [];
@@ -2009,27 +2019,37 @@ export function BudgetDashboard({ projectId }: { projectId?: string } = {}) {
             overflow: 'hidden',
           }}>
             {([
-              { id: 'all',      label: 'All types' },
-              { id: 'biddable', label: 'Biddable' },
-              { id: 'set',      label: 'Set' },
-            ] as const).map(opt => (
-              <button
-                key={opt.id}
-                type="button"
-                onClick={() => setTradeTypeFilter(opt.id)}
-                style={{
-                  height: 32, padding: '0 11px', fontSize: 12.5, cursor: 'pointer',
-                  fontFamily: 'inherit', border: 'none',
-                  borderRight: opt.id !== 'set' ? '0.5px solid var(--color-border-secondary)' : 'none',
-                  background: tradeTypeFilter === opt.id ? 'var(--lib-black)' : 'var(--color-background-primary)',
-                  color: tradeTypeFilter === opt.id ? '#fff' : 'var(--color-text-secondary)',
-                  fontWeight: tradeTypeFilter === opt.id ? 500 : 400,
-                  transition: 'background 0.15s, color 0.15s',
-                }}
-              >
-                {opt.label}
-              </button>
-            ))}
+              { id: 'all',      label: 'All',      count: tradeTypeCounts.all },
+              { id: 'biddable', label: 'Biddable', count: tradeTypeCounts.biddable },
+              { id: 'set',      label: 'Set',      count: tradeTypeCounts.set },
+            ] as const).map(opt => {
+              const active = tradeTypeFilter === opt.id;
+              return (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => setTradeTypeFilter(opt.id)}
+                  style={{
+                    height: 32, padding: '0 11px', fontSize: 12.5, cursor: 'pointer',
+                    fontFamily: 'inherit', border: 'none',
+                    borderRight: opt.id !== 'set' ? '0.5px solid var(--color-border-secondary)' : 'none',
+                    background: active ? 'var(--lib-black)' : 'var(--color-background-primary)',
+                    color: active ? '#fff' : 'var(--color-text-secondary)',
+                    fontWeight: active ? 500 : 400,
+                    transition: 'background 0.15s, color 0.15s',
+                    display: 'inline-flex', alignItems: 'center', gap: 5,
+                  }}
+                >
+                  {opt.label}
+                  <span style={{
+                    fontSize: 10.5, fontWeight: 500,
+                    background: active ? 'rgba(255,255,255,0.18)' : 'var(--color-background-secondary)',
+                    color: active ? '#fff' : 'var(--color-text-tertiary)',
+                    padding: '1px 5px', borderRadius: 999,
+                  }}>{opt.count}</span>
+                </button>
+              );
+            })}
           </div>
         )}
 

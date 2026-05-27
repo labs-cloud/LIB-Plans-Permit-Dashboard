@@ -9,18 +9,25 @@ function getFieldById(task: ClickUpTask, id: string): ClickUpCustomFieldValue | 
   return task.custom_fields?.find(f => f.id === id);
 }
 
+// Reads the "2. Trade Type" drop_down field: orderindex 0 = Biddable, 1 = Set.
 function getTradeType(task: ClickUpTask): 'biddable' | 'set' | undefined {
   const f = getFieldById(task, F.TRADE_TYPE);
   if (!f || f.value == null) return undefined;
-  const options = (f.type_config?.options ?? []) as Array<{ id: string; name: string; orderindex: number }>;
   const numVal = Number(f.value);
-  const opt = Number.isFinite(numVal)
-    ? options.find(o => o.orderindex === numVal)
-    : options.find(o => o.id === String(f.value));
-  const name = (opt?.name ?? '').toLowerCase();
-  if (name.includes('biddable')) return 'biddable';
-  if (name.includes('set')) return 'set';
+  if (numVal === 0) return 'biddable';
+  if (numVal === 1) return 'set';
+  // String option-ID fallback
+  const options = (f.type_config?.options ?? []) as Array<{ id: string; name: string; orderindex?: number }>;
+  const opt = options.find(o => o.id === String(f.value));
+  if (opt?.orderindex === 0) return 'biddable';
+  if (opt?.orderindex === 1) return 'set';
   return undefined;
+}
+
+// When the explicit Trade Type field isn't set, derive from the workflow status.
+function deriveTradeTypeFromStatus(status: string): 'biddable' | 'set' {
+  const s = status.toLowerCase();
+  return s === 'budget set' || s === 'bid received' ? 'set' : 'biddable';
 }
 
 function getCostType(task: ClickUpTask): 'hard' | 'soft' {
@@ -163,7 +170,7 @@ export function transformBudgetTasks(
     const newv = deriveNewv(est, fin);
     const costType = getCostType(task);
     const status = task.status?.status ?? '';
-    const tradeType = getTradeType(task);
+    const tradeType = getTradeType(task) ?? deriveTradeTypeFromStatus(status);
 
     return {
       taskId: task.id,
