@@ -11,7 +11,7 @@ export interface BudgetTrade {
   status?: string;
   /** ClickUp task ID — used to build deep-links. */
   taskId?: string;
-  /** Trade type from ClickUp "2. Trade Type" field: 0=Biddable, 1=Set. */
+  /** Trade type: from ClickUp "2. Trade Type" field (0=Biddable, 1=Set), or derived from workflow status. Always set. */
   tradeType?: 'biddable' | 'set';
   /** True when this trade row was kept after deduplication of (costType, tradeName) pairs. */
   hasDuplicate?: boolean;
