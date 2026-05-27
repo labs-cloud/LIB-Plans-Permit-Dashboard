@@ -28,6 +28,19 @@ function isAwarded(task: ClickUpTask): boolean {
   return (task.status?.status ?? '').toUpperCase().trim() === 'AWARDED';
 }
 
+// A bid qualifies for the lowest-bid calculation only when the sub has
+// actually submitted a number (not just received an RFP).
+function isQualifyingBid(task: ClickUpTask): boolean {
+  const s = (task.status?.status ?? '').toLowerCase().trim();
+  return (
+    s === 'proposals received' ||
+    s === 'to clarify' ||
+    s === 'leveled' ||
+    s === 'reviewed' ||
+    s === 'awarded'
+  );
+}
+
 // Build trade option map from the Trade dropdown field schema (Schema B / flat lists).
 function buildTradeOptionMap(tasks: ClickUpTask[]): Map<number, string> {
   const map = new Map<number, string>();
@@ -60,7 +73,7 @@ export function computeBiddingLows(tasks: ClickUpTask[]): Map<string, number> {
       if (!t.parent) parentNames.set(t.id, t.name.trim());
     }
     for (const t of tasks) {
-      if (!t.parent) continue;
+      if (!t.parent || !isQualifyingBid(t)) continue;
       const tradeName = parentNames.get(t.parent);
       if (!tradeName) continue;
       const amt = getAmt(t);
@@ -70,6 +83,7 @@ export function computeBiddingLows(tasks: ClickUpTask[]): Map<string, number> {
     // Schema B: flat tasks, trade resolved from Trade dropdown field
     const optionMap = buildTradeOptionMap(tasks);
     for (const t of tasks) {
+      if (!isQualifyingBid(t)) continue;
       const f = t.custom_fields?.find(cf => cf.id === TRADE_FIELD_ID);
       if (!f || f.value == null) continue;
       const tradeName = optionMap.get(Number(f.value));
