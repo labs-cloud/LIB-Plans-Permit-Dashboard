@@ -182,12 +182,16 @@ export function transformBiddingTasksByName(
   const hasHierarchy = tasks.some(t => t.parent != null && listTaskIds.has(t.parent));
 
   const byTrade = new Map<string, ClickUpTask[]>();
+  const tradeNameToTaskId = new Map<string, string>();
 
   if (hasHierarchy) {
     // ── Schema A: parent/subtask hierarchy ──────────────────────────────────
     const parentIdToName = new Map<string, string>();
     for (const task of tasks) {
-      if (!task.parent) parentIdToName.set(task.id, task.name.trim());
+      if (!task.parent) {
+        parentIdToName.set(task.id, task.name.trim());
+        tradeNameToTaskId.set(task.name.trim(), task.id);
+      }
     }
     // Pre-populate buckets in ClickUp list order.
     for (const tradeName of parentIdToName.values()) {
@@ -230,7 +234,7 @@ export function transformBiddingTasksByName(
     const amounts = subs.map(s => s.amount).filter((a): a is number => a !== null);
     const low = amounts.length > 0 ? Math.min(...amounts) : null;
 
-    trades.push({ trade: tradeName, annot: null, subs, low });
+    trades.push({ trade: tradeName, annot: null, subs, low, taskId: tradeNameToTaskId.get(tradeName) });
   }
 
   return { name: projectName, location: projectLocation, id: projectId, phase: 'Bidding', coordInitials, coordName, trades };

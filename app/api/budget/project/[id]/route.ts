@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { unstable_cache } from 'next/cache';
 import { hasClickUpToken, getFoldersInSpace, getListsInFolder, getTasksInList } from '@/lib/clickup';
 import { transformBudgetTasks } from '@/lib/budget-transforms';
+import { findBiddingList, computeBiddingLows } from '@/lib/bidding-lows';
 import type { BudgetPayload, BudgetProject, BudgetPortfolioStub } from '@/lib/budget-types';
 import type { ClickUpList } from '@/lib/clickup';
 import { CLICKUP, CACHE_TTL_SECONDS } from '@/lib/constants';
@@ -56,6 +57,7 @@ async function buildPayload(projectId: string): Promise<BudgetPayload> {
 
   const lists = await getListsInFolder(targetFolder.id);
   const budgetList = findBudgetList(lists);
+  const biddingListInFolder = findBiddingList(lists);
 
   if (!budgetList) {
     console.warn(
@@ -69,8 +71,12 @@ async function buildPayload(projectId: string): Promise<BudgetPayload> {
     };
   }
 
-  const tasks = await getTasksInList(budgetList.id, true);
-  const project = transformBudgetTasks(tasks, targetFolder.name, '', targetFolder.id, '', '');
+  const [tasks, biddingTasks] = await Promise.all([
+    getTasksInList(budgetList.id, true),
+    biddingListInFolder ? getTasksInList(biddingListInFolder.id, true, true) : Promise.resolve([]),
+  ]);
+  const biddingLows = computeBiddingLows(biddingTasks);
+  const project = transformBudgetTasks(tasks, targetFolder.name, '', targetFolder.id, '', '', biddingLows);
 
   return { project, portfolioProjects, syncedAt: Date.now(), source: 'live' };
 }

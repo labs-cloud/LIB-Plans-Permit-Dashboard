@@ -938,21 +938,64 @@ function DetailedView({
             )}
           </SideCard>
 
-          <SideCard title="Row composition" icon="ti-tag">
-            {[
-              { label: 'Trades with bids in', val: bs.withBids },
-              { label: 'Estimate-only', val: bs.eo },
-              { label: '"Included"', val: bs.inc, icon: 'ti-package' },
-              { label: '"NA"', val: bs.na, icon: 'ti-ban' },
-            ].map(({ label, val, icon }, i) => (
-              <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '9px 0', fontSize: 13, borderTop: i === 0 ? 'none' : '0.5px solid var(--color-border-tertiary)' }}>
-                <span style={{ color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center', gap: 6 }}>
-                  {icon && <i className={`ti ${icon}`} style={{ fontSize: 11 }} />}
-                  {label}
-                </span>
-                <span style={{ fontWeight: 500 }}>{val}</span>
-              </div>
-            ))}
+          <SideCard title="Row composition" icon="ti-chart-donut-3">
+            {(() => {
+              const segments = [
+                { label: 'Bids in',        val: bs.withBids, color: '#4ade80' },
+                { label: 'Estimate-only',  val: bs.eo,       color: '#94a3b8' },
+                { label: 'Included',       val: bs.inc,      color: '#60a5fa' },
+                { label: 'NA',             val: bs.na,       color: '#f87171' },
+              ].filter(s => s.val > 0);
+              const total = segments.reduce((s, x) => s + x.val, 0);
+              if (total === 0) return <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', padding: '8px 0' }}>No data</div>;
+              // Build SVG donut arcs
+              const cx = 60, cy = 60, ro = 52, ri = 32;
+              function polar(cx: number, cy: number, r: number, angle: number) {
+                return [cx + r * Math.cos(angle - Math.PI / 2), cy + r * Math.sin(angle - Math.PI / 2)];
+              }
+              function arc(cx: number, cy: number, ro: number, ri: number, startAngle: number, endAngle: number, color: string, key: string) {
+                const large = endAngle - startAngle > Math.PI ? 1 : 0;
+                const [ox1, oy1] = polar(cx, cy, ro, startAngle);
+                const [ox2, oy2] = polar(cx, cy, ro, endAngle);
+                const [ix1, iy1] = polar(cx, cy, ri, endAngle);
+                const [ix2, iy2] = polar(cx, cy, ri, startAngle);
+                return (
+                  <path
+                    key={key}
+                    d={`M ${ox1} ${oy1} A ${ro} ${ro} 0 ${large} 1 ${ox2} ${oy2} L ${ix1} ${iy1} A ${ri} ${ri} 0 ${large} 0 ${ix2} ${iy2} Z`}
+                    fill={color}
+                    stroke="var(--color-background-primary)"
+                    strokeWidth={1.5}
+                  />
+                );
+              }
+              let angle = 0;
+              const paths = segments.map(s => {
+                const span = (s.val / total) * 2 * Math.PI;
+                const path = arc(cx, cy, ro, ri, angle, angle + span, s.color, s.label);
+                angle += span;
+                return path;
+              });
+              return (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                  <svg width={120} height={120} style={{ flexShrink: 0 }}>
+                    {paths}
+                    <text x={cx} y={cy - 6} textAnchor="middle" fontSize={18} fontWeight={700} fill="var(--color-text-primary)">{total}</text>
+                    <text x={cx} y={cy + 10} textAnchor="middle" fontSize={9} fill="var(--color-text-tertiary)">trades</text>
+                  </svg>
+                  <div style={{ flex: 1, fontSize: 12 }}>
+                    {segments.map(s => (
+                      <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 0' }}>
+                        <span style={{ width: 9, height: 9, borderRadius: 2, background: s.color, flexShrink: 0, display: 'inline-block' }} />
+                        <span style={{ flex: 1, color: 'var(--color-text-secondary)' }}>{s.label}</span>
+                        <span style={{ fontWeight: 600 }}>{s.val}</span>
+                        <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)', minWidth: 32, textAlign: 'right' }}>{(s.val / total * 100).toFixed(0)}%</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
           </SideCard>
 
           <SideCard title="New Budget rule" icon="ti-info-circle">
@@ -1179,6 +1222,7 @@ function TreemapView({ onBack, search }: { onBack: () => void; search?: string }
   const q = search?.toLowerCase().trim() || '';
   const trades = q ? project.trades.filter(r => r.trade.toLowerCase().includes(q)) : project.trades;
   const bs = computeStats(trades);
+  const [tooltip, setTooltip] = useState<{text: string; x: number; y: number} | null>(null);
 
   // Numeric newv trades
   const numericTrades = trades.filter(r => isMoney(r.newv)).map(r => ({ r, val: r.newv as number }));
@@ -1293,7 +1337,15 @@ function TreemapView({ onBack, search }: { onBack: () => void; search?: string }
             return (
               <div
                 key={r.trade}
-                title={`${r.trade}\nNew Budget: ${fmt$(val)}\n${dp !== null ? `Δ vs est: ${dpStr}` : 'Estimate-only'}`}
+                onMouseEnter={(e) => {
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  setTooltip({
+                    text: `${r.trade}\n${fmt$(val)}${dp !== null ? `\n${dp < 0 ? '−' : '+'}${Math.abs(dp).toFixed(1)}% vs est` : '\nEstimate-only'}`,
+                    x: rect.left + rect.width / 2,
+                    y: rect.top,
+                  });
+                }}
+                onMouseLeave={() => setTooltip(null)}
                 style={{
                   flexBasis: `max(4%, ${flexBasis}%)`,
                   flexGrow: val,
@@ -1304,7 +1356,7 @@ function TreemapView({ onBack, search }: { onBack: () => void; search?: string }
                   borderRadius: 4,
                   padding: isLarge ? '8px 10px' : '4px 6px',
                   overflow: 'hidden',
-                  cursor: 'default',
+                  cursor: 'pointer',
                   border: '0.5px solid rgba(0,0,0,0.07)',
                 }}
               >
@@ -1320,6 +1372,28 @@ function TreemapView({ onBack, search }: { onBack: () => void; search?: string }
             );
           })}
         </div>
+        {tooltip && (
+          <div style={{
+            position: 'fixed',
+            left: tooltip.x,
+            top: tooltip.y - 8,
+            transform: 'translate(-50%, -100%)',
+            background: 'rgba(20,20,20,0.95)',
+            color: '#fff',
+            padding: '7px 11px',
+            borderRadius: 7,
+            fontSize: 11.5,
+            pointerEvents: 'none',
+            zIndex: 9999,
+            whiteSpace: 'pre',
+            lineHeight: 1.65,
+            boxShadow: '0 4px 16px rgba(0,0,0,0.35)',
+            fontFamily: 'inherit',
+            letterSpacing: 0,
+          }}>
+            {tooltip.text}
+          </div>
+        )}
       </div>
 
       {/* Top 8 by $ value */}
