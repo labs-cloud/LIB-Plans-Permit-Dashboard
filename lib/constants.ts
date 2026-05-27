@@ -25,6 +25,7 @@ export const CLICKUP = {
     CONTRACT:      '3d4711c5-4e42-4ca3-be33-01671b032067', // currency — set when AWARDED
     // Budget
     BUDGET_ALLOC:  '932ad261-d33f-4e50-83d0-cb5be27f3be9', // currency — estimated budget
+    UPDATED_BUDGET: 'fababed6-f5d6-41e5-a078-24234ce9df56', // currency — manual override (per-project "01. Budget" lists)
     // Sub slots (name + amount pairs)
     SUB_1:         '01d90719-501b-4936-a178-d2b2896b6e08', // short_text
     SUB_2:         'f461f3f6-4f02-4f63-ad78-cfbae3c94837',

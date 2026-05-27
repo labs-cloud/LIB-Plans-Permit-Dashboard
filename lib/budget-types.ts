@@ -6,6 +6,21 @@ export interface BudgetTrade {
   fin: MoneyVal;
   newv: MoneyVal;
   manual?: boolean;
+  costType?: 'hard' | 'soft';
+  /** Workflow status from task.status.status ("to budget", "open for bidding", etc.) */
+  status?: string;
+  /** ClickUp task ID — used to build deep-links. */
+  taskId?: string;
+  /** True when this trade row was kept after deduplication of (costType, tradeName) pairs. */
+  hasDuplicate?: boolean;
+  /** ClickUp URLs of the duplicate tasks that were dropped during dedup. */
+  duplicateTaskUrls?: string[];
+  /** Bid amount of the sub with Awarded status in the bidding list. */
+  awardedBid?: number;
+  /** Name of the awarded sub. */
+  awardedSubName?: string;
+  /** True when the Updated Budget override exists but doesn't match the awarded sub's bid. */
+  finMismatch?: boolean;
 }
 
 export interface BudgetProject {
@@ -27,6 +42,13 @@ export interface BudgetPortfolioStub {
 export interface BudgetPayload {
   project: BudgetProject;
   portfolioProjects: BudgetPortfolioStub[];
+  syncedAt: number;
+  source?: 'live' | 'empty';
+  warning?: string;
+}
+
+export interface BudgetPortfolioPayload {
+  projects: BudgetProject[];
   syncedAt: number;
   source?: 'live' | 'empty';
   warning?: string;

@@ -1,9 +1,10 @@
 'use client';
 
-import { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import useSWR from 'swr';
 import { LogoHeader } from './LogoHeader';
-import type { BidStatus, BidSub, BidTrade, BiddingPayload } from '@/lib/bidding-types';
+import type { BidStatus, BidSub, BidTrade, BiddingPayload, BiddingPortfolioPayload } from '@/lib/bidding-types';
 
 // ─── Data context (replaces static fixture import) ────────────────────────────
 
@@ -21,6 +22,21 @@ async function fetcher(url: string): Promise<BiddingPayload> {
   return res.json() as Promise<BiddingPayload>;
 }
 
+async function portfolioFetcher(url: string): Promise<BiddingPortfolioPayload> {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`fetch ${url} → ${res.status}`);
+  return res.json() as Promise<BiddingPortfolioPayload>;
+}
+
+function useBiddingPortfolio() {
+  const { data } = useSWR<BiddingPortfolioPayload>(
+    '/api/bidding/portfolio',
+    portfolioFetcher,
+    { refreshInterval: 300_000, revalidateOnFocus: false, dedupingInterval: 60_000 },
+  );
+  return data ?? null;
+}
+
 // ─── Status metadata ──────────────────────────────────────────────────────────
 
 type StatusMeta = {
@@ -33,23 +49,21 @@ type StatusMeta = {
 };
 
 const STATUS_META: Record<BidStatus, StatusMeta> = {
-  ntb: { label: 'Not bidding', icon: 'ti-ban',        bg: 'var(--bid-ntb-bg)', fg: 'var(--bid-ntb-fg)', ring: 'var(--bid-ntb-ring)', strong: 'var(--bid-ntb-strong)' },
-  snt: { label: 'Sent',        icon: 'ti-send',        bg: 'var(--bid-snt-bg)', fg: 'var(--bid-snt-fg)', ring: 'var(--bid-snt-ring)', strong: 'var(--bid-snt-strong)' },
-  rec: { label: 'Received',    icon: 'ti-checks',      bg: 'var(--bid-rec-bg)', fg: 'var(--bid-rec-fg)', ring: 'var(--bid-rec-ring)', strong: 'var(--bid-rec-strong)' },
-  hld: { label: 'Hold',        icon: 'ti-hand-stop',   bg: 'var(--bid-hld-bg)', fg: 'var(--bid-hld-fg)', ring: 'var(--bid-hld-ring)', strong: 'var(--bid-hld-strong)' },
-  fnl: { label: 'Finalized',   icon: 'ti-trophy',      bg: 'var(--bid-fnl-bg)', fg: 'var(--bid-fnl-fg)', ring: 'var(--bid-fnl-ring)', strong: 'var(--bid-fnl-strong)' },
-  fu1: { label: 'FU·W1 (14d ago)', icon: 'ti-message-2', bg: 'var(--bid-fu1-bg)', fg: 'var(--bid-fu1-fg)', ring: 'var(--bid-fu1-ring)', strong: 'var(--bid-fu1-strong)' },
-  fu2: { label: 'FU·W2 (7d ago)',  icon: 'ti-message-2', bg: 'var(--bid-fu2-bg)', fg: 'var(--bid-fu2-fg)', ring: 'var(--bid-fu2-ring)', strong: 'var(--bid-fu2-strong)' },
-  fu3: { label: 'FU·W3 (0d ago)',  icon: 'ti-message-2', bg: 'var(--bid-fu3-bg)', fg: 'var(--bid-fu3-fg)', ring: 'var(--bid-fu3-ring)', strong: 'var(--bid-fu3-strong)' },
+  ntb: { label: 'To Send',       icon: 'ti-ban',        bg: 'var(--bid-ntb-bg)', fg: 'var(--bid-ntb-fg)', ring: 'var(--bid-ntb-ring)', strong: 'var(--bid-ntb-strong)' },
+  snt: { label: 'RFP Sent',      icon: 'ti-send',       bg: 'var(--bid-snt-bg)', fg: 'var(--bid-snt-fg)', ring: 'var(--bid-snt-ring)', strong: 'var(--bid-snt-strong)' },
+  rec: { label: 'Bid Received',  icon: 'ti-checks',     bg: 'var(--bid-rec-bg)', fg: 'var(--bid-rec-fg)', ring: 'var(--bid-rec-ring)', strong: 'var(--bid-rec-strong)' },
+  hld: { label: 'Rejected',      icon: 'ti-hand-stop',  bg: 'var(--bid-hld-bg)', fg: 'var(--bid-hld-fg)', ring: 'var(--bid-hld-ring)', strong: 'var(--bid-hld-strong)' },
+  fnl: { label: 'Awarded',       icon: 'ti-trophy',     bg: 'var(--bid-fnl-bg)', fg: 'var(--bid-fnl-fg)', ring: 'var(--bid-fnl-ring)', strong: 'var(--bid-fnl-strong)' },
+  fu1: { label: 'Followed Up · W1 (14d ago)', icon: 'ti-message-2', bg: 'var(--bid-fu1-bg)', fg: 'var(--bid-fu1-fg)', ring: 'var(--bid-fu1-ring)', strong: 'var(--bid-fu1-strong)' },
+  fu2: { label: 'Followed Up · W2 (7d ago)',  icon: 'ti-message-2', bg: 'var(--bid-fu2-bg)', fg: 'var(--bid-fu2-fg)', ring: 'var(--bid-fu2-ring)', strong: 'var(--bid-fu2-strong)' },
+  fu3: { label: 'Followed Up · W3 (0d ago)',  icon: 'ti-message-2', bg: 'var(--bid-fu3-bg)', fg: 'var(--bid-fu3-fg)', ring: 'var(--bid-fu3-ring)', strong: 'var(--bid-fu3-strong)' },
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function fmt$(n: number | null): string {
   if (n === null) return '—';
-  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(2)}M`;
-  if (n >= 1_000) return `$${(n / 1_000).toFixed(0)}K`;
-  return `$${n.toLocaleString()}`;
+  return '$' + Math.round(n).toLocaleString('en-US');
 }
 
 function fmtLong$(n: number): string {
@@ -121,31 +135,38 @@ function KpiCard({
   value,
   icon,
   tone,
+  onClick,
+  active,
 }: {
   label: string;
   caption: string;
   value: string | number;
   icon: string;
   tone: KpiTone;
+  onClick?: () => void;
+  active?: boolean;
 }) {
   const ts = TONE_STYLES[tone];
   return (
     <div
+      onClick={onClick}
       style={{
-        background: 'var(--color-background-secondary)',
-        border: '0.5px solid transparent',
+        background: active ? 'var(--color-background-secondary)' : 'var(--color-background-secondary)',
+        border: active ? '1.5px solid var(--lib-softblack)' : '0.5px solid transparent',
         borderRadius: 'var(--border-radius-md)',
         padding: '14px 16px',
         display: 'flex',
         alignItems: 'center',
         gap: 10,
-        transition: 'border-color 0.15s',
+        transition: 'border-color 0.15s, box-shadow 0.15s',
+        cursor: onClick ? 'pointer' : 'default',
+        boxShadow: active ? '0 0 0 3px rgba(0,0,0,0.06)' : 'none',
       }}
       onMouseEnter={(e) => {
-        (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--color-border-secondary)';
+        if (onClick) (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--color-border-secondary)';
       }}
       onMouseLeave={(e) => {
-        (e.currentTarget as HTMLDivElement).style.borderColor = 'transparent';
+        if (!active) (e.currentTarget as HTMLDivElement).style.borderColor = 'transparent';
       }}
     >
       <div style={{ flex: 1, minWidth: 0 }}>
@@ -447,31 +468,33 @@ function Drawer({ payload, onClose }: { payload: DrawerPayload; onClose: () => v
                   )}
                 </div>
               </div>
-              <div>
-                <div
-                  style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4 }}
-                >
-                  OPEN IN CLICKUP
+              {payload.sub.url && (
+                <div>
+                  <div
+                    style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4 }}
+                  >
+                    OPEN IN CLICKUP
+                  </div>
+                  <a
+                    href={payload.sub.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      fontSize: 12,
+                      color: 'var(--color-text-info)',
+                      padding: '6px 12px',
+                      border: '0.5px solid var(--color-border-secondary)',
+                      borderRadius: 6,
+                    }}
+                  >
+                    <i className="ti ti-external-link" style={{ fontSize: 14 }} />
+                    Open task in ClickUp
+                  </a>
                 </div>
-                <a
-                  href="#"
-                  target="_blank"
-                  rel="noopener"
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 6,
-                    fontSize: 12,
-                    color: 'var(--color-text-info)',
-                    padding: '6px 12px',
-                    border: '0.5px solid var(--color-border-secondary)',
-                    borderRadius: 6,
-                  }}
-                >
-                  <i className="ti ti-external-link" style={{ fontSize: 14 }} />
-                  Open task
-                </a>
-              </div>
+              )}
             </>
           ) : (
             <>
@@ -590,6 +613,27 @@ function Drawer({ payload, onClose }: { payload: DrawerPayload; onClose: () => v
 function OverviewView({ onGoDetailed }: { onGoDetailed: () => void }) {
   const { project, portfolioProjects } = useBidding();
   const trades = project.trades;
+
+  const portfolioData = useBiddingPortfolio();
+
+  // Map: projectName → Map<tradeName, BidTrade>
+  const projectTradeMap = useMemo(() => {
+    const map = new Map<string, Map<string, BidTrade>>();
+    if (!portfolioData) return map;
+    for (const proj of portfolioData.projects) {
+      const tm = new Map<string, BidTrade>();
+      for (const t of proj.trades) tm.set(t.trade, t);
+      map.set(proj.name, tm);
+    }
+    return map;
+  }, [portfolioData]);
+
+  // Sorted union of all trade names across all portfolio projects
+  const allTradeNames = useMemo(() => {
+    const names = new Set<string>();
+    for (const [, tm] of projectTradeMap) for (const n of tm.keys()) names.add(n);
+    return [...names].sort();
+  }, [projectTradeMap]);
 
   const kpis = useMemo(() => {
     const notFnl = trades.filter(
@@ -747,34 +791,64 @@ function OverviewView({ onGoDetailed }: { onGoDetailed: () => void }) {
               </tr>
             </thead>
             <tbody>
-              {trades.map((trade, ti) => {
-                const ts = tradeStatus(trade);
-                const isHld = ts === 'hld';
-                const isFuOrSnt = ts === 'fu1' || ts === 'snt';
-                return (
-                  <tr key={ti}>
-                    <td
-                      style={{
-                        padding: '7px 12px',
-                        border: '0.5px solid var(--color-border-tertiary)',
-                        background: 'var(--color-background-primary)',
-                        fontWeight: 500,
-                        fontSize: 12,
-                        position: 'sticky',
-                        left: 0,
-                        zIndex: 1,
-                        borderLeft: isHld
-                          ? '3px solid var(--bid-hld-ring)'
-                          : isFuOrSnt
-                          ? '3px solid var(--warn-strong)'
-                          : '0.5px solid var(--color-border-tertiary)',
-                        paddingLeft: isHld || isFuOrSnt ? 10 : 12,
-                      }}
-                    >
-                      {trade.trade}
-                    </td>
-                    {portfolioProjects.slice(0, 8).map((proj, pi) => {
-                      if (!proj.isReal) {
+              {portfolioData === null ? (
+                <tr>
+                  <td colSpan={9} style={{ padding: '12px', textAlign: 'center', color: 'var(--color-text-tertiary)', fontSize: 12 }}>
+                    <i className="ti ti-loader" /> Loading portfolio…
+                  </td>
+                </tr>
+              ) : (
+                allTradeNames.map((tradeName, ti) => {
+                  // Use the first project's trade to determine sticky-cell highlight
+                  const firstProjTrade = portfolioProjects.slice(0, 8).find(p => p.isReal)
+                    ? projectTradeMap.get(portfolioProjects.slice(0, 8).find(p => p.isReal)!.name)?.get(tradeName)
+                    : undefined;
+                  const firstTs = firstProjTrade ? tradeStatus(firstProjTrade) : null;
+                  const isHld = firstTs === 'hld';
+                  const isFuOrSnt = firstTs === 'fu1' || firstTs === 'snt';
+                  return (
+                    <tr key={ti}>
+                      <td
+                        style={{
+                          padding: '7px 12px',
+                          border: '0.5px solid var(--color-border-tertiary)',
+                          background: 'var(--color-background-primary)',
+                          fontWeight: 500,
+                          fontSize: 12,
+                          position: 'sticky',
+                          left: 0,
+                          zIndex: 1,
+                          borderLeft: isHld
+                            ? '3px solid var(--bid-hld-ring)'
+                            : isFuOrSnt
+                            ? '3px solid var(--warn-strong)'
+                            : '0.5px solid var(--color-border-tertiary)',
+                          paddingLeft: isHld || isFuOrSnt ? 10 : 12,
+                        }}
+                      >
+                        {tradeName}
+                      </td>
+                      {portfolioProjects.slice(0, 8).map((proj, pi) => {
+                        if (!proj.isReal) {
+                          return (
+                            <td
+                              key={pi}
+                              style={{
+                                padding: '7px 10px',
+                                border: '0.5px solid var(--color-border-tertiary)',
+                                textAlign: 'center',
+                                color: 'var(--color-text-tertiary)',
+                                fontSize: 11,
+                                fontStyle: 'italic',
+                              }}
+                            >
+                              pending
+                            </td>
+                          );
+                        }
+                        const trade = projectTradeMap.get(proj.name)?.get(tradeName);
+                        const ts = trade ? tradeStatus(trade) : null;
+                        const lowSub = trade?.subs.find(s => s.amount === trade.low && trade.low !== null);
                         return (
                           <td
                             key={pi}
@@ -782,73 +856,57 @@ function OverviewView({ onGoDetailed }: { onGoDetailed: () => void }) {
                               padding: '7px 10px',
                               border: '0.5px solid var(--color-border-tertiary)',
                               textAlign: 'center',
-                              color: 'var(--color-text-tertiary)',
-                              fontSize: 11,
-                              fontStyle: 'italic',
+                              verticalAlign: 'middle',
                             }}
                           >
-                            pending
+                            {trade === undefined ? (
+                              <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>—</span>
+                            ) : ts ? (
+                              <div
+                                style={{
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  alignItems: 'center',
+                                  gap: 3,
+                                }}
+                              >
+                                <StatusPill status={ts} small />
+                                {trade.low !== null && (
+                                  <span
+                                    style={{
+                                      fontSize: 10,
+                                      color: 'var(--good-fg)',
+                                      fontVariantNumeric: 'tabular-nums',
+                                    }}
+                                  >
+                                    {fmt$(trade.low)}
+                                  </span>
+                                )}
+                                {lowSub && (
+                                  <span
+                                    style={{
+                                      fontSize: 9,
+                                      color: 'var(--color-text-tertiary)',
+                                    }}
+                                  >
+                                    {lowSub.name}
+                                  </span>
+                                )}
+                              </div>
+                            ) : (
+                              <span
+                                style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}
+                              >
+                                —
+                              </span>
+                            )}
                           </td>
                         );
-                      }
-                      const lowSub = trade.subs.find(
-                        (s) => s.amount === trade.low && trade.low !== null,
-                      );
-                      return (
-                        <td
-                          key={pi}
-                          style={{
-                            padding: '7px 10px',
-                            border: '0.5px solid var(--color-border-tertiary)',
-                            textAlign: 'center',
-                            verticalAlign: 'middle',
-                          }}
-                        >
-                          {ts ? (
-                            <div
-                              style={{
-                                display: 'flex',
-                                flexDirection: 'column',
-                                alignItems: 'center',
-                                gap: 3,
-                              }}
-                            >
-                              <StatusPill status={ts} small />
-                              {trade.low !== null && (
-                                <span
-                                  style={{
-                                    fontSize: 10,
-                                    color: 'var(--good-fg)',
-                                    fontVariantNumeric: 'tabular-nums',
-                                  }}
-                                >
-                                  {fmt$(trade.low)}
-                                </span>
-                              )}
-                              {lowSub && (
-                                <span
-                                  style={{
-                                    fontSize: 9,
-                                    color: 'var(--color-text-tertiary)',
-                                  }}
-                                >
-                                  {lowSub.name}
-                                </span>
-                              )}
-                            </div>
-                          ) : (
-                            <span
-                              style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}
-                            >
-                              —
-                            </span>
-                          )}
-                        </td>
-                      );
-                    })}
-                  </tr>
-                );
-              })}
+                      })}
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>
@@ -893,23 +951,24 @@ function OverviewView({ onGoDetailed }: { onGoDetailed: () => void }) {
 
 // ─── Detailed view ────────────────────────────────────────────────────────────
 
-type FilterKey = 'all' | BidStatus | 'fu';
+type FilterKey = 'all' | BidStatus | 'fu' | 'out';
 
 const FILTER_CHIPS: { key: FilterKey; label: string }[] = [
   { key: 'all', label: 'All' },
-  { key: 'snt', label: 'Sent' },
-  { key: 'rec', label: 'Received' },
-  { key: 'hld', label: 'Hold' },
-  { key: 'fnl', label: 'Finalized' },
-  { key: 'fu', label: 'Follow-up' },
+  { key: 'snt', label: 'RFP Sent' },
+  { key: 'rec', label: 'Bid Received' },
+  { key: 'hld', label: 'Rejected' },
+  { key: 'fnl', label: 'Awarded' },
+  { key: 'fu', label: 'Followed Up' },
 ];
 
 function DetailedView({ onBack, search = '' }: { onBack: () => void; search?: string }) {
   const { project } = useBidding();
   const trades = project.trades;
-
   const [filter, setFilter] = useState<FilterKey>('all');
   const [drawer, setDrawer] = useState<DrawerPayload | null>(null);
+  const [shareCopied, setShareCopied] = useState(false);
+  const [embedCopied, setEmbedCopied] = useState(false);
 
   const kpis = useMemo(() => {
     const fnlCount = trades.filter((t) => t.subs.some((s) => s.status === 'fnl')).length;
@@ -944,6 +1003,10 @@ function DetailedView({ onBack, search = '' }: { onBack: () => void; search?: st
           (s) => s.status === 'fu1' || s.status === 'fu2' || s.status === 'fu3',
         ),
       );
+    else if (filter === 'out')
+      result = result.filter((t) =>
+        t.subs.some((s) => s.status === 'snt' || s.status === 'rec'),
+      );
     else if (filter !== 'all')
       result = result.filter((t) => t.subs.some((s) => s.status === filter));
     if (search.trim()) {
@@ -972,6 +1035,9 @@ function DetailedView({ onBack, search = '' }: { onBack: () => void; search?: st
       ntb: trades.filter(
         (t) => t.subs.length > 0 && t.subs.every((s) => s.status === 'ntb'),
       ).length,
+      out: trades.filter((t) =>
+        t.subs.some((s) => s.status === 'snt' || s.status === 'rec'),
+      ).length,
       fu1: 0,
       fu2: 0,
       fu3: 0,
@@ -982,6 +1048,170 @@ function DetailedView({ onBack, search = '' }: { onBack: () => void; search?: st
     () => trades.reduce((a, t) => a + (t.low ?? 0), 0),
     [trades],
   );
+
+  // Status color palette for print (hardcoded hex — CSS vars don't work in popup windows)
+  const PRINT_STATUS: Record<BidStatus, { bg: string; fg: string; ring: string; label: string }> = {
+    ntb: { bg: '#E8E6E1', fg: '#3F3D38', ring: '#9C9A92', label: 'To Send' },
+    snt: { bg: '#7DD3F2', fg: '#053A5F', ring: '#1B7CB0', label: 'RFP Sent' },
+    rec: { bg: '#FFE74A', fg: '#3D2D00', ring: '#9C7A00', label: 'Bid Received' },
+    hld: { bg: '#F47B7B', fg: '#3E0707', ring: '#A82828', label: 'Rejected' },
+    fnl: { bg: '#7DD68F', fg: '#0D3E18', ring: '#1F7A38', label: 'Awarded' },
+    fu1: { bg: '#C8A7E6', fg: '#33124F', ring: '#6B3A95', label: 'Followed Up · W1' },
+    fu2: { bg: '#F8CEAC', fg: '#4A2308', ring: '#A85F18', label: 'Followed Up · W2' },
+    fu3: { bg: '#F5C8DD', fg: '#5A1338', ring: '#A8336E', label: 'Followed Up · W3' },
+  };
+
+  function handlePrint() {
+    const date = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+    const rows = trades.map((trade, ti) => {
+      const subs5 = Array.from({ length: 5 }, (_, i) => trade.subs[i] ?? null);
+      const rowBg = ti % 2 === 0 ? '#fff' : '#fafaf8';
+      const cells = subs5.map(sub => {
+        if (!sub) return `<td style="padding:6px 8px;border-bottom:0.5px solid #f0f0ec;text-align:center;color:#ccc;font-size:10px;background:${rowBg};">—</td>`;
+        const s = PRINT_STATUS[sub.status as BidStatus] ?? PRINT_STATUS.ntb;
+        const isLow = sub.amount !== null && sub.amount === trade.low;
+        const amt = sub.amount !== null ? '$' + Math.round(sub.amount).toLocaleString('en-US') : '—';
+        return `<td style="padding:5px 6px;border-bottom:0.5px solid #f0f0ec;vertical-align:top;background:${rowBg};">
+          <div style="background:${s.bg};color:${s.fg};border:1px solid ${s.ring};border-radius:4px 4px 0 0;border-bottom:none;padding:3px 6px;font-size:9.5px;text-align:center;font-weight:${isLow ? 700 : 500};line-height:1.3;">${sub.name}</div>
+          <div style="background:${isLow ? '#e8f5e9' : '#f8f8f6'};color:${isLow ? '#1F7A38' : '#555'};border:1px solid ${isLow ? '#81c784' : '#e0e0dc'};border-top:none;border-radius:0 0 4px 4px;padding:2px 6px;font-size:9.5px;text-align:right;font-weight:${isLow ? 700 : 400};">${amt}</div>
+        </td>`;
+      }).join('');
+      const lowStr = trade.low !== null ? '$' + Math.round(trade.low).toLocaleString('en-US') : '—';
+      return `<tr>
+        <td style="padding:8px 12px;border-bottom:0.5px solid #f0f0ec;font-weight:600;font-size:11px;background:${rowBg};">
+          ${trade.trade}
+          <div style="font-size:9px;color:#aaa;margin-top:1px;">${trade.subs.length} sub${trade.subs.length !== 1 ? 's' : ''}</div>
+        </td>
+        ${cells}
+        <td style="padding:8px 12px;border-bottom:0.5px solid #f0f0ec;text-align:right;font-weight:700;color:${trade.low !== null ? '#1F7A38' : '#aaa'};font-size:11px;background:${rowBg};">${lowStr}</td>
+      </tr>`;
+    }).join('');
+
+    const totalStr = '$' + Math.round(runningLowTotal).toLocaleString('en-US');
+
+    const legendHtml = (Object.entries(PRINT_STATUS) as [BidStatus, typeof PRINT_STATUS[BidStatus]][])
+      .map(([, s]) => `<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:4px;background:${s.bg};color:${s.fg};border:1px solid ${s.ring};font-size:9px;font-weight:500;">${s.label}</span>`)
+      .join('');
+
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Bidding Report · ${project.name}</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #1a1a1a; background: #fff; padding: 24px 28px; }
+    @page { size: landscape; margin: 10mm 12mm; }
+    @media print { body { padding: 0; } }
+    .header { display: flex; align-items: center; gap: 18px; border-bottom: 3px solid #F47832; padding-bottom: 14px; margin-bottom: 16px; }
+    .logo-crop { width: 60px; height: 60px; overflow: hidden; position: relative; flex-shrink: 0; }
+    .logo-img { position: absolute; width: 224px; height: auto; left: -18px; top: -1px; }
+    .header-text h1 { font-size: 17px; font-weight: 700; letter-spacing: -0.01em; }
+    .header-text p { font-size: 11px; color: #888; margin-top: 3px; }
+    .kpi-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-bottom: 14px; }
+    .kpi { background: #f8f8f6; border: 0.5px solid #e8e8e4; border-radius: 8px; padding: 9px 14px; }
+    .kpi-val { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .kpi-label { font-size: 9px; color: #888; margin-top: 2px; text-transform: uppercase; letter-spacing: 0.05em; }
+    .legend { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+    table { width: 100%; border-collapse: collapse; }
+    th { padding: 8px 10px; font-size: 9px; letter-spacing: 0.07em; text-transform: uppercase; color: #888; background: #f5f5f2; border-bottom: 1px solid #e8e8e4; font-weight: 600; }
+    th:first-child { text-align: left; }
+    th:nth-child(n+2):nth-last-child(n+2) { text-align: center; }
+    th:last-child { text-align: right; }
+    .total-row td { background: #f5fdf7 !important; font-weight: 700; font-size: 11px; border-top: 2px solid #b2dfdb; padding: 9px 12px; }
+    .footer { margin-top: 14px; font-size: 9.5px; color: #bbb; display: flex; justify-content: space-between; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="logo-crop">
+      <img class="logo-img" src="/lib_brand/lead_it_builders_logo.png" alt="Lead It Builders" />
+    </div>
+    <div class="header-text">
+      <h1>Bidding Report · ${project.name}</h1>
+      <p>${project.location || project.id} · Generated ${date}</p>
+    </div>
+  </div>
+  <div class="kpi-grid">
+    <div class="kpi"><div class="kpi-val">${kpis.total}</div><div class="kpi-label">Total trades</div></div>
+    <div class="kpi"><div class="kpi-val" style="color:#1F7A38;">${kpis.fnlCount}</div><div class="kpi-label">Finalized</div></div>
+    <div class="kpi"><div class="kpi-val" style="color:#9C7A00;">${kpis.outCount}</div><div class="kpi-label">Out for bid</div></div>
+    <div class="kpi"><div class="kpi-val" style="color:#A82828;">${kpis.hldCount}</div><div class="kpi-label">On hold</div></div>
+    <div class="kpi"><div class="kpi-val" style="color:#1F7A38;">${totalStr}</div><div class="kpi-label">Lowest running</div></div>
+  </div>
+  <div class="legend">${legendHtml}</div>
+  <table>
+    <thead>
+      <tr>
+        <th>Trade</th>
+        <th>Sub 1</th><th>Sub 2</th><th>Sub 3</th><th>Sub 4</th><th>Sub 5</th>
+        <th>Lowest Bid</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${rows}
+      <tr class="total-row">
+        <td colspan="6">Total — lowest column — running</td>
+        <td style="text-align:right;color:#1F7A38;">${totalStr}</td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="footer">
+    <span>Lead It Builders · Bidding Dashboard · ${date}</span>
+    <span>Color = bidding status from the 8-color palette · lowest bid highlighted in green</span>
+  </div>
+  <script>window.onload = function() { window.print(); };<\/script>
+</body>
+</html>`;
+
+    const w = window.open('', '_blank');
+    if (!w) return;
+    w.document.write(html);
+    w.document.close();
+  }
+
+  function handleCopyEmbedLink() {
+    const url = `https://lib-plans-permit-dashboard.vercel.app/bidding/${encodeURIComponent(project.name)}?embed=1`;
+    const onSuccess = () => { setEmbedCopied(true); setTimeout(() => setEmbedCopied(false), 2500); };
+    const execFallback = () => {
+      const ta = document.createElement('textarea');
+      ta.value = url;
+      ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;pointer-events:none;';
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      try { document.execCommand('copy'); onSuccess(); } catch (_) { /* silent */ }
+      document.body.removeChild(ta);
+    };
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(url).then(onSuccess).catch(execFallback);
+    } else {
+      execFallback();
+    }
+  }
+
+  function handleShareLink() {
+    const url = `${window.location.origin}/bidding/${encodeURIComponent(project.name)}/report`;
+    const onSuccess = () => {
+      setShareCopied(true);
+      setTimeout(() => setShareCopied(false), 2500);
+    };
+    const execFallback = () => {
+      const ta = document.createElement('textarea');
+      ta.value = url;
+      ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;pointer-events:none;';
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      try { document.execCommand('copy'); onSuccess(); } catch (_) { /* silent */ }
+      document.body.removeChild(ta);
+    };
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(url).then(onSuccess).catch(execFallback);
+    } else {
+      execFallback();
+    }
+  }
 
   return (
     <>
@@ -1013,8 +1243,69 @@ function DetailedView({ onBack, search = '' }: { onBack: () => void; search?: st
         </button>
         <i className="ti ti-chevron-right" style={{ fontSize: 12, opacity: 0.5 }} />
         <strong style={{ color: 'var(--color-text-primary)' }}>
-          800 Brady Ave · Bidding
+          {project.name} · Bidding
         </strong>
+        <span style={{ flex: 1 }} />
+
+        {/* Print / Share button group */}
+        <div style={{ display: 'inline-flex', borderRadius: 'var(--border-radius-md)', overflow: 'hidden', border: '0.5px solid var(--color-border-secondary)' }}>
+          <button
+            type="button"
+            onClick={handlePrint}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 5,
+              padding: '4px 10px',
+              background: 'var(--color-background-secondary)',
+              color: 'var(--color-text-secondary)',
+              fontSize: 11,
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              border: 'none',
+              borderRight: '0.5px solid var(--color-border-secondary)',
+            }}
+          >
+            <i className="ti ti-printer" style={{ fontSize: 13 }} />
+            Print
+          </button>
+          <button
+            type="button"
+            onClick={handleShareLink}
+            title="Copy live report link to clipboard"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 5,
+              padding: '4px 10px',
+              background: shareCopied ? 'var(--bid-fnl-bg)' : 'var(--color-background-secondary)',
+              color: shareCopied ? 'var(--bid-fnl-fg)' : 'var(--color-text-secondary)',
+              fontSize: 11,
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              border: 'none',
+              transition: 'background 0.2s, color 0.2s',
+            }}
+          >
+            <i className={`ti ${shareCopied ? 'ti-check' : 'ti-link'}`} style={{ fontSize: 13 }} />
+            {shareCopied ? 'Copied!' : 'Share'}
+          </button>
+          <button
+            type="button"
+            onClick={handleCopyEmbedLink}
+            title="Copy stable embed URL for ClickUp"
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 10px',
+              background: embedCopied ? 'var(--bid-fnl-bg)' : 'var(--color-background-secondary)',
+              color: embedCopied ? 'var(--bid-fnl-fg)' : 'var(--color-text-secondary)',
+              fontSize: 11, cursor: 'pointer', fontFamily: 'inherit', border: 'none',
+              transition: 'background 0.2s, color 0.2s',
+            }}
+          >
+            <i className={`ti ${embedCopied ? 'ti-check' : 'ti-brand-clickup'}`} style={{ fontSize: 13 }} />
+            {embedCopied ? 'Copied!' : 'Copy embed link'}
+          </button>
+        </div>
       </div>
 
       {/* Project header */}
@@ -1118,6 +1409,8 @@ function DetailedView({ onBack, search = '' }: { onBack: () => void; search?: st
           value={kpis.total}
           icon="ti-list"
           tone="info"
+          active={filter === 'all'}
+          onClick={() => setFilter('all')}
         />
         <KpiCard
           label="Finalized"
@@ -1125,6 +1418,8 @@ function DetailedView({ onBack, search = '' }: { onBack: () => void; search?: st
           value={kpis.fnlCount}
           icon="ti-trophy"
           tone="good"
+          active={filter === 'fnl'}
+          onClick={() => setFilter(filter === 'fnl' ? 'all' : 'fnl')}
         />
         <KpiCard
           label="Out for bid"
@@ -1132,6 +1427,8 @@ function DetailedView({ onBack, search = '' }: { onBack: () => void; search?: st
           value={kpis.outCount}
           icon="ti-send"
           tone="info"
+          active={filter === 'out'}
+          onClick={() => setFilter(filter === 'out' ? 'all' : 'out')}
         />
         <KpiCard
           label="On hold"
@@ -1139,6 +1436,8 @@ function DetailedView({ onBack, search = '' }: { onBack: () => void; search?: st
           value={kpis.hldCount}
           icon="ti-hand-stop"
           tone="danger"
+          active={filter === 'hld'}
+          onClick={() => setFilter(filter === 'hld' ? 'all' : 'hld')}
         />
         <KpiCard
           label="Not bidding"
@@ -1146,6 +1445,8 @@ function DetailedView({ onBack, search = '' }: { onBack: () => void; search?: st
           value={kpis.ntbCount}
           icon="ti-ban"
           tone="amber"
+          active={filter === 'ntb'}
+          onClick={() => setFilter(filter === 'ntb' ? 'all' : 'ntb')}
         />
         <KpiCard
           label="Lowest running"
@@ -1283,7 +1584,12 @@ function DetailedView({ onBack, search = '' }: { onBack: () => void; search?: st
             </thead>
             <tbody>
               {filteredTrades.map((trade, ti) => {
-                const subs5: (BidSub | null)[] = Array.from({ length: 5 }, (_, i) => trade.subs[i] ?? null);
+                const visibleSubs = filter === 'all'
+                  ? trade.subs
+                  : filter === 'fu'
+                    ? trade.subs.filter(s => s.status === 'fu1' || s.status === 'fu2' || s.status === 'fu3')
+                    : trade.subs.filter(s => s.status === filter);
+                const subs5: (BidSub | null)[] = Array.from({ length: 5 }, (_, i) => visibleSubs[i] ?? null);
                 const isZebra = ti % 2 === 1;
                 const lowestZebraColor = isZebra
                   ? 'rgba(220,234,247,1)'
@@ -1352,7 +1658,6 @@ function DetailedView({ onBack, search = '' }: { onBack: () => void; search?: st
                           </td>
                         );
                       }
-                      const m = STATUS_META[sub.status];
                       const isLow = sub.amount !== null && sub.amount === trade.low;
                       return (
                         <td
@@ -1365,43 +1670,61 @@ function DetailedView({ onBack, search = '' }: { onBack: () => void; search?: st
                           }}
                           onClick={() => setDrawer({ type: 'sub', trade, sub })}
                         >
-                          {/* name block */}
+                          {/* name block — neutral, single color */}
                           <div
                             style={{
                               display: 'block',
                               padding: '5px 8px',
-                              borderRadius: '5px 5px 0 0',
-                              border: `1px solid ${m.ring}`,
-                              borderBottom: 'none',
+                              borderRadius: isLow ? '5px 5px 0 0' : 5,
+                              border: isLow
+                                ? '1px solid var(--good-strong)'
+                                : '1px solid var(--color-border-tertiary)',
+                              borderBottom: isLow ? 'none' : undefined,
                               fontSize: 11.5,
                               textAlign: 'center',
                               fontWeight: 500,
                               minHeight: 26,
-                              background: m.bg,
-                              color: m.fg,
+                              background: isLow ? 'var(--good-bg)' : 'var(--color-background-secondary)',
+                              color: isLow ? 'var(--good-fg)' : 'var(--color-text-primary)',
                             }}
                           >
                             {sub.name}
                           </div>
-                          {/* amount block */}
-                          <div
-                            style={{
-                              display: 'block',
-                              padding: '5px 8px',
-                              border: `1px solid var(--color-border-tertiary)`,
-                              borderTop: 'none',
-                              borderRadius: '0 0 5px 5px',
-                              fontSize: 11.5,
-                              textAlign: 'right',
-                              fontVariantNumeric: 'tabular-nums',
-                              minHeight: 26,
-                              background: isLow ? 'var(--good-bg)' : 'transparent',
-                              color: isLow ? 'var(--good-fg)' : 'var(--color-text-secondary)',
-                              fontWeight: isLow ? 600 : 400,
-                            }}
-                          >
-                            {sub.amount !== null ? fmt$(sub.amount) : '—'}
-                          </div>
+                          {/* amount block — green only for lowest */}
+                          {isLow && (
+                            <div
+                              style={{
+                                display: 'block',
+                                padding: '5px 8px',
+                                border: '1px solid var(--good-strong)',
+                                borderTop: 'none',
+                                borderRadius: '0 0 5px 5px',
+                                fontSize: 11.5,
+                                textAlign: 'right',
+                                fontVariantNumeric: 'tabular-nums',
+                                minHeight: 26,
+                                background: 'var(--good-bg)',
+                                color: 'var(--good-fg)',
+                                fontWeight: 600,
+                              }}
+                            >
+                              {sub.amount !== null ? fmt$(sub.amount) : '—'}
+                            </div>
+                          )}
+                          {!isLow && sub.amount !== null && (
+                            <div
+                              style={{
+                                display: 'block',
+                                padding: '3px 8px',
+                                fontSize: 11,
+                                textAlign: 'right',
+                                fontVariantNumeric: 'tabular-nums',
+                                color: 'var(--color-text-secondary)',
+                              }}
+                            >
+                              {fmt$(sub.amount)}
+                            </div>
+                          )}
                         </td>
                       );
                     })}
@@ -1490,6 +1813,35 @@ function MatrixView({
     );
   }, [project.trades, search]);
   const cols = portfolioProjects.slice(0, 8);
+
+  const portfolioData = useBiddingPortfolio();
+
+  // Map: projectName → Map<tradeName, BidTrade>
+  const projectTradeMap = useMemo(() => {
+    const map = new Map<string, Map<string, BidTrade>>();
+    if (!portfolioData) return map;
+    for (const proj of portfolioData.projects) {
+      const tm = new Map<string, BidTrade>();
+      for (const t of proj.trades) tm.set(t.trade, t);
+      map.set(proj.name, tm);
+    }
+    return map;
+  }, [portfolioData]);
+
+  // Sorted union of all trade names across all portfolio projects,
+  // filtered by current search query.
+  const allTradeNames = useMemo(() => {
+    const names = new Set<string>();
+    for (const [, tm] of projectTradeMap) for (const n of tm.keys()) names.add(n);
+    // Also include trades from the selected project (in case portfolio data lags)
+    for (const t of project.trades) names.add(t.trade);
+    let sorted = [...names].sort();
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      sorted = sorted.filter(n => n.toLowerCase().includes(q));
+    }
+    return sorted;
+  }, [projectTradeMap, project.trades, search]);
 
   return (
     <SectionCard
@@ -1598,95 +1950,111 @@ function MatrixView({
             </tr>
           </thead>
           <tbody>
-            {trades.map((trade, ti) => {
-              const ts = tradeStatus(trade);
-              const isEven = ti % 2 === 0;
-              return (
-                <tr key={ti}>
-                  <td
-                    style={{
-                      padding: '7px 12px',
-                      border: '0.5px solid var(--color-border-tertiary)',
-                      fontWeight: 500,
-                      fontSize: 11.5,
-                      background: isEven
-                        ? 'var(--color-background-primary)'
-                        : 'var(--color-background-secondary)',
-                      position: 'sticky',
-                      left: 0,
-                      zIndex: 1,
-                    }}
-                  >
-                    {trade.trade}
-                    {trade.annot && (
-                      <div style={{ fontSize: 9, color: 'var(--danger-fg)', fontStyle: 'italic', marginTop: 1 }}>
-                        {trade.annot}
-                      </div>
-                    )}
-                  </td>
-                  {cols.map((proj, pi) => {
-                    if (!proj.isReal) {
+            {portfolioData === null ? (
+              <tr>
+                <td colSpan={9} style={{ padding: '12px', textAlign: 'center', color: 'var(--color-text-tertiary)', fontSize: 12 }}>
+                  <i className="ti ti-loader" /> Loading portfolio…
+                </td>
+              </tr>
+            ) : (
+              allTradeNames.map((tradeName, ti) => {
+                const isEven = ti % 2 === 0;
+                // For the sticky trade-name cell, use the first real project's trade for highlighting
+                const firstRealProj = cols.find(p => p.isReal);
+                const firstTrade = firstRealProj
+                  ? projectTradeMap.get(firstRealProj.name)?.get(tradeName)
+                  : undefined;
+                return (
+                  <tr key={ti}>
+                    <td
+                      style={{
+                        padding: '7px 12px',
+                        border: '0.5px solid var(--color-border-tertiary)',
+                        fontWeight: 500,
+                        fontSize: 11.5,
+                        background: isEven
+                          ? 'var(--color-background-primary)'
+                          : 'var(--color-background-secondary)',
+                        position: 'sticky',
+                        left: 0,
+                        zIndex: 1,
+                      }}
+                    >
+                      {tradeName}
+                      {firstTrade?.annot && (
+                        <div style={{ fontSize: 9, color: 'var(--danger-fg)', fontStyle: 'italic', marginTop: 1 }}>
+                          {firstTrade.annot}
+                        </div>
+                      )}
+                    </td>
+                    {cols.map((proj, pi) => {
+                      if (!proj.isReal) {
+                        return (
+                          <td
+                            key={pi}
+                            style={{
+                              padding: '6px 8px',
+                              border: '0.5px solid var(--color-border-tertiary)',
+                              textAlign: 'center',
+                              color: 'var(--color-text-tertiary)',
+                              fontSize: 10,
+                              fontStyle: 'italic',
+                              background: isEven
+                                ? 'var(--color-background-primary)'
+                                : 'var(--color-background-secondary)',
+                            }}
+                          >
+                            pending
+                          </td>
+                        );
+                      }
+                      const trade = projectTradeMap.get(proj.name)?.get(tradeName);
+                      const ts = trade ? tradeStatus(trade) : null;
+                      const m = ts ? STATUS_META[ts] : null;
                       return (
                         <td
                           key={pi}
                           style={{
-                            padding: '6px 8px',
+                            padding: '4px 6px',
                             border: '0.5px solid var(--color-border-tertiary)',
                             textAlign: 'center',
-                            color: 'var(--color-text-tertiary)',
-                            fontSize: 10,
-                            fontStyle: 'italic',
-                            background: isEven
-                              ? 'var(--color-background-primary)'
-                              : 'var(--color-background-secondary)',
+                            verticalAlign: 'middle',
                           }}
                         >
-                          pending
+                          {trade === undefined ? (
+                            <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)' }}>—</span>
+                          ) : m ? (
+                            <div
+                              style={{
+                                background: m.bg,
+                                color: m.fg,
+                                border: `1px solid ${m.ring}`,
+                                borderRadius: 4,
+                                padding: '2px 5px',
+                                fontSize: 9,
+                                fontWeight: 600,
+                                whiteSpace: 'nowrap',
+                              }}
+                            >
+                              {m.label.split(' ')[0]}
+                              {trade.low !== null && (
+                                <div style={{ fontSize: 8, fontWeight: 400, color: m.fg, opacity: 0.8 }}>
+                                  {fmt$(trade.low)}
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)' }}>
+                              —
+                            </span>
+                          )}
                         </td>
                       );
-                    }
-                    const m = ts ? STATUS_META[ts] : null;
-                    return (
-                      <td
-                        key={pi}
-                        style={{
-                          padding: '4px 6px',
-                          border: '0.5px solid var(--color-border-tertiary)',
-                          textAlign: 'center',
-                          verticalAlign: 'middle',
-                        }}
-                      >
-                        {m ? (
-                          <div
-                            style={{
-                              background: m.bg,
-                              color: m.fg,
-                              border: `1px solid ${m.ring}`,
-                              borderRadius: 4,
-                              padding: '2px 5px',
-                              fontSize: 9,
-                              fontWeight: 600,
-                              whiteSpace: 'nowrap',
-                            }}
-                          >
-                            {m.label.split(' ')[0]}
-                            {trade.low !== null && (
-                              <div style={{ fontSize: 8, fontWeight: 400, color: m.fg, opacity: 0.8 }}>
-                                {fmt$(trade.low)}
-                              </div>
-                            )}
-                          </div>
-                        ) : (
-                          <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)' }}>
-                            —
-                          </span>
-                        )}
-                      </td>
-                    );
-                  })}
-                </tr>
-              );
-            })}
+                    })}
+                  </tr>
+                );
+              })
+            )}
           </tbody>
         </table>
       </div>
@@ -1838,15 +2206,17 @@ function PipelineView({ search = '' }: { search?: string }) {
             {col.items.map((trade, i) => (
               <div
                 key={i}
+                onClick={() => trade.taskId && window.open(`https://app.clickup.com/t/${trade.taskId}`, '_blank', 'noopener')}
                 style={{
                   background: 'var(--color-background-primary)',
                   borderRadius: 6,
                   padding: '8px 10px',
                   marginBottom: 6,
                   border: `0.5px solid ${m.ring}`,
+                  cursor: trade.taskId ? 'pointer' : 'default',
                 }}
               >
-                <div style={{ fontSize: 12, fontWeight: 500 }}>{trade.trade}</div>
+                <div style={{ fontSize: 12, fontWeight: 500 }}>{trade.trade}{trade.taskId && <i className="ti ti-external-link" style={{ fontSize: 9, opacity: 0.4, marginLeft: 4 }} />}</div>
                 {trade.low !== null && (
                   <div
                     style={{
@@ -2353,87 +2723,287 @@ function SubsView({ search = '' }: { search?: string }) {
   );
 }
 
+// ─── Portfolio matrix view ─────────────────────────────────────────────────────
+
+function PortfolioMatrixView({
+  portfolioData,
+  onNavigateToProject,
+  search,
+}: {
+  portfolioData: BiddingPortfolioPayload;
+  onNavigateToProject: (id: string) => void;
+  search: string;
+}) {
+  const projects = portfolioData.projects;
+
+  const projectTradeMap = useMemo(() => {
+    const map = new Map<string, Map<string, BidTrade>>();
+    for (const proj of projects) {
+      const tm = new Map<string, BidTrade>();
+      for (const t of proj.trades) tm.set(t.trade, t);
+      map.set(proj.name, tm);
+    }
+    return map;
+  }, [projects]);
+
+  const allTradeNames = useMemo(() => {
+    const names = new Set<string>();
+    for (const [, tm] of projectTradeMap) for (const n of tm.keys()) names.add(n);
+    const sorted = [...names].sort();
+    if (!search.trim()) return sorted;
+    const q = search.toLowerCase();
+    return sorted.filter((n) => n.toLowerCase().includes(q));
+  }, [projectTradeMap, search]);
+
+  return (
+    <SectionCard title="Portfolio bidding matrix — all projects" icon="ti-table">
+      <div style={{ overflowX: 'auto' }} className="matrix-scroll">
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+          <colgroup>
+            <col style={{ minWidth: 200 }} />
+            {projects.map((_, i) => (
+              <col key={i} style={{ minWidth: 130 }} />
+            ))}
+          </colgroup>
+          <thead>
+            <tr>
+              <th
+                style={{
+                  textAlign: 'left',
+                  padding: '8px 12px',
+                  fontSize: 10,
+                  letterSpacing: '0.06em',
+                  textTransform: 'uppercase',
+                  color: 'var(--color-text-tertiary)',
+                  fontWeight: 600,
+                  background: 'var(--color-background-secondary)',
+                  border: '0.5px solid var(--color-border-tertiary)',
+                  position: 'sticky',
+                  left: 0,
+                  zIndex: 2,
+                }}
+              >
+                Trade
+              </th>
+              {projects.map((proj) => (
+                <th
+                  key={proj.name}
+                  title={`View ${proj.name}`}
+                  onClick={() => onNavigateToProject(proj.name)}
+                  style={{
+                    textAlign: 'center',
+                    padding: '7px 8px',
+                    fontSize: 10,
+                    color: 'var(--color-text-primary)',
+                    fontWeight: 600,
+                    background: 'var(--color-background-secondary)',
+                    border: '0.5px solid var(--color-border-tertiary)',
+                    whiteSpace: 'nowrap',
+                    cursor: 'pointer',
+                    letterSpacing: '0.02em',
+                    maxWidth: 130,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                  }}
+                >
+                  {proj.name}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {allTradeNames.length === 0 ? (
+              <tr>
+                <td
+                  colSpan={projects.length + 1}
+                  style={{
+                    padding: 24,
+                    textAlign: 'center',
+                    color: 'var(--color-text-tertiary)',
+                    fontSize: 12,
+                  }}
+                >
+                  {search ? 'No trades match your search.' : 'No bidding data yet.'}
+                </td>
+              </tr>
+            ) : (
+              allTradeNames.map((tradeName, ti) => (
+                <tr key={ti}>
+                  <td
+                    style={{
+                      padding: '7px 12px',
+                      border: '0.5px solid var(--color-border-tertiary)',
+                      fontWeight: 500,
+                      background: 'var(--color-background-primary)',
+                      position: 'sticky',
+                      left: 0,
+                      zIndex: 1,
+                    }}
+                  >
+                    {tradeName}
+                  </td>
+                  {projects.map((proj) => {
+                    const trade = projectTradeMap.get(proj.name)?.get(tradeName);
+                    const ts = trade ? tradeStatus(trade) : null;
+                    const m = ts ? STATUS_META[ts] : null;
+                    return (
+                      <td
+                        key={proj.name}
+                        style={{
+                          padding: '6px 8px',
+                          border: '0.5px solid var(--color-border-tertiary)',
+                          textAlign: 'center',
+                          background: m ? m.bg : undefined,
+                        }}
+                      >
+                        {ts ? (
+                          <StatusPill status={ts} small />
+                        ) : (
+                          <span style={{ color: 'var(--color-text-tertiary)', fontSize: 11 }}>—</span>
+                        )}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    </SectionCard>
+  );
+}
+
 // ─── Main BiddingDashboard ─────────────────────────────────────────────────────
 
-type View = 'overview' | 'detailed' | 'matrix' | 'pipeline' | 'followups' | 'spreads' | 'subs';
+type ProjectTab = 'matrix' | 'pipeline' | 'followups' | 'subs';
 
-const VIEW_TABS: { id: View; label: string; icon: string }[] = [
-  { id: 'overview',  label: 'Overview',   icon: 'ti-layout-dashboard' },
-  { id: 'detailed',  label: 'Detailed',   icon: 'ti-table-options' },
-  { id: 'matrix',    label: 'Matrix',     icon: 'ti-layout-grid' },
-  { id: 'pipeline',  label: 'Pipeline',   icon: 'ti-git-branch' },
-  { id: 'followups', label: 'Follow-ups', icon: 'ti-message-2' },
-  { id: 'spreads',   label: 'Spreads',    icon: 'ti-chart-bar' },
-  { id: 'subs',      label: 'Subs',       icon: 'ti-users' },
+const PROJECT_TABS: { id: ProjectTab; label: string; icon: string }[] = [
+  { id: 'matrix',    label: 'Trade Matrix', icon: 'ti-table-options' },
+  { id: 'pipeline',  label: 'Pipeline',     icon: 'ti-git-branch' },
+  { id: 'followups', label: 'Follow-ups',   icon: 'ti-message-2' },
+  { id: 'subs',      label: 'Subs',         icon: 'ti-users' },
 ];
 
-export function BiddingDashboard() {
-  const [view, setView] = useState<View>('overview');
-  const [selectedProject, setSelectedProject] = useState<string>('');
+export function BiddingDashboard({ projectId }: { projectId?: string } = {}) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const tab = ((searchParams?.get('tab') ?? 'matrix') as ProjectTab);
   const [search, setSearch] = useState('');
 
-  // SWR URL includes projectId once the user (or the first-load effect) has picked a project.
-  // Changing selectedProject changes the key, which triggers a re-fetch.
-  const swrUrl = selectedProject
-    ? `/api/bidding?projectId=${encodeURIComponent(selectedProject)}`
-    : '/api/bidding';
+  const navigateToProject = useCallback(
+    (id: string) => router.push(`/bidding/${encodeURIComponent(id)}`),
+    [router],
+  );
+  const navigateToPortfolio = useCallback(() => router.push('/bidding'), [router]);
+  const setTab = useCallback(
+    (newTab: ProjectTab) => {
+      if (!projectId) return;
+      const params = new URLSearchParams(searchParams?.toString() ?? '');
+      params.set('tab', newTab);
+      router.push(`/bidding/${encodeURIComponent(projectId)}?${params.toString()}`);
+    },
+    [router, projectId, searchParams],
+  );
 
-  const { data, isLoading } = useSWR<BiddingPayload>(swrUrl, fetcher, {
-    refreshInterval: 300_000,
-    revalidateOnFocus: false,
-    dedupingInterval: 60_000,
-  });
+  // Portfolio data — only fetched in portfolio mode
+  const { data: portfolioData, isLoading: portfolioLoading } = useSWR<BiddingPortfolioPayload>(
+    projectId ? null : '/api/bidding/portfolio',
+    portfolioFetcher,
+    { refreshInterval: 300_000, revalidateOnFocus: false, dedupingInterval: 60_000 },
+  );
 
-  // When the initial (no-param) fetch returns, lock in the first real project so subsequent
-  // project-picker changes produce a stable URL key change rather than replacing stale data.
-  useEffect(() => {
-    if (data && !selectedProject) {
-      const first = data.portfolioProjects.find(p => p.isReal) ?? data.portfolioProjects[0];
-      if (first) setSelectedProject(first.name);
-    }
-  }, [data, selectedProject]);
+  // Per-project data — only fetched in project mode
+  const { data: projectData, isLoading: projectLoading } = useSWR<BiddingPayload>(
+    projectId ? `/api/bidding/project/${encodeURIComponent(projectId)}` : null,
+    fetcher,
+    { refreshInterval: 300_000, revalidateOnFocus: false, dedupingInterval: 60_000 },
+  );
+
+  const isLoading = projectId ? projectLoading : portfolioLoading;
+
+  const syncedAt = projectId
+    ? (projectData?.syncedAt ?? null)
+    : (portfolioData?.syncedAt ?? null);
 
   const subtitle = useMemo(() => {
-    if (!data) return 'Loading…';
-    const { project, portfolioProjects } = data;
-    const fnlCount = project.trades.filter(t => t.subs.some(s => s.status === 'fnl')).length;
-    return `${project.trades.length} trades · ${fnlCount} finalized · ${portfolioProjects.length} projects in portfolio`;
-  }, [data]);
+    if (projectId) {
+      if (!projectData) return 'Loading…';
+      const fnlCount = projectData.project.trades.filter((t) =>
+        t.subs.some((s) => s.status === 'fnl'),
+      ).length;
+      return `${projectData.project.trades.length} trades · ${fnlCount} finalized`;
+    }
+    if (!portfolioData) return 'Loading…';
+    return `${portfolioData.projects.length} projects · all bidding lists`;
+  }, [projectId, projectData, portfolioData]);
 
-  if (isLoading || !data) {
+  // Project names for the picker — populated from whichever payload is available
+  const allProjectNames = useMemo(() => {
+    if (projectData) return projectData.portfolioProjects.map((p) => p.name);
+    if (portfolioData) return portfolioData.projects.map((p) => p.name);
+    return [];
+  }, [projectData, portfolioData]);
+
+  // Loading skeleton
+  if (isLoading || (projectId ? !projectData : !portfolioData)) {
     return (
       <>
         <LogoHeader title="Bidding Dashboard" subtitleOverride="Loading from ClickUp…" syncedAt={null} />
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 240, color: 'var(--color-text-tertiary)', fontSize: 13 }}>
-          <i className="ti ti-loader" style={{ fontSize: 20, marginRight: 8, animation: 'lib-spin 1s linear infinite' }} />
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            height: 240,
+            color: 'var(--color-text-tertiary)',
+            fontSize: 13,
+          }}
+        >
+          <i
+            className="ti ti-loader"
+            style={{ fontSize: 20, marginRight: 8, animation: 'lib-spin 1s linear infinite' }}
+          />
           Loading bidding data…
         </div>
       </>
     );
   }
 
-  if (data.warning) {
+  // No-token warning (portfolio mode)
+  if (!projectId && portfolioData!.source === 'empty') {
     return (
       <>
-        <LogoHeader title="Bidding Dashboard" subtitleOverride={data.warning} syncedAt={null} />
-        <div style={{ padding: '32px 24px', color: 'var(--color-text-secondary)', fontSize: 13, lineHeight: 1.6 }}>
-          <strong>No data available.</strong> {data.warning}
+        <LogoHeader title="Bidding Dashboard" subtitleOverride="No ClickUp token" syncedAt={null} />
+        <div style={{ padding: '32px 24px', color: 'var(--color-text-secondary)', fontSize: 13 }}>
+          <strong>No data available.</strong> Add <code>CLICKUP_API_TOKEN</code> to{' '}
+          <code>.env.local</code> to load live data.
         </div>
       </>
     );
   }
 
-  const { portfolioProjects } = data;
+  // No-token warning (project mode)
+  if (projectId && projectData!.warning) {
+    return (
+      <>
+        <LogoHeader title="Bidding Dashboard" subtitleOverride={projectData!.warning} syncedAt={null} />
+        <div style={{ padding: '32px 24px', color: 'var(--color-text-secondary)', fontSize: 13 }}>
+          <strong>No data available.</strong> {projectData!.warning}
+        </div>
+      </>
+    );
+  }
 
   return (
-    <BiddingCtx.Provider value={data}>
+    <>
       <LogoHeader
         title="Bidding Dashboard"
         subtitleOverride={subtitle}
-        syncedAt={data.syncedAt || null}
+        syncedAt={syncedAt}
       />
 
-      {/* Filter bar */}
+      {/* Filter / navigation bar */}
       <div
         style={{
           display: 'flex',
@@ -2444,7 +3014,7 @@ export function BiddingDashboard() {
         }}
         className="filter-bar"
       >
-        {/* Search */}
+        {/* Search input */}
         <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
           <i
             className="ti ti-search"
@@ -2477,35 +3047,12 @@ export function BiddingDashboard() {
           />
         </div>
 
-        {/* Portfolio filter dropdown — drives the active project fetch */}
+        {/* Project picker — "★ All projects" is always first */}
         <select
-          style={{
-            height: 32,
-            padding: '0 10px',
-            border: '0.5px solid var(--color-border-secondary)',
-            borderRadius: 'var(--border-radius-md)',
-            background: 'var(--color-background-primary)',
-            color: 'var(--color-text-primary)',
-            fontSize: 12.5,
-            fontFamily: 'inherit',
-          }}
-          value={selectedProject}
-          onChange={(e) => setSelectedProject(e.target.value)}
-        >
-          {portfolioProjects.filter((p) => p.isReal).map((p) => (
-            <option key={p.name} value={p.name}>
-              ★ {p.name}
-            </option>
-          ))}
-        </select>
-
-        {/* Project picker */}
-        <select
-          value={selectedProject}
+          value={projectId ?? ''}
           onChange={(e) => {
-            setSelectedProject(e.target.value);
-            const proj = portfolioProjects.find((p) => p.name === e.target.value);
-            if (proj?.isReal) setView('detailed');
+            if (!e.target.value) navigateToPortfolio();
+            else navigateToProject(e.target.value);
           }}
           style={{
             height: 32,
@@ -2516,59 +3063,67 @@ export function BiddingDashboard() {
             color: 'var(--color-text-primary)',
             fontSize: 12.5,
             fontFamily: 'inherit',
-            minWidth: 200,
+            minWidth: 220,
           }}
         >
-          {portfolioProjects.map((p) => (
-            <option key={p.name} value={p.name}>
-              {p.isReal ? '★ ' : ''}
-              {p.name}{p.location ? ` · ${p.location}` : ''}
+          <option value="">★ All projects</option>
+          {allProjectNames.map((name) => (
+            <option key={name} value={name}>
+              {name}
             </option>
           ))}
         </select>
 
-        {/* View tab strip */}
-        <div
-          className="view-toggle"
-          style={{
-            display: 'flex',
-            gap: 4,
-            padding: 4,
-            background: 'var(--color-background-secondary)',
-            borderRadius: 'var(--border-radius-md)',
-            marginLeft: 'auto',
-          }}
-        >
-          {VIEW_TABS.map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              className={`tab${view === tab.id ? ' active' : ''}`}
-              onClick={() => setView(tab.id)}
-            >
-              <i className={`ti ${tab.icon}`} style={{ fontSize: 13, marginRight: 5 }} />
-              {tab.label}
-            </button>
-          ))}
-        </div>
+        {/* Tab strip — per-project mode only */}
+        {projectId && (
+          <div
+            className="view-toggle"
+            style={{
+              display: 'flex',
+              gap: 4,
+              padding: 4,
+              background: 'var(--color-background-secondary)',
+              borderRadius: 'var(--border-radius-md)',
+              marginLeft: 'auto',
+            }}
+          >
+            {PROJECT_TABS.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                className={`tab${tab === t.id ? ' active' : ''}`}
+                onClick={() => setTab(t.id)}
+              >
+                <i className={`ti ${t.icon}`} style={{ fontSize: 13, marginRight: 5 }} />
+                {t.label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* View content */}
-      {view === 'overview' && <OverviewView onGoDetailed={() => setView('detailed')} />}
-      {view === 'detailed' && <DetailedView onBack={() => setView('overview')} search={search} />}
-      {view === 'matrix' && (
-        <MatrixView
-          onBack={() => setView('overview')}
-          onGoDetailed={() => setView('detailed')}
+      {/* Content — portfolio mode */}
+      {!projectId && (
+        <PortfolioMatrixView
+          portfolioData={portfolioData!}
+          onNavigateToProject={navigateToProject}
           search={search}
         />
       )}
-      {view === 'pipeline' && <PipelineView search={search} />}
-      {view === 'followups' && <FollowUpsView search={search} />}
-      {view === 'spreads' && <SpreadsView search={search} />}
-      {view === 'subs' && <SubsView search={search} />}
 
-      {/* Footer — two lines */}
+      {/* Content — per-project mode */}
+      {projectId && projectData && (
+        <BiddingCtx.Provider value={projectData}>
+          {tab === 'matrix' && (
+            <DetailedView onBack={navigateToPortfolio} search={search} />
+          )}
+          {tab === 'pipeline' && <PipelineView search={search} />}
+          {tab === 'followups' && <FollowUpsView search={search} />}
+          {tab === 'subs' && <SubsView search={search} />}
+        </BiddingCtx.Provider>
+      )}
+
+      {/* Footer */}
       <div
         style={{
           fontSize: 11,
@@ -2579,12 +3134,12 @@ export function BiddingDashboard() {
         }}
       >
         <div>
-          Live from ClickUp · 60-second cache · click any project, trade row, or sub cell to open in ClickUp
+          Live from ClickUp · 60-second cache · click any trade row or sub cell to open in ClickUp
         </div>
         <div>
-          Color = bidding status from the 8-color PDF palette · variance bar = New − Estimated · &quot;Manual&quot; = auto-rule overridden
+          Color = bidding status from the 8-color PDF palette
         </div>
       </div>
-    </BiddingCtx.Provider>
+    </>
   );
 }

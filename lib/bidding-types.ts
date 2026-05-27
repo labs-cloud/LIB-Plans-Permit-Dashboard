@@ -5,6 +5,7 @@ export interface BidSub {
   amount: number | null;
   status: BidStatus;
   flag?: string;
+  url?: string;
 }
 
 export interface BidTrade {
@@ -12,6 +13,7 @@ export interface BidTrade {
   annot: string | null;
   subs: BidSub[];
   low: number | null;
+  taskId?: string;
 }
 
 export interface PortfolioProjectStub {
@@ -36,4 +38,10 @@ export interface BiddingPayload {
   syncedAt: number;
   source?: 'live' | 'empty';
   warning?: string;
+}
+
+export interface BiddingPortfolioPayload {
+  projects: BiddingProject[];
+  syncedAt: number;
+  source?: 'live' | 'empty';
 }

@@ -30,7 +30,7 @@ function findBudgetList(lists: ClickUpList[]): ClickUpList | undefined {
   return undefined;
 }
 
-async function buildBudgetPayload(projectId: string | null): Promise<BudgetPayload> {
+async function buildPayload(projectId: string): Promise<BudgetPayload> {
   if (!hasClickUpToken()) {
     return {
       project: EMPTY_PROJECT,
@@ -49,9 +49,7 @@ async function buildBudgetPayload(projectId: string | null): Promise<BudgetPaylo
     real: true,
   }));
 
-  const targetFolder = projectId
-    ? (folders.find(f => f.name === projectId) ?? folders[0])
-    : folders[0];
+  const targetFolder = folders.find(f => f.name === projectId) ?? folders[0];
 
   if (!targetFolder) {
     return { project: EMPTY_PROJECT, portfolioProjects, syncedAt: Date.now(), source: 'live' };
@@ -63,9 +61,14 @@ async function buildBudgetPayload(projectId: string | null): Promise<BudgetPaylo
 
   if (!budgetList) {
     console.warn(
-      `[budget] No "01. Budget" list found in folder "${targetFolder.name}" (id=${targetFolder.id}).`,
+      `[budget/project] No "01. Budget" list in folder "${targetFolder.name}" (id=${targetFolder.id}).`,
     );
-    return { project: { ...EMPTY_PROJECT, name: targetFolder.name }, portfolioProjects, syncedAt: Date.now(), source: 'live' };
+    return {
+      project: { ...EMPTY_PROJECT, name: targetFolder.name },
+      portfolioProjects,
+      syncedAt: Date.now(),
+      source: 'live',
+    };
   }
 
   const [tasks, biddingTasks] = await Promise.all([
@@ -79,17 +82,19 @@ async function buildBudgetPayload(projectId: string | null): Promise<BudgetPaylo
   return { project, portfolioProjects, syncedAt: Date.now(), source: 'live' };
 }
 
-const getCachedBudgetPayload = unstable_cache(
-  buildBudgetPayload,
-  ['lib-budget:v5'],
-  { revalidate: CACHE_TTL_SECONDS, tags: [BUDGET_CACHE_TAG] },
-);
+const getCachedPayload = unstable_cache(buildPayload, ['lib-budget-project:v6'], {
+  revalidate: CACHE_TTL_SECONDS,
+  tags: [BUDGET_CACHE_TAG],
+});
 
-export async function GET(req: Request) {
+export async function GET(
+  _req: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
   try {
-    const { searchParams } = new URL(req.url);
-    const projectId = searchParams.get('projectId');
-    const payload = await getCachedBudgetPayload(projectId);
+    const { id } = await params;
+    const projectId = decodeURIComponent(id);
+    const payload = await getCachedPayload(projectId);
     return NextResponse.json(payload, {
       headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300' },
     });
