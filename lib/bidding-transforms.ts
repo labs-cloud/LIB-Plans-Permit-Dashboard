@@ -133,7 +133,7 @@ export function transformBiddingTasks(
     for (const [nameId, amtId] of slots) {
       const name = getString(task, nameId);
       if (!name) continue;
-      subs.push({ name, amount: getCurrency(task, amtId), status: tradeStatus, url: task.url });
+      subs.push({ name, amount: getCurrency(task, amtId), status: tradeStatus, url: `https://app.clickup.com/t/${task.id}` });
     }
 
     let low: number | null = null;
@@ -228,7 +228,7 @@ export function transformBiddingTasksByName(
       name: task.name.trim(),
       amount: getCurrencyByName(task, 'Bid/Contracted Amount'),
       status: mapBiddingStatusName(task.status?.status ?? ''),
-      url: task.url,
+      url: `https://app.clickup.com/t/${task.id}`,
     }));
 
     const amounts = subs.map(s => s.amount).filter((a): a is number => a !== null);
