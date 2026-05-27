@@ -233,6 +233,56 @@ function SideCard({ title, icon, children }: { title: string; icon: string; chil
 }
 
 // ──────────────────────────────────────────────────────────────
+// ReconcileButton
+// ──────────────────────────────────────────────────────────────
+function ReconcileButton({ label, taskId, value, onSuccess }: {
+  label: string;
+  taskId: string;
+  value: number;
+  onSuccess?: () => void;
+}) {
+  const [state, setState] = useState<'idle' | 'loading' | 'done' | 'error'>('idle');
+
+  async function handleClick() {
+    setState('loading');
+    try {
+      const res = await fetch('/api/budget/reconcile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ taskId, value }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      setState('done');
+      onSuccess?.();
+      setTimeout(() => setState('idle'), 3000);
+    } catch {
+      setState('error');
+      setTimeout(() => setState('idle'), 3000);
+    }
+  }
+
+  return (
+    <button
+      onClick={handleClick}
+      disabled={state === 'loading' || state === 'done'}
+      style={{
+        flex: 1, height: 32, borderRadius: 'var(--border-radius-md)',
+        border: '0.5px solid #92400e', background: state === 'done' ? '#d1fae5' : '#fef3c7',
+        color: state === 'done' ? '#065f46' : '#92400e',
+        fontSize: 11.5, cursor: state === 'loading' ? 'wait' : 'pointer',
+        fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center',
+        justifyContent: 'center', gap: 5, transition: 'background 0.2s, color 0.2s',
+      }}
+    >
+      {state === 'loading' && <i className="ti ti-loader-2" style={{ fontSize: 13, animation: 'spin 1s linear infinite' }} />}
+      {state === 'done' && <i className="ti ti-check" style={{ fontSize: 13 }} />}
+      {state === 'error' && <i className="ti ti-alert-triangle" style={{ fontSize: 13 }} />}
+      {state === 'idle' ? label : state === 'loading' ? 'Saving…' : state === 'done' ? 'Saved!' : 'Error'}
+    </button>
+  );
+}
+
+// ──────────────────────────────────────────────────────────────
 // drawer
 // ──────────────────────────────────────────────────────────────
 function Drawer({
@@ -304,6 +354,34 @@ function Drawer({
                   </div>
                 );
               })()}
+              {trade.finMismatch && trade.awardedBid !== undefined && (
+                <>
+                  <h4 style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#92400e', margin: '16px 0 8px', background: '#fef3c7', padding: '4px 8px', borderRadius: 4 }}>
+                    ⚠ Mismatch detected
+                  </h4>
+                  <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', lineHeight: 1.6 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '0.5px solid var(--color-border-tertiary)' }}>
+                      <span>Updated Budget (override)</span>
+                      <span style={{ fontWeight: 600 }}>${(trade.fin as number).toLocaleString()}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '0.5px solid var(--color-border-tertiary)' }}>
+                      <span>Awarded bid ({trade.awardedSubName})</span>
+                      <span style={{ fontWeight: 600 }}>${trade.awardedBid.toLocaleString()}</span>
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 6 }}>
+                      Diff: {((trade.fin as number) - trade.awardedBid) > 0 ? '+' : ''}${Math.abs((trade.fin as number) - trade.awardedBid).toLocaleString()}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                    <ReconcileButton
+                      label="Use awarded bid"
+                      taskId={trade.taskId!}
+                      value={trade.awardedBid}
+                      onSuccess={() => { /* drawer will refresh on next SWR poll */ }}
+                    />
+                  </div>
+                </>
+              )}
               <h4 style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--color-text-tertiary)', margin: '16px 0 8px' }}>Bid history</h4>
               <div style={{ color: 'var(--color-text-tertiary)', fontStyle: 'italic', padding: '18px 0', textAlign: 'center', fontSize: 12 }}>
                 Full bid history available in ClickUp
@@ -856,6 +934,16 @@ function DetailedView({
                       <td style={{ padding: '10px 12px', borderBottom: '0.5px solid var(--color-border-tertiary)', verticalAlign: 'middle', fontSize: 13, fontWeight: 500 }}>
                         <span style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                           {r.trade}
+                          {r.finMismatch && (
+                            <span
+                              title={`Updated Budget ($${r.fin?.toLocaleString()}) differs from awarded bid ($${r.awardedBid?.toLocaleString()} — ${r.awardedSubName}). Open Reconcile to resolve.`}
+                              style={{
+                                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                                width: 16, height: 16, borderRadius: 3, background: '#fef3c7',
+                                color: '#92400e', fontSize: 9.5, fontWeight: 700, flexShrink: 0, cursor: 'help',
+                              }}
+                            >!</span>
+                          )}
                           {r.hasDuplicate && r.duplicateTaskUrls && r.duplicateTaskUrls.length > 0 && (
                             <a
                               href={r.duplicateTaskUrls[0]}
@@ -1010,6 +1098,43 @@ function DetailedView({
               <div style={{ padding: '4px 0' }}><b style={{ color: 'var(--color-text-primary)' }}>Included / NA</b> → mirrors that token</div>
             </div>
           </SideCard>
+
+          {(() => {
+            const mismatches = filteredTrades.filter(t => t.finMismatch && t.awardedBid !== undefined && typeof t.fin === 'number');
+            if (mismatches.length === 0) return null;
+            return (
+              <div style={{ background: 'var(--color-background-primary)', border: '0.5px solid var(--color-border-tertiary)', borderLeft: '3px solid #f59e0b', borderRadius: 'var(--border-radius-lg)', padding: '16px 18px', marginBottom: 14 }}>
+                <h3 style={{ margin: '0 0 12px', fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--color-text-tertiary)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <i className="ti ti-alert-triangle" style={{ fontSize: 13 }} />
+                  {`Reconcile (${mismatches.length})`}
+                </h3>
+                <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 8, lineHeight: 1.5 }}>
+                  Updated Budget override differs from awarded sub&apos;s bid. Click to sync.
+                </div>
+                {mismatches.map(t => {
+                  const fin = t.fin as number;
+                  const diff = fin - (t.awardedBid as number);
+                  return (
+                    <div key={t.trade} style={{ padding: '8px 0', borderTop: '0.5px solid var(--color-border-tertiary)' }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.trade}</div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--color-text-secondary)', marginBottom: 6 }}>
+                        <span>Override: ${fin.toLocaleString()}</span>
+                        <span>Awarded: ${(t.awardedBid as number).toLocaleString()}</span>
+                      </div>
+                      <div style={{ fontSize: 10, color: diff > 0 ? '#dc2626' : '#16a34a', marginBottom: 6 }}>
+                        {diff > 0 ? '+' : ''}${Math.abs(diff).toLocaleString()} difference
+                      </div>
+                      <ReconcileButton
+                        label={`Use awarded ($${(t.awardedBid as number).toLocaleString()})`}
+                        taskId={t.taskId!}
+                        value={t.awardedBid as number}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
         </div>
       </div>
     </div>
@@ -1071,8 +1196,18 @@ function VarianceView({ onBack, search }: { onBack: () => void; search?: string 
         onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-background-secondary)')}
         onMouseLeave={e => (e.currentTarget.style.background = '')}
       >
-        <div style={{ fontSize: 12.5, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {r.trade}
+        <div style={{ fontSize: 12.5, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.trade}</span>
+          {r.finMismatch && (
+            <span
+              title={`Updated Budget ($${r.fin?.toLocaleString()}) differs from awarded bid ($${r.awardedBid?.toLocaleString()} — ${r.awardedSubName}). Open Reconcile to resolve.`}
+              style={{
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                width: 16, height: 16, borderRadius: 3, background: '#fef3c7',
+                color: '#92400e', fontSize: 9.5, fontWeight: 700, flexShrink: 0, cursor: 'help',
+              }}
+            >!</span>
+          )}
         </div>
         {/* bar */}
         <div style={{ position: 'relative', height: 14 }}>
