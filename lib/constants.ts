@@ -38,6 +38,7 @@ export const CLICKUP = {
     SUB_4_AMT:     '87d4e396-50f0-4995-a0c9-483f5c1f638e',
     SUB_5_AMT:     '7ea03080-824d-4cf9-9193-4a020bcf0919',
     SUBCONTRACTORS: 'f6d611a7-71e9-49d6-a95e-3301de536333', // labels — canonical sub directory
+    TRADE_TYPE:     'e86b14c6-5c9f-4391-ab51-846acfe366a8', // drop_down — 0=Biddable, 1=Set
   },
 } as const;
 
