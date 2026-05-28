@@ -45,8 +45,9 @@ const OPTIONS: Option[] = [
 
 // Extract the project segment from the current path, e.g.
 // "/bidding/3930%20Carpenter" → "3930%20Carpenter"
+// Also handles "/plans/3930%20Carpenter" for the Plans per-project route.
 function extractProjectSegment(path: string): string | null {
-  const m = path.match(/^\/(?:budget|bidding)\/([^/]+)/);
+  const m = path.match(/^\/(?:budget|bidding|plans)\/([^/]+)/);
   return m ? m[1] : null;
 }
 
@@ -55,10 +56,11 @@ export function DashboardSwitcher() {
   const activeId: Option['id'] = pathname.startsWith('/budget') ? 'budget' : pathname.startsWith('/bidding') ? 'bidding' : pathname.startsWith('/permits') ? 'permits' : 'plans';
   const active = OPTIONS.find((o) => o.id === activeId)!;
 
-  // If we're on a per-project page, carry the project over to budget/bidding.
+  // If we're on a per-project page, carry the project over to budget/bidding/plans.
+  // Plans per-project lives at /plans/[segment]; its portfolio is still at /.
   const projectSegment = extractProjectSegment(pathname);
   function hrefFor(opt: Option): string {
-    if (projectSegment && (opt.id === 'budget' || opt.id === 'bidding')) {
+    if (projectSegment && (opt.id === 'budget' || opt.id === 'bidding' || opt.id === 'plans')) {
       return `/${opt.id}/${projectSegment}`;
     }
     return opt.href;
