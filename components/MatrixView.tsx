@@ -1062,6 +1062,7 @@ function StatusCell({
   const title = arr.map((s) => STATUS_NAME[s]).join(', ');
   const inner = (
     <div
+      className={taskId ? 'matrix-task-cell' : undefined}
       style={{
         display: 'flex',
         alignItems: 'center',
@@ -1916,10 +1917,15 @@ function HeatmapRows({
                       onMouseMove: onCellMove,
                       onMouseLeave: onCellLeave,
                     };
+                    const linkable = taskId && status !== 'empty';
                     const cellEl = (
-                      <div style={heatCellStyle(status, cellSize)} {...handlers} />
+                      <div
+                        className={linkable ? 'matrix-task-cell' : undefined}
+                        style={heatCellStyle(status, cellSize)}
+                        {...handlers}
+                      />
                     );
-                    return taskId && status !== 'empty' ? (
+                    return linkable ? (
                       <a
                         key={plan}
                         href={taskUrl(taskId)}
@@ -2062,10 +2068,15 @@ function HeatmapCols({
                     onMouseMove: onCellMove,
                     onMouseLeave: onCellLeave,
                   };
+                  const linkable = taskId && status !== 'empty';
                   const cellEl = (
-                    <div style={heatCellStyle(status, cellSize)} {...handlers} />
+                    <div
+                      className={linkable ? 'matrix-task-cell' : undefined}
+                      style={heatCellStyle(status, cellSize)}
+                      {...handlers}
+                    />
                   );
-                  return taskId && status !== 'empty' ? (
+                  return linkable ? (
                     <a
                       key={p.folderId}
                       href={taskUrl(taskId)}

@@ -595,7 +595,7 @@ function PortfolioBudgetView({
                     return (
                       <td
                         key={proj.name}
-                        className={taskId ? 'budget-matrix-cell' : undefined}
+                        className={taskId ? 'matrix-task-cell' : undefined}
                         title={taskId ? `Open ${tradeName} · ${proj.name} in ClickUp` : undefined}
                         onClick={taskId ? () => window.open(`${CLICKUP.BASE_URL}/t/${taskId}`, '_blank', 'noopener') : undefined}
                         style={{
