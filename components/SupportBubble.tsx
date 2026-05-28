@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { ScreenshotEditor } from './ScreenshotEditor';
 
 type Mode = 'menu' | 'issue' | 'feature';
 type Status = 'idle' | 'sending' | 'sent' | 'error';
@@ -16,6 +17,9 @@ export function SupportBubble() {
   const [files, setFiles] = useState<File[]>([]);
   const [status, setStatus] = useState<Status>('idle');
   const [error, setError] = useState<string | null>(null);
+  const [captureBusy, setCaptureBusy] = useState(false);
+  const [hidden, setHidden] = useState(false);
+  const [editing, setEditing] = useState<string | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
   const buttonRef = useRef<HTMLButtonElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -80,6 +84,55 @@ export function SupportBubble() {
     setFiles(files.filter((_, i) => i !== idx));
   };
 
+  const addBlobAsFile = (blob: Blob) => {
+    let total = files.reduce((acc, f) => acc + f.size, 0);
+    if (blob.size > MAX_FILE_BYTES) {
+      setError('Capture is larger than 8 MB. Crop it down and try again.');
+      return false;
+    }
+    if (total + blob.size > MAX_TOTAL_BYTES) {
+      setError('Total attachments would exceed 20 MB.');
+      return false;
+    }
+    const file = new File([blob], `screenshot-${Date.now()}.png`, { type: 'image/png' });
+    setFiles([...files, file]);
+    return true;
+  };
+
+  const handleCapture = async () => {
+    setError(null);
+    setCaptureBusy(true);
+    setHidden(true);
+    await new Promise<void>((resolve) => {
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+    });
+    try {
+      const html2canvas = (await import('html2canvas')).default;
+      const bodyBg =
+        getComputedStyle(document.body).backgroundColor ||
+        getComputedStyle(document.documentElement).backgroundColor ||
+        '#ffffff';
+      const canvas = await html2canvas(document.body, {
+        backgroundColor: bodyBg,
+        logging: false,
+        useCORS: true,
+        scale: Math.min(2, window.devicePixelRatio || 1),
+      });
+      const dataUrl = canvas.toDataURL('image/png');
+      setEditing(dataUrl);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Capture failed.');
+    } finally {
+      setHidden(false);
+      setCaptureBusy(false);
+    }
+  };
+
+  const handleEditorDone = (blob: Blob) => {
+    if (addBlobAsFile(blob)) setEditing(null);
+    else setEditing(null);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (mode === 'menu') return;
@@ -116,6 +169,14 @@ export function SupportBubble() {
 
   return (
     <>
+      {editing && (
+        <ScreenshotEditor
+          imageDataUrl={editing}
+          onDone={handleEditorDone}
+          onCancel={() => setEditing(null)}
+        />
+      )}
+      <div style={{ display: hidden ? 'none' : 'contents' }}>
       <button
         ref={buttonRef}
         type="button"
@@ -273,24 +334,46 @@ export function SupportBubble() {
                   <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>
                     Screenshots ({files.length})
                   </span>
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    style={{
-                      background: 'transparent',
-                      border: '0.5px solid var(--color-border-secondary)',
-                      borderRadius: 'var(--border-radius-md)',
-                      padding: '4px 10px',
-                      fontSize: 12,
-                      cursor: 'pointer',
-                      color: 'var(--color-text-primary)',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 4,
-                    }}
-                  >
-                    <i className="ti ti-paperclip" style={{ fontSize: 14 }} /> Attach
-                  </button>
+                  <span style={{ display: 'inline-flex', gap: 6 }}>
+                    <button
+                      type="button"
+                      onClick={handleCapture}
+                      disabled={captureBusy}
+                      style={{
+                        background: 'transparent',
+                        border: '0.5px solid var(--color-border-secondary)',
+                        borderRadius: 'var(--border-radius-md)',
+                        padding: '4px 10px',
+                        fontSize: 12,
+                        cursor: captureBusy ? 'wait' : 'pointer',
+                        color: 'var(--color-text-primary)',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 4,
+                        opacity: captureBusy ? 0.7 : 1,
+                      }}
+                    >
+                      <i className="ti ti-camera" style={{ fontSize: 14 }} /> Capture screen
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      style={{
+                        background: 'transparent',
+                        border: '0.5px solid var(--color-border-secondary)',
+                        borderRadius: 'var(--border-radius-md)',
+                        padding: '4px 10px',
+                        fontSize: 12,
+                        cursor: 'pointer',
+                        color: 'var(--color-text-primary)',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 4,
+                      }}
+                    >
+                      <i className="ti ti-paperclip" style={{ fontSize: 14 }} /> Attach
+                    </button>
+                  </span>
                   <input
                     ref={fileInputRef}
                     type="file"
@@ -414,6 +497,7 @@ export function SupportBubble() {
           )}
         </div>
       )}
+      </div>
     </>
   );
 }
