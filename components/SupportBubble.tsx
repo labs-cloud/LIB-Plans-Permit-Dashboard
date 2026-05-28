@@ -13,7 +13,6 @@ export function SupportBubble() {
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<Mode>('menu');
   const [message, setMessage] = useState('');
-  const [reporter, setReporter] = useState('');
   const [files, setFiles] = useState<File[]>([]);
   const [status, setStatus] = useState<Status>('idle');
   const [error, setError] = useState<string | null>(null);
@@ -94,7 +93,6 @@ export function SupportBubble() {
     const fd = new FormData();
     fd.set('kind', mode);
     fd.set('message', message.trim());
-    fd.set('reporter', reporter.trim());
     if (typeof window !== 'undefined') {
       fd.set('pageUrl', window.location.href);
       fd.set('userAgent', navigator.userAgent);
@@ -245,16 +243,6 @@ export function SupportBubble() {
 
           {(mode === 'issue' || mode === 'feature') && status !== 'sent' && (
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>Your name or email (optional)</span>
-                <input
-                  type="text"
-                  value={reporter}
-                  onChange={(e) => setReporter(e.target.value)}
-                  placeholder="e.g. jane@leaditbuilders.com"
-                  style={inputStyle}
-                />
-              </label>
               <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                 <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>
                   {mode === 'issue' ? 'What went wrong?' : 'What would you like to see?'}
