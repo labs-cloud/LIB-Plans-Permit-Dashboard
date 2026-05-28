@@ -137,32 +137,19 @@ export function transformBudgetTasks(
 ): BudgetProject {
   const entries: RawEntry[] = tasks.map(task => {
     const est: MoneyVal = getCurrency(task, F.BUDGET_ALLOC);
-    const bidContracted: MoneyVal = getCurrency(task, F.BID_CONTRACTED);
     const updatedBudget: MoneyVal = getCurrency(task, F.UPDATED_BUDGET);
     const biddingLow: number | null = biddingLows?.get(task.name.trim()) ?? null;
     const awardedEntry = awardedBids?.get(task.name.trim());
     const awardedBid: number | null = awardedEntry?.amount ?? null;
     const awardedSubName: string | null = awardedEntry?.subName ?? null;
 
-    let fin: MoneyVal;
+    // fin comes ONLY from bid activity in the 02. Bidding list — never from
+    // trade-task fields which may contain stale or manually-entered data.
+    const fin: MoneyVal = awardedBid ?? biddingLow ?? null;
+
+    // newv: manual budget override (Updated Budget) → finalized bid → estimate carry-forward.
+    const newv = deriveNewv(est, updatedBudget ?? fin);
     const finMismatch = false;
-
-    // Priority: trade-level Bid/Contracted Amount → awarded sub bid → lowest qualifying
-    // bid → Updated Budget manual override → null.
-    // fin must NEVER fall through to est (Budget Allocated).
-    if (bidContracted !== null) {
-      fin = bidContracted;
-    } else if (awardedBid !== null) {
-      fin = awardedBid;
-    } else if (biddingLow !== null) {
-      fin = biddingLow;
-    } else if (updatedBudget !== null) {
-      fin = updatedBudget;
-    } else {
-      fin = null;
-    }
-
-    const newv = deriveNewv(est, fin);
     const costType = getCostType(task);
     const status = task.status?.status ?? '';
     const tradeType = getTradeType(task) ?? 'pending';
