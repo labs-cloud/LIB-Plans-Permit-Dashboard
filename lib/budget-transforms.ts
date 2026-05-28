@@ -137,6 +137,7 @@ export function transformBudgetTasks(
 ): BudgetProject {
   const entries: RawEntry[] = tasks.map(task => {
     const est: MoneyVal = getCurrency(task, F.BUDGET_ALLOC);
+    const bidContracted: MoneyVal = getCurrency(task, F.BID_CONTRACTED);
     const updatedBudget: MoneyVal = getCurrency(task, F.UPDATED_BUDGET);
     const biddingLow: number | null = biddingLows?.get(task.name.trim()) ?? null;
     const awardedEntry = awardedBids?.get(task.name.trim());
@@ -144,21 +145,21 @@ export function transformBudgetTasks(
     const awardedSubName: string | null = awardedEntry?.subName ?? null;
 
     let fin: MoneyVal;
-    let finMismatch = false;
+    const finMismatch = false;
 
-    if (updatedBudget !== null) {
-      // Manual "Updated Budget" override takes priority.
-      fin = updatedBudget;
-      // Flag when the override diverges from the awarded sub's bid.
-      if (awardedBid !== null && Math.abs(updatedBudget - awardedBid) > 0.5) {
-        finMismatch = true;
-      }
+    // Priority: trade-level Bid/Contracted Amount → awarded sub bid → lowest qualifying
+    // bid → Updated Budget manual override → null.
+    // fin must NEVER fall through to est (Budget Allocated).
+    if (bidContracted !== null) {
+      fin = bidContracted;
     } else if (awardedBid !== null) {
-      // No manual override — use awarded sub's bid as finalized value.
       fin = awardedBid;
-    } else {
-      // Neither override nor awarded bid — fall back to mathematical minimum.
+    } else if (biddingLow !== null) {
       fin = biddingLow;
+    } else if (updatedBudget !== null) {
+      fin = updatedBudget;
+    } else {
+      fin = null;
     }
 
     const newv = deriveNewv(est, fin);
