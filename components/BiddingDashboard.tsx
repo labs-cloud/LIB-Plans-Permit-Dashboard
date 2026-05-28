@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import useSWR from 'swr';
 import { LogoHeader } from './LogoHeader';
 import type { BidStatus, BidSub, BidTrade, BiddingPayload, BiddingPortfolioPayload } from '@/lib/bidding-types';
+import { taskUrl } from '@/lib/urls';
 
 // ─── Data context (replaces static fixture import) ────────────────────────────
 
@@ -849,9 +850,13 @@ function OverviewView({ onGoDetailed }: { onGoDetailed: () => void }) {
                         const trade = projectTradeMap.get(proj.name)?.get(tradeName);
                         const ts = trade ? tradeStatus(trade) : null;
                         const lowSub = trade?.subs.find(s => s.amount === trade.low && trade.low !== null);
+                        const cellTaskId = ts ? trade?.taskId : undefined;
                         return (
                           <td
                             key={pi}
+                            className={cellTaskId ? 'matrix-task-cell' : undefined}
+                            title={cellTaskId ? `Open ${tradeName} · ${proj.name} in ClickUp` : undefined}
+                            onClick={cellTaskId ? () => window.open(taskUrl(cellTaskId), '_blank', 'noopener') : undefined}
                             style={{
                               padding: '7px 10px',
                               border: '0.5px solid var(--color-border-tertiary)',
@@ -2011,9 +2016,13 @@ function MatrixView({
                       const trade = projectTradeMap.get(proj.name)?.get(tradeName);
                       const ts = trade ? tradeStatus(trade) : null;
                       const m = ts ? STATUS_META[ts] : null;
+                      const cellTaskId = m ? trade?.taskId : undefined;
                       return (
                         <td
                           key={pi}
+                          className={cellTaskId ? 'matrix-task-cell' : undefined}
+                          title={cellTaskId ? `Open ${tradeName} · ${proj.name} in ClickUp` : undefined}
+                          onClick={cellTaskId ? () => window.open(taskUrl(cellTaskId), '_blank', 'noopener') : undefined}
                           style={{
                             padding: '4px 6px',
                             border: '0.5px solid var(--color-border-tertiary)',
