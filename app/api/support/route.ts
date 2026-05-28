@@ -3,7 +3,7 @@ import { Resend } from 'resend';
 
 export const runtime = 'nodejs';
 
-const SUPPORT_TO = 'labs@optentia.com';
+const SUPPORT_ADDRESS = 'labs@optentia.com';
 const MAX_ATTACHMENT_BYTES = 8 * 1024 * 1024; // 8 MB per file
 const MAX_TOTAL_BYTES = 20 * 1024 * 1024; // 20 MB request cap
 const ALLOWED_MIME = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/webp']);
@@ -44,7 +44,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Message is too long (max 8000 characters).' }, { status: 400 });
   }
 
-  const reporter = String(form.get('reporter') ?? '').trim().slice(0, 200) || 'Unknown';
   const pageUrl = String(form.get('pageUrl') ?? '').trim().slice(0, 500);
   const userAgent = String(form.get('userAgent') ?? '').trim().slice(0, 500);
 
@@ -77,11 +76,10 @@ export async function POST(req: Request) {
   }
 
   const label = labelFor(kind);
-  const subject = `[Plans Dashboard] ${label} — ${reporter}`;
+  const subject = `[Plans Dashboard] ${label}`;
 
   const lines = [
     `Type: ${label}`,
-    `Reporter: ${reporter}`,
     pageUrl ? `Page: ${pageUrl}` : null,
     userAgent ? `User-Agent: ${userAgent}` : null,
     `Submitted: ${new Date().toISOString()}`,
@@ -99,7 +97,6 @@ export async function POST(req: Request) {
     <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;color:#1a1a1a;">
       <h2 style="margin:0 0 12px 0;font-size:16px;">${escapeHtml(label)}</h2>
       <table style="border-collapse:collapse;font-size:13px;margin-bottom:16px;">
-        <tr><td style="padding:2px 12px 2px 0;color:#6b6b6b;">Reporter</td><td>${escapeHtml(reporter)}</td></tr>
         ${pageUrl ? `<tr><td style="padding:2px 12px 2px 0;color:#6b6b6b;">Page</td><td><a href="${escapeHtml(pageUrl)}">${escapeHtml(pageUrl)}</a></td></tr>` : ''}
         ${userAgent ? `<tr><td style="padding:2px 12px 2px 0;color:#6b6b6b;">Browser</td><td>${escapeHtml(userAgent)}</td></tr>` : ''}
         <tr><td style="padding:2px 12px 2px 0;color:#6b6b6b;">Submitted</td><td>${new Date().toISOString()}</td></tr>
@@ -109,18 +106,16 @@ export async function POST(req: Request) {
     </div>
   `;
 
-  const from = process.env.SUPPORT_FROM_EMAIL || 'Plans Dashboard <onboarding@resend.dev>';
-  const replyTo = process.env.SUPPORT_REPLY_TO || undefined;
+  const from = process.env.SUPPORT_FROM_EMAIL || `Plans Dashboard <${SUPPORT_ADDRESS}>`;
 
   try {
     const resend = new Resend(apiKey);
     const { error } = await resend.emails.send({
       from,
-      to: SUPPORT_TO,
+      to: SUPPORT_ADDRESS,
       subject,
       text,
       html,
-      replyTo,
       attachments: attachments.map((a) => ({
         filename: a.filename,
         content: a.content,
