@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useMemo, useState, type ReactNo
 import useSWR from 'swr';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { LogoHeader } from '@/components/LogoHeader';
+import { ProjectPicker } from '@/components/ProjectPicker';
 import { CLICKUP } from '@/lib/constants';
 import type {
   BudgetTrade,
@@ -2100,41 +2101,13 @@ export function BudgetDashboard({ projectId }: { projectId?: string } = {}) {
         )}
 
         {/* Project picker */}
-        {isEmbed && projectId ? (
-          <span style={{
-            height: 32, padding: '0 10px',
-            border: '0.5px solid var(--color-border-secondary)',
-            borderRadius: 'var(--border-radius-md)',
-            background: 'var(--color-background-secondary)',
-            color: 'var(--color-text-primary)',
-            fontFamily: 'inherit', fontSize: 13, minWidth: 200, fontWeight: 500,
-            display: 'inline-flex', alignItems: 'center',
-          }}>
-            {projectId}
-          </span>
-        ) : (
-          <select
-            className="budget-project-select"
-            value={projectId ?? ''}
-            onChange={(e) => {
-              if (!e.target.value) navigateToPortfolio();
-              else navigateToProject(e.target.value);
-            }}
-            style={{
-              height: 32, padding: '0 10px',
-              border: '0.5px solid var(--color-border-secondary)',
-              borderRadius: 'var(--border-radius-md)',
-              background: 'var(--color-background-primary)',
-              color: 'var(--color-text-primary)',
-              fontFamily: 'inherit', fontSize: 13, minWidth: 200, fontWeight: 500,
-            }}
-          >
-            <option value="">★ All projects</option>
-            {allProjectNames.map(name => (
-              <option key={name} value={name}>{name}</option>
-            ))}
-          </select>
-        )}
+        <ProjectPicker
+          projectId={projectId}
+          projectNames={allProjectNames}
+          onPortfolio={navigateToPortfolio}
+          onProject={navigateToProject}
+          isEmbed={isEmbed}
+        />
 
         {/* Copy embed link — per-project, non-embed mode only */}
         {!isEmbed && projectId && (

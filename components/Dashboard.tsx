@@ -4,22 +4,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import useSWR from 'swr';
 import { useRouter, useSearchParams } from 'next/navigation';
 
-import type { CoordinatorId, PhaseId } from '@/lib/constants';
-import { COORD_BY_ID, PHASES } from '@/lib/constants';
-import type { DashboardPayload, KpiStripData, PermitsPanelData, Project, StickingItem } from '@/lib/types';
+import type { DashboardPayload } from '@/lib/types';
 import { computeKpis, computePermitsPanel } from '@/lib/kpis';
-import { buildMatrix } from '@/lib/plan-type-map';
 import { computeSticking } from '@/lib/sticking';
 
 import { LogoHeader } from './LogoHeader';
-import { FilterBar, type ViewMode } from './FilterBar';
-import { KpiStrip } from './KpiStrip';
-import { CoordinatorRoster } from './CoordinatorRoster';
+import { ProjectPicker } from './ProjectPicker';
 import { OverviewView } from './OverviewView';
-import { DetailedView } from './DetailedView';
 import { MatrixView } from './MatrixView';
-import type { SortKey } from './SortChips';
-import type { ChipStyle, DetailedLayout } from './ViewSettings';
 
 const fetcher = async (url: string): Promise<DashboardPayload> => {
   const res = await fetch(url);
@@ -50,80 +42,40 @@ const EMPTY_PAYLOAD: DashboardPayload = {
 interface Props {
   initial: DashboardPayload | null;
   initialError?: string | null;
+  projectId?: string;
 }
 
-function readParam<T extends string>(
-  params: URLSearchParams,
-  key: string,
-  allowed: readonly T[],
-  fallback: T,
-): T {
-  const v = params.get(key);
-  if (v && (allowed as readonly string[]).includes(v)) return v as T;
-  return fallback;
-}
-
-const SORT_KEYS: readonly SortKey[] = ['urgency', 'coord', 'phase', 'name', 'activity'] as const;
-const COORD_KEYS: readonly (CoordinatorId | 'all')[] = ['all', 'faigy', 'malky', 'unassigned'] as const;
-const PHASE_KEYS: readonly (PhaseId | 'all')[] = ['all', 'pre', 'con', 'post'] as const;
-const VIEW_KEYS: readonly ViewMode[] = ['overview', 'detailed', 'matrix'] as const;
-const LAYOUT_KEYS: readonly DetailedLayout[] = ['A', 'B', 'C', 'D'] as const;
-const CHIP_KEYS: readonly ChipStyle[] = ['solid', 'dot', 'stripe'] as const;
-
-// Per-user "launch this view by default" preference. Read-once on mount and
-// then never auto-updated, so toggling default in one tab doesn't yank views
-// out from under another open tab.
-const DEFAULT_VIEW_STORAGE_KEY = 'lib.dashboard.defaultView';
-
-function readDefaultView(): ViewMode {
-  if (typeof window === 'undefined') return 'overview';
-  try {
-    const saved = window.localStorage.getItem(DEFAULT_VIEW_STORAGE_KEY);
-    if (saved && (VIEW_KEYS as readonly string[]).includes(saved)) {
-      return saved as ViewMode;
-    }
-  } catch {
-    /* ignore — private mode, sandbox iframe, etc. */
-  }
-  return 'overview';
-}
-
-function sortProjects(list: Project[], key: SortKey): Project[] {
-  const arr = [...list];
-  if (key === 'urgency') arr.sort((a, b) => a.urgency - b.urgency || a.name.localeCompare(b.name));
-  else if (key === 'name') arr.sort((a, b) => a.name.localeCompare(b.name));
-  else if (key === 'phase')
-    arr.sort(
-      (a, b) =>
-        (a.phase ?? 'zz').localeCompare(b.phase ?? 'zz') || a.urgency - b.urgency,
-    );
-  else if (key === 'coord')
-    arr.sort((a, b) => a.coord.localeCompare(b.coord) || a.urgency - b.urgency);
-  else if (key === 'activity') arr.sort((a, b) => b.lastActivity - a.lastActivity);
-  return arr;
-}
-
-export function Dashboard({ initial, initialError }: Props) {
+export function Dashboard({ initial, initialError, projectId }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const isEmbed = searchParams?.get('embed') === '1';
 
-  // The user's saved "open this view on launch" preference. Tracked in state
-  // so the FilterBar pin button reflects updates without a refresh; persisted
-  // to localStorage on every change.
-  const [defaultView, setDefaultViewState] = useState<ViewMode>('overview');
-  useEffect(() => setDefaultViewState(readDefaultView()), []);
-
-  const view = readParam(searchParams, 'view', VIEW_KEYS, 'overview');
-  const coord = readParam(searchParams, 'coord', COORD_KEYS, 'all');
-  const phase = readParam(searchParams, 'phase', PHASE_KEYS, 'all');
-  const sort = readParam(searchParams, 'sort', SORT_KEYS, 'urgency');
-  const layout = readParam(searchParams, 'layout', LAYOUT_KEYS, 'A');
-  const chipStyle = readParam(searchParams, 'chip', CHIP_KEYS, 'solid');
-  const search = searchParams.get('q') ?? '';
-  const assetTypeRaw = searchParams.get('assetType') ?? 'all';
+  const search = searchParams?.get('q') ?? '';
   const [searchInput, setSearchInput] = useState(search);
   useEffect(() => setSearchInput(search), [search]);
+
+  // Stable ref so the debounce effect doesn't re-arm on every render.
+  const searchParamsRef = useRef(searchParams);
+  searchParamsRef.current = searchParams;
+
+  const setSearch = useCallback(
+    (q: string) => {
+      const params = new URLSearchParams(searchParamsRef.current.toString());
+      if (q) params.set('q', q);
+      else params.delete('q');
+      const qs = params.toString();
+      router.replace(qs ? `?${qs}` : '?', { scroll: false });
+    },
+    [router],
+  );
+
+  useEffect(() => {
+    const handle = window.setTimeout(() => {
+      if (searchInput === search) return;
+      setSearch(searchInput || '');
+    }, 200);
+    return () => window.clearTimeout(handle);
+  }, [searchInput, search, setSearch]);
 
   const { data, error } = useSWR<DashboardPayload>('/api/projects', fetcher, {
     fallbackData: initial ?? undefined,
@@ -134,122 +86,45 @@ export function Dashboard({ initial, initialError }: Props) {
   });
 
   const payload = data ?? initial ?? EMPTY_PAYLOAD;
-
-  // Validate Asset Type filter against options the server actually returned —
-  // falls back to 'all' if the URL holds a stale value.
-  const assetType =
-    assetTypeRaw !== 'all' && payload.assetTypes.includes(assetTypeRaw) ? assetTypeRaw : 'all';
-
-  // Hold `searchParams` in a ref so `setParam` keeps stable identity across
-  // renders. Otherwise it's recreated every render (URL change, SWR refetch,
-  // search-input keystrokes) and re-arms the search-debounce effect.
-  const searchParamsRef = useRef(searchParams);
-  searchParamsRef.current = searchParams;
-
-  const setParam = useCallback(
-    (updates: Record<string, string | null>) => {
-      const params = new URLSearchParams(searchParamsRef.current.toString());
-      for (const [k, v] of Object.entries(updates)) {
-        if (v == null || v === '') params.delete(k);
-        else params.set(k, v);
-      }
-      const qs = params.toString();
-      router.replace(qs ? `?${qs}` : '?', { scroll: false });
-    },
-    [router],
-  );
-
-  const setView = (v: ViewMode) => setParam({ view: v === 'overview' ? null : v });
-  const setDefaultView = useCallback((v: ViewMode | null) => {
-    const next = v ?? 'overview';
-    setDefaultViewState(next);
-    try {
-      if (v === null || v === 'overview') {
-        window.localStorage.removeItem(DEFAULT_VIEW_STORAGE_KEY);
-      } else {
-        window.localStorage.setItem(DEFAULT_VIEW_STORAGE_KEY, v);
-      }
-    } catch {
-      /* ignore */
-    }
-  }, []);
-
-  // On first load with no explicit ?view= in the URL, navigate to the user's
-  // saved default. We only do this once on mount and only when there's a real
-  // preference to honor (i.e. not the implicit 'overview' fallback).
-  const didApplyDefaultRef = useRef(false);
-  useEffect(() => {
-    if (didApplyDefaultRef.current) return;
-    didApplyDefaultRef.current = true;
-    const saved = readDefaultView();
-    if (saved === 'overview') return;
-    if (searchParamsRef.current.get('view')) return;
-    setParam({ view: saved });
-  }, [setParam]);
-  const setCoord = (c: CoordinatorId | 'all') => setParam({ coord: c === 'all' ? null : c });
-  const setPhase = (p: PhaseId | 'all') => setParam({ phase: p === 'all' ? null : p });
-  const setAssetType = (s: string | 'all') => setParam({ assetType: s === 'all' ? null : s });
-  const setSort = (s: SortKey) => setParam({ sort: s === 'urgency' ? null : s });
-  const setLayout = (l: DetailedLayout) => setParam({ layout: l === 'A' ? null : l });
-  const setChipStyle = (c: ChipStyle) => setParam({ chip: c === 'solid' ? null : c });
-
-  // Debounced commit of search to URL.
-  useEffect(() => {
-    const handle = window.setTimeout(() => {
-      if (searchInput === search) return;
-      setParam({ q: searchInput || null });
-    }, 200);
-    return () => window.clearTimeout(handle);
-  }, [searchInput, search, setParam]);
-
-  // Stage 1: project-level filters (coord, phase, search). Plans are still
-  // the full set at this point.
-  const projectFiltered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return payload.projects.filter((p) => {
-      if (coord !== 'all' && p.coord !== coord) return false;
-      if (phase !== 'all' && p.phase !== phase) return false;
-      if (q && !p.name.toLowerCase().includes(q)) return false;
-      return true;
-    });
-  }, [payload.projects, coord, phase, search]);
-
-  // Stage 2: plan-level Asset Type filter — replaces each project's plan list
-  // and re-derives the matrix so the matrix dots reflect only matching plans.
-  const filtered = useMemo(() => {
-    if (assetType === 'all') return projectFiltered;
-    return projectFiltered.map((project) => {
-      const plans = project.plans.filter((plan) => plan.assetType === assetType);
-      return { ...project, plans, matrix: buildMatrix(plans) };
-    });
-  }, [projectFiltered, assetType]);
-
-  const sorted = useMemo(() => sortProjects(filtered, sort), [filtered, sort]);
-
-  const filtersActive = coord !== 'all' || phase !== 'all' || assetType !== 'all' || !!search;
-
-  const filteredKpis: KpiStripData = useMemo(
-    () => (filtersActive ? computeKpis(filtered) : payload.kpis),
-    [filtersActive, filtered, payload.kpis],
-  );
-  const filteredSticking: StickingItem[] = useMemo(
-    () => (filtersActive ? computeSticking(filtered) : payload.sticking),
-    [filtersActive, filtered, payload.sticking],
-  );
-  const filteredPermits: PermitsPanelData = useMemo(
-    () => (filtersActive ? computePermitsPanel(filtered) : payload.permits),
-    [filtersActive, filtered, payload.permits],
-  );
-
-  const filterTagBits: string[] = [];
-  if (coord !== 'all') filterTagBits.push(COORD_BY_ID[coord].name);
-  if (phase !== 'all') filterTagBits.push(PHASES.find((p) => p.id === phase)?.label ?? phase);
-  if (assetType !== 'all') filterTagBits.push(assetType);
-  if (search) filterTagBits.push(`“${search}”`);
-  const filterTag = filterTagBits.length ? filterTagBits.join(' · ') : null;
-
   const errMessage = initialError ?? (error ? String(error) : null);
   const warning = errMessage ?? payload.warning ?? null;
+
+  const allProjectNames = useMemo(
+    () => payload.projects.map((p) => p.name),
+    [payload.projects],
+  );
+
+  // Portfolio: search-filtered project list for the matrix.
+  const portfolioProjects = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return payload.projects;
+    return payload.projects.filter((p) => p.name.toLowerCase().includes(q));
+  }, [payload.projects, search]);
+
+  // Per-project: resolve the single selected project from the full payload.
+  const selectedProject = useMemo(
+    () => (projectId ? (payload.projects.find((p) => p.name === projectId) ?? null) : null),
+    [payload.projects, projectId],
+  );
+
+  const singleKpis = useMemo(
+    () => (selectedProject ? computeKpis([selectedProject]) : EMPTY_PAYLOAD.kpis),
+    [selectedProject],
+  );
+  const singleSticking = useMemo(
+    () => (selectedProject ? computeSticking([selectedProject]) : []),
+    [selectedProject],
+  );
+  const singlePermits = useMemo(
+    () => (selectedProject ? computePermitsPanel([selectedProject]) : EMPTY_PAYLOAD.permits),
+    [selectedProject],
+  );
+
+  const navigateToProject = useCallback(
+    (name: string) => router.push(`/plans/${encodeURIComponent(name)}`),
+    [router],
+  );
+  const navigateToPortfolio = useCallback(() => router.push('/'), [router]);
 
   return (
     <div
@@ -260,72 +135,139 @@ export function Dashboard({ initial, initialError }: Props) {
         borderRadius: 'var(--border-radius-lg)',
       }}
     >
-      {!isEmbed && (
+      {!isEmbed && !projectId && (
         <LogoHeader
-          shownCount={sorted.length}
+          shownCount={portfolioProjects.length}
           totalCount={payload.projects.length}
           syncedAt={payload.syncedAt}
-          filterLine={filterTag}
+          warning={warning}
+        />
+      )}
+      {!isEmbed && projectId && (
+        <LogoHeader
+          title="Plans Dashboard"
+          subtitleOverride={projectId}
+          syncedAt={payload.syncedAt}
           warning={warning}
         />
       )}
 
-      <FilterBar
-        search={searchInput}
-        coord={coord}
-        phase={phase}
-        assetType={assetType}
-        assetTypeOptions={payload.assetTypes}
-        view={view}
-        defaultView={defaultView}
-        onSetDefaultView={setDefaultView}
-        onSearchChange={setSearchInput}
-        onCoordChange={setCoord}
-        onPhaseChange={setPhase}
-        onAssetTypeChange={setAssetType}
-        onViewChange={setView}
-      />
+      {/* Toolbar: search (portfolio only) + project picker */}
+      <div
+        className="budget-toolbar"
+        style={{
+          display: 'flex',
+          gap: 8,
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          marginBottom: '1.25rem',
+        }}
+      >
+        {!projectId && (
+          <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+            <i
+              className="ti ti-search"
+              style={{
+                position: 'absolute',
+                left: 8,
+                fontSize: 13,
+                color: 'var(--color-text-tertiary)',
+                pointerEvents: 'none',
+              }}
+            />
+            <input
+              type="search"
+              placeholder="Search projects…"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              style={{
+                height: 32,
+                paddingLeft: 26,
+                paddingRight: 8,
+                border: '0.5px solid var(--color-border-secondary)',
+                borderRadius: 'var(--border-radius-md)',
+                background: 'var(--color-background-primary)',
+                color: 'var(--color-text-primary)',
+                fontFamily: 'inherit',
+                fontSize: 13,
+                width: 200,
+                outline: 'none',
+              }}
+            />
+          </div>
+        )}
+        <ProjectPicker
+          projectId={projectId}
+          projectNames={allProjectNames}
+          onPortfolio={navigateToPortfolio}
+          onProject={navigateToProject}
+          isEmbed={isEmbed}
+        />
+      </div>
 
-      {view === 'detailed' && (
+      {/* Per-project mode */}
+      {projectId && (
         <>
-          <CoordinatorRoster
-            projects={payload.projects}
-            activeCoord={coord}
-            onCoordToggle={(c) => setCoord(coord === c ? 'all' : c)}
-          />
-          <KpiStrip data={filteredKpis} projects={filtered} />
+          <div
+            style={{
+              fontSize: 12,
+              color: 'var(--color-text-secondary)',
+              marginBottom: 16,
+              display: 'flex',
+              gap: 6,
+              alignItems: 'center',
+            }}
+          >
+            <button
+              onClick={navigateToPortfolio}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: 'var(--color-text-info)',
+                cursor: 'pointer',
+                padding: 0,
+                fontSize: 12,
+                fontFamily: 'inherit',
+              }}
+            >
+              Portfolio
+            </button>
+            <i className="ti ti-chevron-right" style={{ fontSize: 14, opacity: 0.6 }} />
+            <span>{projectId}</span>
+          </div>
+
+          {selectedProject ? (
+            <OverviewView
+              projects={[selectedProject]}
+              totalCount={1}
+              sticking={singleSticking}
+              kpis={singleKpis}
+              permits={singlePermits}
+              activeCoord="all"
+              activePhase="all"
+              onCoordToggle={() => {}}
+              onPhaseToggle={() => {}}
+              onSwitchToDetailed={() => {}}
+            />
+          ) : (
+            <div
+              style={{
+                padding: '48px 24px',
+                textAlign: 'center',
+                color: 'var(--color-text-tertiary)',
+                fontSize: 13,
+              }}
+            >
+              {payload.projects.length === 0
+                ? 'Loading project data…'
+                : `Project "${projectId}" was not found.`}
+            </div>
+          )}
         </>
       )}
 
-      {view === 'matrix' && <KpiStrip data={filteredKpis} projects={filtered} />}
-
-      {view === 'overview' && (
-        <OverviewView
-          projects={sorted}
-          totalCount={payload.projects.length}
-          sticking={filteredSticking}
-          kpis={filteredKpis}
-          permits={filteredPermits}
-          activeCoord={coord}
-          activePhase={phase}
-          onCoordToggle={(c) => setCoord(coord === c ? 'all' : c)}
-          onPhaseToggle={(p) => setPhase(phase === p ? 'all' : p)}
-          onSwitchToDetailed={() => setView('detailed')}
-        />
-      )}
-      {view === 'detailed' && (
-        <DetailedView
-          projects={sorted}
-          permits={filteredPermits}
-          sort={sort}
-          onSortChange={setSort}
-          layout={layout}
-          chipStyle={chipStyle}
-          onLayoutChange={setLayout}
-          onChipStyleChange={setChipStyle}
-        />
-      )}
-      {view === 'matrix' && <MatrixView projects={sorted} />}
+      {/* Portfolio mode: project × plan-type matrix */}
+      {!projectId && <MatrixView projects={portfolioProjects} />}
 
       <div
         style={{

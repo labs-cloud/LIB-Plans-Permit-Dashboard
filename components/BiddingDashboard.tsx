@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import { useRouter, useSearchParams } from 'next/navigation';
 import useSWR from 'swr';
 import { LogoHeader } from './LogoHeader';
+import { ProjectPicker } from './ProjectPicker';
 import type { BidStatus, BidSub, BidTrade, BiddingPayload, BiddingPortfolioPayload } from '@/lib/bidding-types';
 import { taskUrl } from '@/lib/urls';
 
@@ -3061,45 +3062,13 @@ export function BiddingDashboard({ projectId }: { projectId?: string } = {}) {
         </div>
 
         {/* Project picker — "★ All projects" is always first */}
-        {isEmbed && projectId ? (
-          <span style={{
-            height: 32, padding: '0 10px',
-            border: '0.5px solid var(--color-border-secondary)',
-            borderRadius: 'var(--border-radius-md)',
-            background: 'var(--color-background-secondary)',
-            color: 'var(--color-text-primary)',
-            fontFamily: 'inherit', fontSize: 12.5, minWidth: 220, fontWeight: 500,
-            display: 'inline-flex', alignItems: 'center',
-          }}>
-            {projectId}
-          </span>
-        ) : (
-          <select
-            value={projectId ?? ''}
-            onChange={(e) => {
-              if (!e.target.value) navigateToPortfolio();
-              else navigateToProject(e.target.value);
-            }}
-            style={{
-              height: 32,
-              padding: '0 10px',
-              border: '0.5px solid var(--color-border-secondary)',
-              borderRadius: 'var(--border-radius-md)',
-              background: 'var(--color-background-primary)',
-              color: 'var(--color-text-primary)',
-              fontSize: 12.5,
-              fontFamily: 'inherit',
-              minWidth: 220,
-            }}
-          >
-            <option value="">★ All projects</option>
-            {allProjectNames.map((name) => (
-              <option key={name} value={name}>
-                {name}
-              </option>
-            ))}
-          </select>
-        )}
+        <ProjectPicker
+          projectId={projectId}
+          projectNames={allProjectNames}
+          onPortfolio={navigateToPortfolio}
+          onProject={navigateToProject}
+          isEmbed={isEmbed}
+        />
 
         {/* Copy embed link — per-project, non-embed mode only */}
         {!isEmbed && projectId && (
