@@ -26,6 +26,7 @@ export const CLICKUP = {
     // Budget
     BUDGET_ALLOC:  '932ad261-d33f-4e50-83d0-cb5be27f3be9', // currency — estimated budget
     UPDATED_BUDGET: 'fababed6-f5d6-41e5-a078-24234ce9df56', // currency — manual override (per-project "01. Budget" lists)
+    BID_CONTRACTED: 'c4d0f269-5875-4b47-bc29-85b52d8931b9', // currency — Bid/Contracted Amount on trade task and bid subtasks
     // Sub slots (name + amount pairs)
     SUB_1:         '01d90719-501b-4936-a178-d2b2896b6e08', // short_text
     SUB_2:         'f461f3f6-4f02-4f63-ad78-cfbae3c94837',

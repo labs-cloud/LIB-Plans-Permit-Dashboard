@@ -81,7 +81,7 @@ async function buildBudgetPayload(projectId: string | null): Promise<BudgetPaylo
 
 const getCachedBudgetPayload = unstable_cache(
   buildBudgetPayload,
-  ['lib-budget:v6'],
+  ['lib-budget:v7'],
   { revalidate: CACHE_TTL_SECONDS, tags: [BUDGET_CACHE_TAG] },
 );
 
