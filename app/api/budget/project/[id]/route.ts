@@ -82,7 +82,7 @@ async function buildPayload(projectId: string): Promise<BudgetPayload> {
   return { project, portfolioProjects, syncedAt: Date.now(), source: 'live' };
 }
 
-const getCachedPayload = unstable_cache(buildPayload, ['lib-budget-project:v10'], {
+const getCachedPayload = unstable_cache(buildPayload, ['lib-budget-project:v11'], {
   revalidate: CACHE_TTL_SECONDS,
   tags: [BUDGET_CACHE_TAG],
 });
