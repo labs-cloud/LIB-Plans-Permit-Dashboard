@@ -13,7 +13,12 @@ export function findBiddingList(lists: ClickUpList[]): ClickUpList | undefined {
 }
 
 function getAmt(t: ClickUpTask): number | null {
-  const f = t.custom_fields?.find(cf => cf.name === 'Bid/Contracted Amount');
+  // Explicitly exclude the Budget Allocated field (BUDGET_ALLOC ID) even if
+  // it has been renamed to "Bid/Contracted Amount" in some ClickUp list templates.
+  // Budget Allocated is always pre-filled and must never drive the fin value.
+  const f = t.custom_fields?.find(
+    cf => cf.name === 'Bid/Contracted Amount' && cf.id !== CLICKUP.FIELD.BUDGET_ALLOC,
+  );
   if (!f || f.value == null) return null;
   const n = Number(f.value);
   return Number.isFinite(n) && n > 0 ? n : null;
