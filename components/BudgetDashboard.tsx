@@ -478,7 +478,7 @@ function PortfolioBudgetView({
         <i className="ti ti-table" />
         Portfolio budget matrix
         <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--color-text-tertiary)', fontWeight: 400 }}>
-          click a project column header to view its full budget detail
+          click a column header for project detail · click a cell to open its ClickUp task
         </span>
       </h2>
       <div style={{ overflowX: 'auto' }}>
@@ -591,9 +591,13 @@ function PortfolioBudgetView({
                       }
                     }
 
+                    const taskId = trade.taskId;
                     return (
                       <td
                         key={proj.name}
+                        className={taskId ? 'budget-matrix-cell' : undefined}
+                        title={taskId ? `Open ${tradeName} · ${proj.name} in ClickUp` : undefined}
+                        onClick={taskId ? () => window.open(`${CLICKUP.BASE_URL}/t/${taskId}`, '_blank', 'noopener') : undefined}
                         style={{
                           padding: '6px 8px',
                           border: '0.5px solid var(--color-border-tertiary)',

@@ -1273,6 +1273,15 @@ tr.expired .status-cell .pill .dot-mini {
 
 /* ----- Budget dashboard (route: /budget) ----- */
 
+/* Portfolio matrix cells deep-link to their ClickUp task */
+.budget-matrix-cell {
+  cursor: pointer;
+  transition: box-shadow 0.12s;
+}
+.budget-matrix-cell:hover {
+  box-shadow: inset 0 0 0 2px var(--lib-orange);
+}
+
 @media (max-width: 860px) {
   /* Table + side rail stack vertically */
   .budget-main-grid {
