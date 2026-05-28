@@ -822,7 +822,7 @@ function DetailedView({
   return (
     <div>
       {/* Breadcrumb */}
-      <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginBottom: 12, display: 'flex', gap: 6, alignItems: 'center' }}>
+      <div className="budget-crumb" style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginBottom: 12, display: 'flex', gap: 6, alignItems: 'center' }}>
         <button onClick={onGoOverview} style={{ background: 'none', border: 'none', color: 'var(--color-text-info)', cursor: 'pointer', padding: 0, fontSize: 12, fontFamily: 'inherit' }}>Portfolio</button>
         <i className="ti ti-chevron-right" style={{ fontSize: 14, opacity: 0.6 }} />
         <span>{project.name} · Budget</span>
@@ -874,7 +874,7 @@ function DetailedView({
       </div>
 
       {/* 6-KPI strip */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', gap: 10, marginBottom: '1.25rem' }}>
+      <div className="budget-kpi-grid budget-kpi-6" style={{ display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', gap: 10, marginBottom: '1.25rem' }}>
         <KpiCard label="Total Estimated" value={fmt$(bs.est)} sub="baseline · all trades" icon="ti-clipboard-list" />
         <KpiCard label="Lowest received" value={fmt$(bs.fin)} sub="finalized + lowest in hand" icon="ti-target" tone="info" />
         <KpiCard label="New Budget" value={fmt$(bs.newv)} sub="finalized or carry-forward" icon="ti-wallet" tone="good" />
@@ -884,7 +884,7 @@ function DetailedView({
       </div>
 
       {/* Main content: table + side rail */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1.7fr 1fr', gap: 14 }}>
+      <div className="budget-main-grid" style={{ display: 'grid', gridTemplateColumns: '1.7fr 1fr', gap: 14 }}>
         {/* Per-trade table */}
         <div style={{
           background: 'var(--color-background-primary)',
@@ -926,8 +926,8 @@ function DetailedView({
               </a>
             </div>
           )}
-          <div style={{ maxHeight: 680, overflowY: 'auto', background: 'var(--color-background-primary)', borderRadius: 8, border: '0.5px solid var(--color-border-tertiary)' }}>
-            <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, fontSize: 12.5 }}>
+          <div className="budget-trade-scroll" style={{ maxHeight: 680, overflowY: 'auto', background: 'var(--color-background-primary)', borderRadius: 8, border: '0.5px solid var(--color-border-tertiary)' }}>
+            <table className="budget-trade-table" style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, fontSize: 12.5 }}>
               <colgroup>
                 <col />
                 <col style={{ width: 140 }} /><col style={{ width: 140 }} /><col style={{ width: 140 }} />
@@ -1231,6 +1231,7 @@ function VarianceView({ onBack, search, tradeTypeFilter = 'all' }: { onBack: () 
     return (
       <div
         onClick={() => setDrawerTrade(r)}
+        className="budget-var-row"
         style={{
           display: 'grid', gridTemplateColumns: '220px 1fr 90px 50px',
           alignItems: 'center', padding: '7px 12px', cursor: 'pointer', gap: 8,
@@ -1285,7 +1286,7 @@ function VarianceView({ onBack, search, tradeTypeFilter = 'all' }: { onBack: () 
       {(() => {
         const netPct = bs.est > 0 ? (netDelta / bs.est * 100) : 0;
         return (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, marginBottom: '1.25rem' }}>
+          <div className="budget-kpi-grid budget-kpi-4" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, marginBottom: '1.25rem' }}>
             <KpiCard label="Total saved (vs est)" value={(totalSaved > 0 ? '−' : '') + fmt$(totalSaved)} sub={`${underTrades.length} trades under`} icon="ti-trending-down" tone="good" />
             <KpiCard label="Total over (vs est)" value={'+' + fmt$(totalOver)} sub={`${overTrades.length} trades over`} icon="ti-trending-up" tone="danger" />
             <KpiCard label="Net Δ vs estimated" value={(netDelta < 0 ? '−' : netDelta > 0 ? '+' : '') + fmt$(Math.abs(netDelta))} sub={netPct.toFixed(1) + '% vs estimate'} icon="ti-arrow-bounce" tone="amber" />
@@ -1295,7 +1296,7 @@ function VarianceView({ onBack, search, tradeTypeFilter = 'all' }: { onBack: () 
       })()}
 
       {/* Top 5 cards side by side */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: '1.25rem' }}>
+      <div className="budget-two-up" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: '1.25rem' }}>
         {/* Top 5 savings */}
         <div style={{ background: 'var(--color-background-primary)', border: '0.5px solid var(--color-border-tertiary)', borderLeft: '3px solid var(--var-under)', borderRadius: 'var(--border-radius-lg)', padding: '16px 18px' }}>
           <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--var-under)', marginBottom: 2 }}>Top 5 Savings</div>
@@ -1476,7 +1477,7 @@ function TreemapView({ onBack, search, tradeTypeFilter = 'all' }: { onBack: () =
       </div>
 
       {/* 4-KPI strip */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, marginBottom: '1.25rem' }}>
+      <div className="budget-kpi-grid budget-kpi-4" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, marginBottom: '1.25rem' }}>
         <KpiCard label="New Budget total" value={fmt$(bs.newv)} sub="sum of all numeric newv" icon="ti-wallet" tone="good" />
         <KpiCard label="Biggest single tile" value={biggestTile ? biggestTile.r.trade.slice(0, 14) : '—'} sub={biggestTile ? fmt$(biggestTile.val) : '—'} icon="ti-maximize" />
         <KpiCard label="Top 5 = % of total" value={top5Pct.toFixed(0) + '%'} sub="sum of top 5 newv / total" icon="ti-chart-pie" tone="amber" />
@@ -1829,7 +1830,7 @@ function CategoriesView({ onBack, search, tradeTypeFilter = 'all' }: { onBack: (
             {isOpen && (
               <div style={{ marginTop: 10, borderTop: '0.5px solid var(--color-border-tertiary)', paddingTop: 8 }}>
                 {pkg.pkgTrades.map(r => (
-                  <div key={r.trade} style={{ display: 'grid', gridTemplateColumns: '1fr 110px 110px 120px', alignItems: 'center', gap: 8, padding: '6px 0', borderBottom: '0.5px solid var(--color-border-tertiary)', fontSize: 12 }}>
+                  <div key={r.trade} className="budget-cat-row" style={{ display: 'grid', gridTemplateColumns: '1fr 110px 110px 120px', alignItems: 'center', gap: 8, padding: '6px 0', borderBottom: '0.5px solid var(--color-border-tertiary)', fontSize: 12 }}>
                     <span style={{ fontWeight: 500 }}>
                       {r.trade}
                     </span>
@@ -1998,9 +1999,9 @@ export function BudgetDashboard({ projectId }: { projectId?: string } = {}) {
       )}
 
       {/* Filter / navigation bar */}
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: '1.25rem' }}>
+      <div className="budget-toolbar" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: '1.25rem' }}>
         {/* Search */}
-        <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+        <div className="budget-search" style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
           <i className="ti ti-search" style={{ position: 'absolute', left: 8, fontSize: 13, color: 'var(--color-text-tertiary)', pointerEvents: 'none' }} />
           <input
             type="search"
@@ -2109,6 +2110,7 @@ export function BudgetDashboard({ projectId }: { projectId?: string } = {}) {
           </span>
         ) : (
           <select
+            className="budget-project-select"
             value={projectId ?? ''}
             onChange={(e) => {
               if (!e.target.value) navigateToPortfolio();
@@ -2158,7 +2160,7 @@ export function BudgetDashboard({ projectId }: { projectId?: string } = {}) {
 
         {/* Tab strip — per-project mode only */}
         {projectId && (
-          <div style={{
+          <div className="budget-tabs" style={{
             display: 'flex', gap: 4, padding: 4,
             background: 'var(--color-background-secondary)',
             borderRadius: 'var(--border-radius-md)',

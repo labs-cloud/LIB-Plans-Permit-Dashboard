@@ -1270,3 +1270,99 @@ tr.expired .status-cell .pill .dot-mini {
     font-size: 11px;
   }
 }
+
+/* ----- Budget dashboard (route: /budget) ----- */
+
+@media (max-width: 860px) {
+  /* Table + side rail stack vertically */
+  .budget-main-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* KPI strips reflow */
+  .budget-kpi-6 {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+
+  /* Top-5 savings / overruns cards stack */
+  .budget-two-up {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Per-trade table scrolls sideways instead of crushing its columns */
+  .budget-trade-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .budget-trade-table {
+    min-width: 620px;
+  }
+
+  /* Variance rows drop the bar column, keep trade + $ + % */
+  .budget-var-row {
+    grid-template-columns: minmax(0, 1fr) 80px 44px !important;
+  }
+  .budget-var-row > div:nth-child(2) {
+    display: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .budget-kpi-grid {
+    gap: 8px !important;
+  }
+  .budget-kpi-6,
+  .budget-kpi-4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+  /* Shrink the big KPI value so it fits two-up */
+  .budget-kpi-grid > div > div:first-child > div:nth-child(2) {
+    font-size: 24px !important;
+  }
+
+  /* Category rows drop the variance bar, keep trade + estimated + new budget */
+  .budget-cat-row {
+    grid-template-columns: minmax(0, 1fr) 90px 90px !important;
+  }
+  .budget-cat-row > :last-child {
+    display: none;
+  }
+
+  /* Toolbar: search, project picker and tabs each take a full row */
+  .budget-toolbar {
+    gap: 8px !important;
+  }
+  .budget-search {
+    flex: 1 1 100%;
+  }
+  .budget-search input {
+    width: 100% !important;
+  }
+  .budget-project-select {
+    flex: 1 1 100%;
+    min-width: 0 !important;
+    width: 100%;
+  }
+  .budget-tabs {
+    margin-left: 0 !important;
+    width: 100%;
+    overflow-x: auto;
+  }
+  .budget-tabs button {
+    flex: 1;
+    justify-content: center;
+    white-space: nowrap;
+  }
+
+  /* Breadcrumb + print/share/open buttons wrap */
+  .budget-crumb {
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 380px) {
+  .budget-kpi-6,
+  .budget-kpi-4 {
+    grid-template-columns: 1fr !important;
+  }
+}
