@@ -20,12 +20,14 @@ export function SupportBubble() {
   const [captureBusy, setCaptureBusy] = useState(false);
   const [hidden, setHidden] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
+  const [hover, setHover] = useState(false);
   const panelRef = useRef<HTMLDivElement | null>(null);
   const buttonRef = useRef<HTMLButtonElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const hoverHideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || editing) return;
     const onDocClick = (e: MouseEvent) => {
       const target = e.target as Node;
       if (panelRef.current?.contains(target)) return;
@@ -41,7 +43,16 @@ export function SupportBubble() {
       document.removeEventListener('mousedown', onDocClick);
       document.removeEventListener('keydown', onKey);
     };
-  }, [open]);
+  }, [open, editing]);
+
+  const showHover = () => {
+    if (hoverHideTimer.current) clearTimeout(hoverHideTimer.current);
+    setHover(true);
+  };
+  const hideHoverSoon = () => {
+    if (hoverHideTimer.current) clearTimeout(hoverHideTimer.current);
+    hoverHideTimer.current = setTimeout(() => setHover(false), 180);
+  };
 
   const reset = () => {
     setMode('menu');
@@ -129,8 +140,15 @@ export function SupportBubble() {
   };
 
   const handleEditorDone = (blob: Blob) => {
-    if (addBlobAsFile(blob)) setEditing(null);
-    else setEditing(null);
+    addBlobAsFile(blob);
+    setEditing(null);
+    setOpen(true);
+  };
+
+  const quickOpen = (target: Mode) => {
+    setMode(target);
+    setOpen(true);
+    setHover(false);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -177,37 +195,75 @@ export function SupportBubble() {
         />
       )}
       <div style={{ display: hidden ? 'none' : 'contents' }}>
-      <button
-        ref={buttonRef}
-        type="button"
-        aria-label={open ? 'Close support menu' : 'Open support menu'}
-        title="Support"
-        onClick={() => {
-          setOpen((v) => !v);
-          if (open) setTimeout(reset, 200);
-        }}
+      <div
         style={{
           position: 'fixed',
           right: 20,
           bottom: 20,
-          width: 48,
-          height: 48,
-          borderRadius: '50%',
-          background: 'var(--lib-orange)',
-          color: '#fff',
-          border: 'none',
-          boxShadow: '0 6px 18px rgba(0,0,0,0.18)',
-          cursor: 'pointer',
-          display: 'inline-flex',
-          alignItems: 'center',
-          justifyContent: 'center',
           zIndex: 2000,
-          transition: 'transform 120ms ease',
-          transform: open ? 'scale(0.94)' : 'scale(1)',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'flex-end',
+          gap: 10,
+          pointerEvents: 'none',
         }}
       >
-        <i className={`ti ${open ? 'ti-x' : 'ti-help'}`} style={{ fontSize: 22 }} />
-      </button>
+        <div
+          onMouseEnter={showHover}
+          onMouseLeave={hideHoverSoon}
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'flex-end',
+            gap: 10,
+            opacity: hover && !open ? 1 : 0,
+            transform: hover && !open ? 'translateY(0)' : 'translateY(8px)',
+            pointerEvents: hover && !open ? 'auto' : 'none',
+            transition: 'opacity 160ms ease, transform 160ms ease',
+          }}
+        >
+          <SubBubble
+            icon="ti-bulb"
+            label="Request feature"
+            onClick={() => quickOpen('feature')}
+          />
+          <SubBubble
+            icon="ti-bug"
+            label="Report issue"
+            onClick={() => quickOpen('issue')}
+          />
+        </div>
+        <button
+          ref={buttonRef}
+          type="button"
+          aria-label={open ? 'Close support menu' : 'Open support menu'}
+          title="Support"
+          onMouseEnter={showHover}
+          onMouseLeave={hideHoverSoon}
+          onClick={() => {
+            setOpen((v) => !v);
+            if (open) setTimeout(reset, 200);
+          }}
+          style={{
+            width: 48,
+            height: 48,
+            borderRadius: '50%',
+            background: 'var(--lib-orange)',
+            color: '#fff',
+            border: 'none',
+            boxShadow: '0 6px 18px rgba(0,0,0,0.18)',
+            cursor: 'pointer',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'transform 120ms ease',
+            transform: open ? 'scale(0.94)' : 'scale(1)',
+            pointerEvents: 'auto',
+          }}
+        >
+          <i className={`ti ${open ? 'ti-x' : 'ti-help'}`} style={{ fontSize: 22 }} />
+        </button>
+      </div>
 
       {open && (
         <div
@@ -218,7 +274,7 @@ export function SupportBubble() {
             position: 'fixed',
             right: 20,
             bottom: 80,
-            width: 360,
+            width: 420,
             maxWidth: 'calc(100vw - 32px)',
             maxHeight: 'calc(100vh - 120px)',
             overflowY: 'auto',
@@ -384,41 +440,21 @@ export function SupportBubble() {
                   />
                 </div>
                 {files.length > 0 && (
-                  <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fill, minmax(72px, 1fr))',
+                      gap: 6,
+                    }}
+                  >
                     {files.map((f, i) => (
-                      <li
-                        key={`${f.name}-${i}`}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          padding: '4px 8px',
-                          background: 'var(--color-background-secondary)',
-                          borderRadius: 'var(--border-radius-md)',
-                          fontSize: 12,
-                        }}
-                      >
-                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginRight: 8 }}>
-                          {f.name} <span style={{ color: 'var(--color-text-tertiary)' }}>· {formatBytes(f.size)}</span>
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => removeFile(i)}
-                          aria-label={`Remove ${f.name}`}
-                          style={{
-                            background: 'transparent',
-                            border: 'none',
-                            color: 'var(--color-text-secondary)',
-                            cursor: 'pointer',
-                            padding: 0,
-                            lineHeight: 0,
-                          }}
-                        >
-                          <i className="ti ti-x" style={{ fontSize: 14 }} />
-                        </button>
-                      </li>
+                      <Thumbnail
+                        key={`${f.name}-${i}-${f.size}`}
+                        file={f}
+                        onRemove={() => removeFile(i)}
+                      />
                     ))}
-                  </ul>
+                  </div>
                 )}
               </div>
 
@@ -502,6 +538,59 @@ export function SupportBubble() {
   );
 }
 
+function SubBubble({
+  icon,
+  label,
+  onClick,
+}: {
+  icon: string;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+      <span
+        style={{
+          background: 'rgba(20,20,20,0.88)',
+          color: '#fff',
+          fontSize: 12,
+          fontWeight: 500,
+          padding: '4px 8px',
+          borderRadius: 6,
+          whiteSpace: 'nowrap',
+        }}
+      >
+        {label}
+      </span>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onClick();
+        }}
+        aria-label={label}
+        title={label}
+        style={{
+          width: 40,
+          height: 40,
+          borderRadius: '50%',
+          background: 'var(--color-background-primary)',
+          color: 'var(--lib-orange)',
+          border: '0.5px solid var(--color-border-secondary)',
+          boxShadow: '0 4px 14px rgba(0,0,0,0.18)',
+          cursor: 'pointer',
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: 0,
+        }}
+      >
+        <i className={`ti ${icon}`} style={{ fontSize: 18 }} />
+      </button>
+    </div>
+  );
+}
+
 function MenuButton({
   icon,
   title,
@@ -570,4 +659,75 @@ function formatBytes(n: number): string {
   if (n < 1024) return `${n} B`;
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
   return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function Thumbnail({ file, onRemove }: { file: File; onRemove: () => void }) {
+  const [url, setUrl] = useState<string | null>(null);
+  useEffect(() => {
+    if (!file.type.startsWith('image/')) return;
+    const objectUrl = URL.createObjectURL(file);
+    setUrl(objectUrl);
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [file]);
+  return (
+    <div
+      title={`${file.name} · ${formatBytes(file.size)}`}
+      style={{
+        position: 'relative',
+        aspectRatio: '1 / 1',
+        background: 'var(--color-background-tertiary)',
+        borderRadius: 'var(--border-radius-md)',
+        overflow: 'hidden',
+        border: '0.5px solid var(--color-border-tertiary)',
+      }}
+    >
+      {url ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={url}
+          alt={file.name}
+          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+        />
+      ) : (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: '100%',
+            height: '100%',
+            color: 'var(--color-text-tertiary)',
+            fontSize: 10,
+            padding: 4,
+            textAlign: 'center',
+          }}
+        >
+          {file.name}
+        </div>
+      )}
+      <button
+        type="button"
+        onClick={onRemove}
+        aria-label={`Remove ${file.name}`}
+        style={{
+          position: 'absolute',
+          top: 2,
+          right: 2,
+          width: 18,
+          height: 18,
+          borderRadius: '50%',
+          background: 'rgba(0,0,0,0.6)',
+          color: '#fff',
+          border: 'none',
+          cursor: 'pointer',
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: 0,
+        }}
+      >
+        <i className="ti ti-x" style={{ fontSize: 12 }} />
+      </button>
+    </div>
+  );
 }
