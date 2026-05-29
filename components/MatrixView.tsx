@@ -487,11 +487,13 @@ function ClassicMatrix({
         settings={settings}
       />
       <div
+        className="matrix-classic-scroll"
         style={{
           background: 'var(--color-background-primary)',
           border: '0.5px solid var(--color-border-tertiary)',
           borderRadius: 'var(--border-radius-lg)',
           overflow: 'auto',
+          WebkitOverflowScrolling: 'touch',
           maxHeight: '78vh',
         }}
       >
@@ -665,7 +667,7 @@ function ClassicThead({ projects, index }: { projects: Project[]; index: PlanInd
   return (
     <thead>
       <tr>
-        <th style={{ ...TH_BASE, ...ROW_H_BASE, zIndex: 4, textAlign: 'left' }}>
+        <th className="matrix-col-plan" style={{ ...TH_BASE, ...ROW_H_BASE, zIndex: 4, textAlign: 'left' }}>
           <div style={{ fontSize: 13, fontWeight: 600 }}>Plan</div>
           <div
             style={{
@@ -759,7 +761,7 @@ function ClassicThead({ projects, index }: { projects: Project[]; index: PlanInd
             </th>
           );
         })}
-        <th style={{ ...TH_BASE, ...ROW_SUM_BASE, zIndex: 4 }}>
+        <th className="matrix-col-sum" style={{ ...TH_BASE, ...ROW_SUM_BASE, zIndex: 4 }}>
           <div
             style={{
               fontSize: 11,
@@ -849,7 +851,7 @@ function ClassicGroup({
   return (
     <>
       <tr>
-        <td style={groupRowH}>
+        <td className="matrix-col-plan" style={groupRowH}>
           <button
             type="button"
             onClick={onToggle}
@@ -976,7 +978,7 @@ function ClassicGroup({
             </td>
           );
         })}
-        <td style={groupRowSum}>
+        <td className="matrix-col-sum" style={groupRowSum}>
           <b style={{ color: 'var(--color-text-primary)', fontWeight: 700, fontSize: 13 }}>
             {groupPct}%
           </b>
@@ -987,7 +989,7 @@ function ClassicGroup({
           const s = planSummary(plan);
           return (
             <tr key={plan}>
-              <td style={ROW_H_BASE}>
+              <td className="matrix-col-plan" style={ROW_H_BASE}>
                 {plan}
                 {s.total < projects.length && (
                   <div
@@ -1021,7 +1023,7 @@ function ClassicGroup({
                   </td>
                 );
               })}
-              <td style={ROW_SUM_BASE}>
+              <td className="matrix-col-sum" style={ROW_SUM_BASE}>
                 <b style={{ color: 'var(--color-text-primary)', fontWeight: 600 }}>{s.approved}</b>
                 /{s.total}
               </td>

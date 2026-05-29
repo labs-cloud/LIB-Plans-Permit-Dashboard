@@ -1282,6 +1282,30 @@ tr.expired .status-cell .pill .dot-mini {
   box-shadow: inset 0 0 0 2px var(--lib-orange) !important;
 }
 
+/*
+ * Classic plans matrix on phones: the frozen "Plan" (left) and "Approved"
+ * (right) columns are 220px + 96px wide, which on a ~385px viewport leaves
+ * almost no room to swipe to the project columns in the middle. Shrink the
+ * frozen columns so there's a usable horizontal scroll window.
+ */
+@media (max-width: 640px) {
+  .matrix-classic-scroll {
+    -webkit-overflow-scrolling: touch;
+  }
+  .matrix-col-plan {
+    width: 124px !important;
+    min-width: 124px !important;
+    max-width: 124px !important;
+  }
+  .matrix-col-sum {
+    width: 72px !important;
+    min-width: 72px !important;
+    max-width: 72px !important;
+    padding-left: 6px !important;
+    padding-right: 6px !important;
+  }
+}
+
 @media (max-width: 860px) {
   /* Table + side rail stack vertically */
   .budget-main-grid {
