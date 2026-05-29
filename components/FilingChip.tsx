@@ -141,14 +141,14 @@ function PlanLinksPopover({ plan, onClose }: { plan: Plan; onClose: () => void }
               cursor: 'pointer',
               fontSize: 12.5,
               fontFamily: 'inherit',
-              color: url ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)',
+              color: 'var(--color-text-primary)',
               textAlign: 'left',
               whiteSpace: 'nowrap',
             }}
           >
             <i
               className={`ti ${icon}`}
-              style={{ fontSize: 13, flexShrink: 0, opacity: url ? 1 : 0.35 }}
+              style={{ fontSize: 13, flexShrink: 0 }}
             />
             {label}
           </button>
