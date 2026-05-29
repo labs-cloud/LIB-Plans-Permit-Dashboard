@@ -1283,26 +1283,28 @@ tr.expired .status-cell .pill .dot-mini {
 }
 
 /*
- * Classic plans matrix on phones: the frozen "Plan" (left) and "Approved"
- * (right) columns are 220px + 96px wide, which on a ~385px viewport leaves
- * almost no room to swipe to the project columns in the middle. Shrink the
- * frozen columns so there's a usable horizontal scroll window.
+ * Classic plans matrix on phones: freezing the "Plan" (left) and "Approved"
+ * (right) columns wastes most of a ~385px viewport and pins the project
+ * column(s) in a tiny gap — on a single-project matrix the project column
+ * even hides behind the frozen Plan column. Un-freeze both columns on mobile
+ * so the whole table pans freely and the Plan column can scroll away. The
+ * header row keeps its top-sticky behavior (only the horizontal freeze is
+ * dropped).
  */
 @media (max-width: 640px) {
   .matrix-classic-scroll {
     -webkit-overflow-scrolling: touch;
   }
   .matrix-col-plan {
-    width: 124px !important;
-    min-width: 124px !important;
-    max-width: 124px !important;
+    left: auto !important;
+    box-shadow: none !important;
+    width: 160px !important;
+    min-width: 160px !important;
+    max-width: 160px !important;
   }
   .matrix-col-sum {
-    width: 72px !important;
-    min-width: 72px !important;
-    max-width: 72px !important;
-    padding-left: 6px !important;
-    padding-right: 6px !important;
+    right: auto !important;
+    box-shadow: none !important;
   }
 }
 
