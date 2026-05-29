@@ -1,3 +1,5 @@
+export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://lib-plans-permit-dashboard.vercel.app';
+
 export const CLICKUP = {
   WORKSPACE_ID: process.env.CLICKUP_WORKSPACE_ID || '9017603275',
   ACTIVE_PROJECTS_SPACE_ID: process.env.CLICKUP_ACTIVE_PROJECTS_SPACE_ID || '90173230172',
