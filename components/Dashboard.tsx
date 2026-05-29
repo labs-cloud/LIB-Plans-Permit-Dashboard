@@ -291,7 +291,7 @@ export function Dashboard({ initial, initialError, projectId }: Props) {
         />
 
         {/* View toggle + pin — pushed to the right */}
-        <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginLeft: 'auto' }}>
+        <div className="view-toggle-wrap" style={{ display: 'flex', gap: 6, alignItems: 'center', marginLeft: 'auto' }}>
           <div
             className="view-toggle"
             style={{

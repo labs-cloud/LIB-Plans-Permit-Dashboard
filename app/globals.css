@@ -246,16 +246,22 @@ body {
     min-width: 0;
   }
 
-  .view-toggle {
+  .view-toggle-wrap {
     grid-column: 1 / -1;
     margin-left: 0 !important;
     width: 100%;
+  }
+
+  .view-toggle {
+    flex: 1;
+    min-width: 0;
   }
 
   .view-toggle .tab {
     flex: 1;
     text-align: center;
     justify-content: center;
+    min-width: 0;
   }
 
   .coordinator-grid {
@@ -1312,6 +1318,15 @@ tr.expired .status-cell .pill .dot-mini {
   /* Table + side rail stack vertically */
   .budget-main-grid {
     grid-template-columns: 1fr !important;
+  }
+  /*
+   * Let the grid items shrink to the viewport so the per-trade table's own
+   * horizontal scroll contains it. Without this, the 620px-min table forces
+   * the grid (and page) wider than the screen, which makes mobile Safari
+   * zoom the whole budget view out.
+   */
+  .budget-main-grid > div {
+    min-width: 0;
   }
 
   /* KPI strips reflow */
