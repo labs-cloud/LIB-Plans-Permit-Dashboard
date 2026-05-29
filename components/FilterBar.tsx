@@ -113,6 +113,7 @@ export function FilterBar({
         ))}
       </select>
       <div
+        className="view-toggle-wrap"
         style={{
           display: 'flex',
           gap: 6,
