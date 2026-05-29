@@ -932,6 +932,7 @@ function DetailedView({
               </a>
             </div>
           )}
+          <div className="budget-trade-scrollwrap">
           <div className="budget-trade-scroll" style={{ maxHeight: 680, overflowY: 'auto', background: 'var(--color-background-primary)', borderRadius: 8, border: '0.5px solid var(--color-border-tertiary)' }}>
             <table className="budget-trade-table" style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, fontSize: 12.5 }}>
               <colgroup>
@@ -1046,6 +1047,7 @@ function DetailedView({
                 </tr>
               </tfoot>
             </table>
+          </div>
           </div>
         </div>
 
