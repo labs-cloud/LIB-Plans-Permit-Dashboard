@@ -98,8 +98,9 @@ export function planLabel(plan: Plan): string {
 function PlanLinksPopover({ plan, projectName, onClose }: { plan: Plan; projectName: string; onClose: () => void }) {
   const planRawName = plan.planType ?? plan.name;
   const assetType = plan.assetType?.toLowerCase().trim() ?? '';
-  const filingUrl = plan.filingLink || (assetType === 'filing set' ? planFilingSetUrl(projectName, planRawName) : null);
-  const fieldUrl = plan.fieldLink || (assetType === 'field set' ? planFieldSetUrl(projectName, planRawName) : null);
+  const hasSetType = assetType === 'filing set' || assetType === 'field set';
+  const filingUrl = plan.filingLink || (hasSetType ? planFilingSetUrl(projectName, planRawName) : null);
+  const fieldUrl = plan.fieldLink || (hasSetType ? planFieldSetUrl(projectName, planRawName) : null);
   const archiveUrl = plan.archiveDrive;
 
   const entries = [
