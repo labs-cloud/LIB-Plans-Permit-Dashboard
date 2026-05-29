@@ -191,7 +191,7 @@ function CompactRowImpl({ project, chipStyle }: Props) {
           }}
         >
           {(expanded ? project.plans : urgentPlans).map((plan) => (
-            <FilingChip key={plan.id} plan={plan} chipStyle={chipStyle} />
+            <FilingChip key={plan.id} plan={plan} chipStyle={chipStyle} projectName={project.name} />
           ))}
         </div>
       )}
