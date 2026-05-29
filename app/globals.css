@@ -1385,10 +1385,10 @@ tr.expired .status-cell .pill .dot-mini {
    * in the cramped two-up layout. Drop the decorative icon and shrink the
    * value so the number gets the full card width.
    */
-  .budget-kpi-grid .kpi-icon {
+  .kpi-icon {
     display: none !important;
   }
-  .budget-kpi-grid .kpi-value {
+  .kpi-value {
     font-size: 20px !important;
     overflow-wrap: anywhere;
   }
@@ -1430,6 +1430,30 @@ tr.expired .status-cell .pill .dot-mini {
   /* Breadcrumb + print/share/open buttons wrap */
   .budget-crumb {
     flex-wrap: wrap;
+  }
+
+  /*
+   * Bidding toolbar lives in the .filter-bar grid. Give the search its own
+   * full-width row and let the tab strip span full width and wrap to a 2x2
+   * grid instead of overflowing off the right edge.
+   */
+  .bidding-search {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+  .bidding-search input {
+    width: 100% !important;
+  }
+  .bidding-tabs {
+    grid-column: 1 / -1;
+    margin-left: 0 !important;
+    width: 100%;
+    flex-wrap: wrap;
+  }
+  .bidding-tabs .tab {
+    flex: 1 1 calc(50% - 4px);
+    justify-content: center;
+    text-align: center;
   }
 }
 
