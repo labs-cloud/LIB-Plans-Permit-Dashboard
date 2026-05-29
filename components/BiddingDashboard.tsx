@@ -176,6 +176,7 @@ function KpiCard({
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{label}</div>
         <div
+          className="kpi-value"
           style={{
             fontSize: 30,
             fontWeight: 500,
@@ -190,6 +191,7 @@ function KpiCard({
         <div style={{ fontSize: 11, color: ts.iconColor, marginTop: 2 }}>{caption}</div>
       </div>
       <div
+        className="kpi-icon"
         style={{
           width: 40,
           height: 40,
@@ -1232,6 +1234,7 @@ function DetailedView({ onBack, search = '' }: { onBack: () => void; search?: st
           display: 'flex',
           alignItems: 'center',
           gap: 6,
+          flexWrap: 'wrap',
         }}
       >
         <button
@@ -3032,7 +3035,7 @@ export function BiddingDashboard({ projectId }: { projectId?: string } = {}) {
         className="filter-bar"
       >
         {/* Search input */}
-        <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+        <div className="bidding-search" style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
           <i
             className="ti ti-search"
             style={{
@@ -3102,7 +3105,7 @@ export function BiddingDashboard({ projectId }: { projectId?: string } = {}) {
         {/* Tab strip — per-project mode only */}
         {projectId && (
           <div
-            className="view-toggle"
+            className="bidding-tabs"
             style={{
               display: 'flex',
               gap: 4,
