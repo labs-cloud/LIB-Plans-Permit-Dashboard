@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { LogoHeader } from '@/components/LogoHeader';
 import { ProjectPicker } from '@/components/ProjectPicker';
 import { CLICKUP, SITE_URL } from '@/lib/constants';
+import { EmbedSyncBar } from '@/components/EmbedSyncBar';
 import type {
   BudgetTrade,
   BudgetPayload,
@@ -2002,6 +2003,7 @@ export function BudgetDashboard({ projectId }: { projectId?: string } = {}) {
           syncedAt={syncedAt}
         />
       )}
+      {isEmbed && <EmbedSyncBar syncedAt={syncedAt} />}
 
       {/* Filter / navigation bar */}
       <div className="budget-toolbar" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: '1.25rem' }}>
