@@ -3,6 +3,7 @@
 import { memo, useEffect, useRef, useState } from 'react';
 import type { Plan, StatusKey } from '@/lib/types';
 import type { ChipStyle } from './ViewSettings';
+import { planFilingSetUrl, planFieldSetUrl } from '@/lib/urls';
 
 interface StyleSpec {
   bg: string;
@@ -94,13 +95,19 @@ export function planLabel(plan: Plan): string {
 
 // ── OneDrive popover ───────────────────────────────────────────────────────
 
-const POPOVER_LINKS: { label: string; icon: string; key: 'filingLink' | 'fieldLink' | 'archiveDrive' }[] = [
-  { label: 'Filing plan', icon: 'ti-file-certificate', key: 'filingLink'    },
-  { label: 'Field plan',  icon: 'ti-file-description', key: 'fieldLink'     },
-  { label: 'Archive',     icon: 'ti-archive',          key: 'archiveDrive'  },
-];
+function PlanLinksPopover({ plan, projectName, onClose }: { plan: Plan; projectName: string; onClose: () => void }) {
+  const planRawName = plan.planType ?? plan.name;
+  const assetType = plan.assetType?.toLowerCase().trim() ?? '';
+  const filingUrl = plan.filingLink || (assetType === 'filing set' ? planFilingSetUrl(projectName, planRawName) : null);
+  const fieldUrl = plan.fieldLink || (assetType === 'field set' ? planFieldSetUrl(projectName, planRawName) : null);
+  const archiveUrl = plan.archiveDrive;
 
-function PlanLinksPopover({ plan, onClose }: { plan: Plan; onClose: () => void }) {
+  const entries = [
+    { label: 'Filing plan', icon: 'ti-file-certificate', url: filingUrl },
+    { label: 'Field plan',  icon: 'ti-file-description', url: fieldUrl  },
+    { label: 'Archive',     icon: 'ti-archive',          url: archiveUrl },
+  ];
+
   return (
     <div
       role="menu"
@@ -117,43 +124,42 @@ function PlanLinksPopover({ plan, onClose }: { plan: Plan; onClose: () => void }
         boxShadow: '0 8px 24px rgba(0,0,0,0.16)',
       }}
     >
-      {POPOVER_LINKS.map(({ label, icon, key }) => {
-        const url = plan[key];
-        return (
-          <button
-            key={label}
-            type="button"
-            role="menuitem"
-            onClick={(e) => {
-              e.stopPropagation();
-              window.open(url ?? '', '_blank', 'noopener');
+      {entries.map(({ label, icon, url }) => (
+        <button
+          key={label}
+          type="button"
+          role="menuitem"
+          onClick={(e) => {
+            e.stopPropagation();
+            if (url) {
+              window.open(url, '_blank', 'noopener');
               onClose();
-            }}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 7,
-              width: '100%',
-              padding: '6px 8px',
-              background: 'transparent',
-              border: 'none',
-              borderRadius: 4,
-              cursor: 'pointer',
-              fontSize: 12.5,
-              fontFamily: 'inherit',
-              color: 'var(--color-text-primary)',
-              textAlign: 'left',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            <i
-              className={`ti ${icon}`}
-              style={{ fontSize: 13, flexShrink: 0 }}
-            />
-            {label}
-          </button>
-        );
-      })}
+            }
+          }}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 7,
+            width: '100%',
+            padding: '6px 8px',
+            background: 'transparent',
+            border: 'none',
+            borderRadius: 4,
+            cursor: url ? 'pointer' : 'default',
+            fontSize: 12.5,
+            fontFamily: 'inherit',
+            color: 'var(--color-text-primary)',
+            textAlign: 'left',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          <i
+            className={`ti ${icon}`}
+            style={{ fontSize: 13, flexShrink: 0 }}
+          />
+          {label}
+        </button>
+      ))}
     </div>
   );
 }
@@ -163,14 +169,21 @@ function PlanLinksPopover({ plan, onClose }: { plan: Plan; onClose: () => void }
 interface ChipProps {
   plan: Plan;
   chipStyle: ChipStyle;
+  projectName: string;
 }
 
-export const FilingChip = memo(function FilingChip({ plan, chipStyle }: ChipProps) {
+export const FilingChip = memo(function FilingChip({ plan, chipStyle, projectName }: ChipProps) {
   const spec = plan.status ? SPECS[plan.status] : UNMAPPED;
   const statusLabel = spec.statusLabel === '—' ? plan.rawStatus || '—' : spec.statusLabel;
   const name = planLabel(plan);
   const isUrgent = plan.status === 'WO';
   const title = plan.planType ?? plan.name;
+
+  const assetType = plan.assetType?.toLowerCase().trim() ?? '';
+  const interactive =
+    assetType === 'filing set' ||
+    assetType === 'field set' ||
+    !!(plan.filingLink || plan.fieldLink || plan.archiveDrive);
 
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLSpanElement>(null);
@@ -197,45 +210,49 @@ export const FilingChip = memo(function FilingChip({ plan, chipStyle }: ChipProp
   const close = () => setOpen(false);
 
   if (chipStyle === 'solid') {
-    return (
-      <span ref={containerRef} style={{ position: 'relative', display: 'inline-block' }}>
-        <button
-          type="button"
-          title={title}
-          onClick={toggle}
+    const inner = (
+      <>
+        {name}
+        <span
           style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 10,
-            padding: '6px 14px',
-            borderRadius: 999,
-            background: spec.bg,
+            fontSize: 9.5,
+            fontWeight: isUrgent ? 700 : 500,
+            textTransform: 'uppercase',
+            letterSpacing: '0.11em',
             color: spec.fg,
-            fontSize: 12.5,
-            fontWeight: 600,
-            letterSpacing: '-0.005em',
-            whiteSpace: 'nowrap',
-            border: 'none',
-            cursor: 'pointer',
-            fontFamily: 'inherit',
+            opacity: isUrgent ? 0.85 : 0.6,
+            lineHeight: 1,
           }}
         >
-          {name}
-          <span
-            style={{
-              fontSize: 9.5,
-              fontWeight: isUrgent ? 700 : 500,
-              textTransform: 'uppercase',
-              letterSpacing: '0.11em',
-              color: spec.fg,
-              opacity: isUrgent ? 0.85 : 0.6,
-              lineHeight: 1,
-            }}
-          >
-            {statusLabel}
-          </span>
-        </button>
-        {open && <PlanLinksPopover plan={plan} onClose={close} />}
+          {statusLabel}
+        </span>
+      </>
+    );
+    const sharedStyle = {
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: 10,
+      padding: '6px 14px',
+      borderRadius: 999,
+      background: spec.bg,
+      color: spec.fg,
+      fontSize: 12.5,
+      fontWeight: 600,
+      letterSpacing: '-0.005em',
+      whiteSpace: 'nowrap',
+      border: 'none',
+      fontFamily: 'inherit',
+    } as React.CSSProperties;
+    return (
+      <span ref={containerRef} style={{ position: 'relative', display: 'inline-block' }}>
+        {interactive ? (
+          <button type="button" title={title} onClick={toggle} style={{ ...sharedStyle, cursor: 'pointer' }}>
+            {inner}
+          </button>
+        ) : (
+          <span title={title} style={sharedStyle}>{inner}</span>
+        )}
+        {open && <PlanLinksPopover plan={plan} projectName={projectName} onClose={close} />}
       </span>
     );
   }
@@ -244,99 +261,18 @@ export const FilingChip = memo(function FilingChip({ plan, chipStyle }: ChipProp
     const bg = isUrgent ? spec.urgentBg : '#fff';
     const borderColor = isUrgent ? spec.border : 'var(--color-border-tertiary)';
     const isHollow = plan.status === 'TS';
-    return (
-      <span ref={containerRef} style={{ position: 'relative', display: 'inline-block' }}>
-        <button
-          type="button"
-          title={title}
-          onClick={toggle}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 8,
-            padding: '6px 12px 6px 11px',
-            borderRadius: 999,
-            border: `0.5px solid ${borderColor}`,
-            background: bg,
-            color: 'var(--color-text-primary)',
-            fontSize: 12.5,
-            fontWeight: 600,
-            letterSpacing: '-0.005em',
-            whiteSpace: 'nowrap',
-            cursor: 'pointer',
-            fontFamily: 'inherit',
-          }}
-        >
-          <span
-            aria-hidden="true"
-            style={{
-              width: isHollow ? 7 : 8,
-              height: isHollow ? 7 : 8,
-              borderRadius: '50%',
-              background: isHollow ? 'transparent' : spec.accent,
-              border: isHollow ? `1px solid ${spec.accent}` : 'none',
-              opacity: plan.status === 'TF' || plan.status === 'TS' ? 0.6 : 1,
-              flex: '0 0 auto',
-            }}
-          />
-          {name}
-          <span
-            style={{
-              fontSize: 11,
-              fontWeight: isUrgent ? 600 : 400,
-              color: isUrgent
-                ? spec.accent
-                : plan.status === 'AP' || plan.status === 'FI'
-                ? spec.accent
-                : 'var(--color-text-tertiary)',
-              lineHeight: 1,
-            }}
-          >
-            {statusLabel}
-          </span>
-        </button>
-        {open && <PlanLinksPopover plan={plan} onClose={close} />}
-      </span>
-    );
-  }
-
-  // stripe
-  const bg = isUrgent ? spec.urgentBg : '#fff';
-  return (
-    <span ref={containerRef} style={{ position: 'relative', display: 'inline-block' }}>
-      <button
-        type="button"
-        title={title}
-        onClick={toggle}
-        style={{
-          position: 'relative',
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: 8,
-          padding: '6px 12px 6px 14px',
-          borderRadius: 6,
-          border: '0.5px solid var(--color-border-tertiary)',
-          background: bg,
-          color: 'var(--color-text-primary)',
-          fontSize: 12.5,
-          fontWeight: 600,
-          letterSpacing: '-0.005em',
-          whiteSpace: 'nowrap',
-          overflow: 'hidden',
-          cursor: 'pointer',
-          fontFamily: 'inherit',
-        }}
-      >
+    const dotInner = (
+      <>
         <span
           aria-hidden="true"
           style={{
-            position: 'absolute',
-            left: 0,
-            top: 0,
-            bottom: 0,
-            width: isUrgent ? 5 : 4,
-            background: spec.accent,
-            opacity: plan.status === 'TS' ? 0.35 : plan.status === 'TF' ? 0.6 : 1,
+            width: isHollow ? 7 : 8,
+            height: isHollow ? 7 : 8,
+            borderRadius: '50%',
+            background: isHollow ? 'transparent' : spec.accent,
+            border: isHollow ? `1px solid ${spec.accent}` : 'none',
+            opacity: plan.status === 'TF' || plan.status === 'TS' ? 0.6 : 1,
+            flex: '0 0 auto',
           }}
         />
         {name}
@@ -344,14 +280,103 @@ export const FilingChip = memo(function FilingChip({ plan, chipStyle }: ChipProp
           style={{
             fontSize: 11,
             fontWeight: isUrgent ? 600 : 400,
-            color: isUrgent ? spec.accent : 'var(--color-text-tertiary)',
+            color: isUrgent
+              ? spec.accent
+              : plan.status === 'AP' || plan.status === 'FI'
+              ? spec.accent
+              : 'var(--color-text-tertiary)',
             lineHeight: 1,
           }}
         >
           {statusLabel}
         </span>
-      </button>
-      {open && <PlanLinksPopover plan={plan} onClose={close} />}
+      </>
+    );
+    const dotSharedStyle = {
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: 8,
+      padding: '6px 12px 6px 11px',
+      borderRadius: 999,
+      border: `0.5px solid ${borderColor}`,
+      background: bg,
+      color: 'var(--color-text-primary)',
+      fontSize: 12.5,
+      fontWeight: 600,
+      letterSpacing: '-0.005em',
+      whiteSpace: 'nowrap',
+      fontFamily: 'inherit',
+    } as React.CSSProperties;
+    return (
+      <span ref={containerRef} style={{ position: 'relative', display: 'inline-block' }}>
+        {interactive ? (
+          <button type="button" title={title} onClick={toggle} style={{ ...dotSharedStyle, cursor: 'pointer', border: `0.5px solid ${borderColor}` }}>
+            {dotInner}
+          </button>
+        ) : (
+          <span title={title} style={dotSharedStyle}>{dotInner}</span>
+        )}
+        {open && <PlanLinksPopover plan={plan} projectName={projectName} onClose={close} />}
+      </span>
+    );
+  }
+
+  // stripe
+  const bg = isUrgent ? spec.urgentBg : '#fff';
+  const stripeInner = (
+    <>
+      <span
+        aria-hidden="true"
+        style={{
+          position: 'absolute',
+          left: 0,
+          top: 0,
+          bottom: 0,
+          width: isUrgent ? 5 : 4,
+          background: spec.accent,
+          opacity: plan.status === 'TS' ? 0.35 : plan.status === 'TF' ? 0.6 : 1,
+        }}
+      />
+      {name}
+      <span
+        style={{
+          fontSize: 11,
+          fontWeight: isUrgent ? 600 : 400,
+          color: isUrgent ? spec.accent : 'var(--color-text-tertiary)',
+          lineHeight: 1,
+        }}
+      >
+        {statusLabel}
+      </span>
+    </>
+  );
+  const stripeSharedStyle = {
+    position: 'relative',
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 8,
+    padding: '6px 12px 6px 14px',
+    borderRadius: 6,
+    border: '0.5px solid var(--color-border-tertiary)',
+    background: bg,
+    color: 'var(--color-text-primary)',
+    fontSize: 12.5,
+    fontWeight: 600,
+    letterSpacing: '-0.005em',
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    fontFamily: 'inherit',
+  } as React.CSSProperties;
+  return (
+    <span ref={containerRef} style={{ position: 'relative', display: 'inline-block' }}>
+      {interactive ? (
+        <button type="button" title={title} onClick={toggle} style={{ ...stripeSharedStyle, cursor: 'pointer' }}>
+          {stripeInner}
+        </button>
+      ) : (
+        <span title={title} style={stripeSharedStyle}>{stripeInner}</span>
+      )}
+      {open && <PlanLinksPopover plan={plan} projectName={projectName} onClose={close} />}
     </span>
   );
 });

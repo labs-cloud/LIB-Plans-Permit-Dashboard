@@ -26,6 +26,16 @@ export function filingSetUrl(projectFolderName: string): string {
   return `${SHAREPOINT_BASE}?id=${encodeURIComponent(idPath)}&viewid=${SHAREPOINT_VIEW_ID}&FolderCTID=${SHAREPOINT_FOLDER_CTID}`;
 }
 
+export function planFilingSetUrl(projectFolderName: string, planName: string): string {
+  const idPath = `/sites/LeaditBuilders/Shared Documents/01_ACTIVE_PROJECTS/${projectFolderName}/04. Plans/01. Filing Set/${planName}`;
+  return `${SHAREPOINT_BASE}?id=${encodeURIComponent(idPath)}&viewid=${SHAREPOINT_VIEW_ID}&FolderCTID=${SHAREPOINT_FOLDER_CTID}`;
+}
+
+export function planFieldSetUrl(projectFolderName: string, planName: string): string {
+  const idPath = `/sites/LeaditBuilders/Shared Documents/01_ACTIVE_PROJECTS/${projectFolderName}/04. Plans/02. Field Set/${planName}`;
+  return `${SHAREPOINT_BASE}?id=${encodeURIComponent(idPath)}&viewid=${SHAREPOINT_VIEW_ID}&FolderCTID=${SHAREPOINT_FOLDER_CTID}`;
+}
+
 export function permitsSearchUrl(permitsListIds: string[]): string {
   if (permitsListIds.length === 0) {
     return `${CLICKUP.BASE_URL}/${CLICKUP.WORKSPACE_ID}/v/s/everything`;

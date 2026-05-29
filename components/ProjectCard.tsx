@@ -171,6 +171,7 @@ function ProjectCardImpl({ project, layout, chipStyle }: Props) {
         <LanesBody
           plans={project.plans}
           chipStyle={chipStyle}
+          projectName={project.name}
           permits={
             permitsHref ? (
               <PermitsChip
@@ -185,7 +186,7 @@ function ProjectCardImpl({ project, layout, chipStyle }: Props) {
       ) : (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
           {(layout === 'B' ? sortedPlans(project.plans) : project.plans).map((plan) => (
-            <FilingChip key={plan.id} plan={plan} chipStyle={chipStyle} />
+            <FilingChip key={plan.id} plan={plan} chipStyle={chipStyle} projectName={project.name} />
           ))}
           {permitsHref ? (
             <PermitsChip
@@ -204,10 +205,11 @@ function ProjectCardImpl({ project, layout, chipStyle }: Props) {
 interface LanesBodyProps {
   plans: Plan[];
   chipStyle: ChipStyle;
+  projectName: string;
   permits: React.ReactNode;
 }
 
-function LanesBody({ plans, chipStyle, permits }: LanesBodyProps) {
+function LanesBody({ plans, chipStyle, projectName, permits }: LanesBodyProps) {
   const byLane = bucketByLane(plans);
   const buckets = LANES.map((lane) => ({ lane, plans: byLane[lane.id] })).filter(
     (b) => b.plans.length > 0,
@@ -266,7 +268,7 @@ function LanesBody({ plans, chipStyle, permits }: LanesBodyProps) {
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
               {b.plans.map((plan) => (
-                <FilingChip key={plan.id} plan={plan} chipStyle={chipStyle} />
+                <FilingChip key={plan.id} plan={plan} chipStyle={chipStyle} projectName={projectName} />
               ))}
             </div>
           </div>
