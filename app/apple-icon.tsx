@@ -8,11 +8,12 @@ import { join } from 'path';
 export const size = { width: 180, height: 180 };
 export const contentType = 'image/png';
 
-// Source logo is 2550×3300. These values mirror the LogoHeader crop window
-// (96×104 at img-width 360, offset -30/-2), scaled up ~1.458× so the mark
-// fills the icon with comfortable padding.
-const CROP = { w: 140, h: 152 };
-const IMG = { w: 525, h: 679, left: -44, top: -3 };
+// Source logo is 2550×3300 and contains the hex mark (x≈366–789, y≈211–706)
+// PLUS the "LEAD IT BUILDERS" wordmark starting at x≈886. We crop a 590px
+// square centred on the mark (x 282–872, y 163–753) — which stops well short
+// of the wordmark — and scale it into a 152px box centred on the white tile.
+const CROP = { w: 152, h: 152 };
+const IMG = { w: 657, h: 850, left: -73, top: -42 };
 
 export default function AppleIcon() {
   const logo = readFileSync(

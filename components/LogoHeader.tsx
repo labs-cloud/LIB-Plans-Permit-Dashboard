@@ -81,10 +81,10 @@ export function LogoHeader({
               onError={() => setImgError(true)}
               style={{
                 position: 'absolute',
-                width: 360,
+                width: 420,
                 height: 'auto',
-                left: -30,
-                top: -2,
+                left: -47,
+                top: -23,
                 maxWidth: 'none',
                 userSelect: 'none',
               }}
