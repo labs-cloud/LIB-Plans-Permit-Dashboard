@@ -5,7 +5,7 @@ import useSWR from 'swr';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { LogoHeader } from '@/components/LogoHeader';
 import { ProjectPicker } from '@/components/ProjectPicker';
-import { CLICKUP } from '@/lib/constants';
+import { CLICKUP, SITE_URL } from '@/lib/constants';
 import type {
   BudgetTrade,
   BudgetPayload,
@@ -747,7 +747,7 @@ function DetailedView({
 <body>
   <div class="header">
     <div class="logo-crop">
-      <img class="logo-img" src="${window.location.origin}/lib_brand/lead_it_builders_logo.png" alt="Lead It Builders" />
+      <img class="logo-img" src="${SITE_URL}/lib_brand/lead_it_builders_logo.png" alt="Lead It Builders" />
     </div>
     <div class="header-main">
       <h1>Budget Outlook Report · ${project.name}</h1>
@@ -802,7 +802,7 @@ function DetailedView({
   }
 
   function handleShareLink() {
-    const url = `${window.location.origin}/budget/${encodeURIComponent(project.name)}/report`;
+    const url = `${SITE_URL}/budget/${encodeURIComponent(project.name)}/report`;
     const onSuccess = () => {
       setShareCopied(true);
       setTimeout(() => setShareCopied(false), 2500);
@@ -2114,7 +2114,7 @@ export function BudgetDashboard({ projectId }: { projectId?: string } = {}) {
           <button
             type="button"
             onClick={() => {
-              const url = `${window.location.origin}/budget/${encodeURIComponent(projectId)}?embed=1`;
+              const url = `${SITE_URL}/budget/${encodeURIComponent(projectId)}?embed=1`;
               navigator.clipboard.writeText(url).then(() => {
                 setEmbedCopied(true);
                 setTimeout(() => setEmbedCopied(false), 2000);

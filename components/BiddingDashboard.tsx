@@ -7,6 +7,7 @@ import { LogoHeader } from './LogoHeader';
 import { ProjectPicker } from './ProjectPicker';
 import type { BidStatus, BidSub, BidTrade, BiddingPayload, BiddingPortfolioPayload } from '@/lib/bidding-types';
 import { taskUrl } from '@/lib/urls';
+import { SITE_URL } from '@/lib/constants';
 
 // ─── Data context (replaces static fixture import) ────────────────────────────
 
@@ -1177,7 +1178,7 @@ function DetailedView({ onBack, search = '' }: { onBack: () => void; search?: st
   }
 
   function handleCopyEmbedLink() {
-    const url = `https://lib-plans-permit-dashboard.vercel.app/bidding/${encodeURIComponent(project.name)}?embed=1`;
+    const url = `${SITE_URL}/bidding/${encodeURIComponent(project.name)}?embed=1`;
     const onSuccess = () => { setEmbedCopied(true); setTimeout(() => setEmbedCopied(false), 2500); };
     const execFallback = () => {
       const ta = document.createElement('textarea');
@@ -1197,7 +1198,7 @@ function DetailedView({ onBack, search = '' }: { onBack: () => void; search?: st
   }
 
   function handleShareLink() {
-    const url = `${window.location.origin}/bidding/${encodeURIComponent(project.name)}/report`;
+    const url = `${SITE_URL}/bidding/${encodeURIComponent(project.name)}/report`;
     const onSuccess = () => {
       setShareCopied(true);
       setTimeout(() => setShareCopied(false), 2500);
@@ -3075,7 +3076,7 @@ export function BiddingDashboard({ projectId }: { projectId?: string } = {}) {
           <button
             type="button"
             onClick={() => {
-              const url = `${window.location.origin}/bidding/${encodeURIComponent(projectId)}?embed=1`;
+              const url = `${SITE_URL}/bidding/${encodeURIComponent(projectId)}?embed=1`;
               navigator.clipboard.writeText(url).then(() => {
                 setEmbedCopied(true);
                 setTimeout(() => setEmbedCopied(false), 2000);
