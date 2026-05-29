@@ -8,6 +8,7 @@ import { ProjectPicker } from './ProjectPicker';
 import type { BidStatus, BidSub, BidTrade, BiddingPayload, BiddingPortfolioPayload } from '@/lib/bidding-types';
 import { taskUrl } from '@/lib/urls';
 import { SITE_URL } from '@/lib/constants';
+import { EmbedSyncBar } from './EmbedSyncBar';
 
 // ─── Data context (replaces static fixture import) ────────────────────────────
 
@@ -3017,6 +3018,7 @@ export function BiddingDashboard({ projectId }: { projectId?: string } = {}) {
           syncedAt={syncedAt}
         />
       )}
+      {isEmbed && <EmbedSyncBar syncedAt={syncedAt} />}
 
       {/* Filter / navigation bar */}
       <div
