@@ -1330,6 +1330,21 @@ tr.expired .status-cell .pill .dot-mini {
   .budget-trade-table {
     min-width: 620px;
   }
+  /* Fade the right edge so it's clear the table scrolls horizontally */
+  .budget-trade-scrollwrap {
+    position: relative;
+  }
+  .budget-trade-scrollwrap::after {
+    content: '';
+    position: absolute;
+    top: 1px;
+    right: 1px;
+    bottom: 1px;
+    width: 22px;
+    pointer-events: none;
+    border-radius: 0 8px 8px 0;
+    background: linear-gradient(to left, var(--color-background-primary) 25%, transparent);
+  }
 
   /* Variance rows drop the bar column, keep trade + $ + % */
   .budget-var-row {
@@ -1387,10 +1402,10 @@ tr.expired .status-cell .pill .dot-mini {
   .budget-tabs {
     margin-left: 0 !important;
     width: 100%;
-    overflow-x: auto;
+    flex-wrap: wrap;
   }
   .budget-tabs button {
-    flex: 1;
+    flex: 1 1 calc(50% - 4px);
     justify-content: center;
     white-space: nowrap;
   }
