@@ -1348,9 +1348,17 @@ tr.expired .status-cell .pill .dot-mini {
   .budget-kpi-4 {
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
   }
-  /* Shrink the big KPI value so it fits two-up */
-  .budget-kpi-grid > div > div:first-child > div:nth-child(2) {
-    font-size: 24px !important;
+  /*
+   * Long currency values (e.g. $10,407,000) collide with the round icon
+   * in the cramped two-up layout. Drop the decorative icon and shrink the
+   * value so the number gets the full card width.
+   */
+  .budget-kpi-grid .kpi-icon {
+    display: none !important;
+  }
+  .budget-kpi-grid .kpi-value {
+    font-size: 20px !important;
+    overflow-wrap: anywhere;
   }
 
   /* Category rows drop the variance bar, keep trade + estimated + new budget */

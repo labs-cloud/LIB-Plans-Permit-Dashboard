@@ -133,13 +133,13 @@ function KpiCard({
     }}>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', lineHeight: 1.2 }}>{label}</div>
-        <div style={{
+        <div className="kpi-value" style={{
           fontSize: 30, fontWeight: 500, fontVariantNumeric: 'tabular-nums',
           letterSpacing: '-0.015em', lineHeight: 1.1, color: vColor, marginTop: 2,
         }}>{value}</div>
         {sub && <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 3 }}>{sub}</div>}
       </div>
-      <span style={{
+      <span className="kpi-icon" style={{
         width: 40, height: 40, flexShrink: 0, borderRadius: 999,
         background: iconBg,
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
