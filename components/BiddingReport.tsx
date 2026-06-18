@@ -37,17 +37,13 @@ export function BiddingReport({ projectId }: { projectId: string }) {
   const trades = project?.trades ?? [];
 
   const kpis = useMemo(() => {
-    const fnlCount = trades.filter((t: BidTrade) => t.subs.some((s) => s.status === 'fnl')).length;
-    const outCount = trades.filter(
-      (t: BidTrade) =>
-        t.subs.some((s) => s.status === 'snt' || s.status === 'rec') &&
-        !t.subs.some((s) => s.status === 'fnl'),
-    ).length;
-    const hldCount = trades.filter((t: BidTrade) => t.subs.some((s) => s.status === 'hld')).length;
+    // Status counts are sub-level (not trade-level) so they match the dashboard pills.
+    const allSubs = trades.flatMap((t: BidTrade) => t.subs);
+    const fnlCount = allSubs.filter((s) => s.status === 'fnl').length;
+    const outCount = allSubs.filter((s) => s.status === 'snt' || s.status === 'rec').length;
+    const hldCount = allSubs.filter((s) => s.status === 'hld').length;
     const total = trades.reduce((a: number, t: BidTrade) => a + (t.low ?? 0), 0);
-    const fuCount = trades.filter((t: BidTrade) =>
-      t.subs.some((s) => s.status === 'fu1' || s.status === 'fu2' || s.status === 'fu3'),
-    ).length;
+    const fuCount = allSubs.filter((s) => s.status.startsWith('fu')).length;
     return { total: trades.length, fnlCount, outCount, hldCount, fuCount, runningTotal: total };
   }, [trades]);
 
