@@ -981,21 +981,20 @@ function DetailedView({ onBack, search = '' }: { onBack: () => void; search?: st
   const [embedCopied, setEmbedCopied] = useState(false);
 
   const kpis = useMemo(() => {
-    const fnlCount = trades.filter((t) => t.subs.some((s) => s.status === 'fnl')).length;
-    const outCount = trades.filter((t) =>
-      t.subs.some((s) => s.status === 'snt' || s.status === 'rec'),
-    ).length;
-    const hldCount = trades.filter((t) => t.subs.some((s) => s.status === 'hld')).length;
-    const ntbCount = trades.filter(
-      (t) => t.subs.length > 0 && t.subs.every((s) => s.status === 'ntb'),
-    ).length;
+    // Count individual subs (not trades) so the KPI cards reflect sub-level status.
+    const allSubs = trades.flatMap((t) => t.subs);
+    const fnlCount = allSubs.filter((s) => s.status === 'fnl').length;
+    const outCount = allSubs.filter((s) => s.status === 'snt' || s.status === 'rec').length;
+    const hldCount = allSubs.filter((s) => s.status === 'hld').length;
+    const ntbCount = allSubs.filter((s) => s.status === 'ntb').length;
     const total = trades.reduce((a, t) => a + (t.low ?? 0), 0);
     const avgSubs =
       trades.length
         ? (trades.reduce((a, t) => a + t.subs.length, 0) / trades.length).toFixed(1)
         : '0';
     return {
-      total: trades.length,
+      totalSubs: allSubs.length,
+      totalTrades: trades.length,
       fnlCount,
       outCount,
       hldCount,
@@ -1031,23 +1030,18 @@ function DetailedView({ onBack, search = '' }: { onBack: () => void; search?: st
   }, [trades, filter, search]);
 
   const chipCounts = useMemo<Record<FilterKey, number>>(() => {
+    // Count individual subs (not trades) so the filter pills reflect sub-level status.
+    const allSubs = trades.flatMap((t) => t.subs);
     return {
-      all: trades.length,
-      snt: trades.filter((t) => t.subs.some((s) => s.status === 'snt')).length,
-      rec: trades.filter((t) => t.subs.some((s) => s.status === 'rec')).length,
-      hld: trades.filter((t) => t.subs.some((s) => s.status === 'hld')).length,
-      fnl: trades.filter((t) => t.subs.some((s) => s.status === 'fnl')).length,
-      fu: trades.filter((t) =>
-        t.subs.some(
-          (s) => s.status === 'fu1' || s.status === 'fu2' || s.status === 'fu3',
-        ),
-      ).length,
-      ntb: trades.filter(
-        (t) => t.subs.length > 0 && t.subs.every((s) => s.status === 'ntb'),
-      ).length,
-      out: trades.filter((t) =>
-        t.subs.some((s) => s.status === 'snt' || s.status === 'rec'),
-      ).length,
+      all: allSubs.length,
+      snt: allSubs.filter((s) => s.status === 'snt').length,
+      rec: allSubs.filter((s) => s.status === 'rec').length,
+      hld: allSubs.filter((s) => s.status === 'hld').length,
+      fnl: allSubs.filter((s) => s.status === 'fnl').length,
+      // fu1/fu2/fu3 are all surfaced under the single "Followed Up" pill.
+      fu: allSubs.filter((s) => s.status.startsWith('fu')).length,
+      ntb: allSubs.filter((s) => s.status === 'ntb').length,
+      out: allSubs.filter((s) => s.status === 'snt' || s.status === 'rec').length,
       fu1: 0,
       fu2: 0,
       fu3: 0,
@@ -1143,7 +1137,7 @@ function DetailedView({ onBack, search = '' }: { onBack: () => void; search?: st
     </div>
   </div>
   <div class="kpi-grid">
-    <div class="kpi"><div class="kpi-val">${kpis.total}</div><div class="kpi-label">Total trades</div></div>
+    <div class="kpi"><div class="kpi-val">${kpis.totalSubs}</div><div class="kpi-label">Total subs</div></div>
     <div class="kpi"><div class="kpi-val" style="color:#1F7A38;">${kpis.fnlCount}</div><div class="kpi-label">Finalized</div></div>
     <div class="kpi"><div class="kpi-val" style="color:#9C7A00;">${kpis.outCount}</div><div class="kpi-label">Out for bid</div></div>
     <div class="kpi"><div class="kpi-val" style="color:#A82828;">${kpis.hldCount}</div><div class="kpi-label">On hold</div></div>
@@ -1415,9 +1409,9 @@ function DetailedView({ onBack, search = '' }: { onBack: () => void; search?: st
         }}
       >
         <KpiCard
-          label="Total trades"
-          caption="in scope"
-          value={kpis.total}
+          label="Total subs"
+          caption={`across ${kpis.totalTrades} trades`}
+          value={kpis.totalSubs}
           icon="ti-list"
           tone="info"
           active={filter === 'all'}
