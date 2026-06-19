@@ -6,7 +6,6 @@ import { createClient } from '@/lib/supabase/client'
 
 export default function LoginPage() {
   const router = useRouter()
-  const supabase = createClient()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [msg, setMsg] = useState<{ kind: 'err' | 'ok'; text: string } | null>(null)
@@ -21,6 +20,7 @@ export default function LoginPage() {
   async function sendMagicLink() {
     if (!email) return setMsg({ kind: 'err', text: 'Enter your email first.' })
     setBusy(true); setMsg(null)
+    const supabase = createClient()
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
@@ -31,6 +31,7 @@ export default function LoginPage() {
 
   async function signInWithPassword() {
     setBusy(true); setMsg(null)
+    const supabase = createClient()
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     setBusy(false)
     if (error) setMsg({ kind: 'err', text: error.message })
