@@ -126,6 +126,16 @@ export async function updateTaskCustomField(
   );
 }
 
+// Returns the set of project names registered in the Master Projects Board,
+// normalised (trimmed, lower-cased) for tolerant matching against folder names.
+// Used to flag Active-Projects folders that have no Master Projects Board record
+// (ClickUp "unlinked project" state) so the dashboard can warn rather than break.
+export async function getMasterProjectNames(): Promise<Set<string>> {
+  const { CLICKUP } = await import('./constants');
+  const tasks = await getTasksInList(CLICKUP.MASTER_PROJECTS_BOARD_LIST_ID, true);
+  return new Set(tasks.map((t) => t.name.trim().toLowerCase()).filter(Boolean));
+}
+
 // includeSubtasks=true is required for per-project "02. Bidding" lists, which use a
 // parent/subtask hierarchy: root tasks = Trade rows, subtasks = Sub rows. Without it
 // only the Trade parent tasks are returned and all sub bid data is missing.

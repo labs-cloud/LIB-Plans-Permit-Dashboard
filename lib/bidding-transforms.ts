@@ -9,23 +9,36 @@ const F = CLICKUP.FIELD;
 // the per-project 02. Bidding list's native task statuses (lowercase, some with
 // ClickUp's persistent "recieved" typo).
 function mapBiddingStatusName(name: string): BidStatus {
-  switch (name.toUpperCase().trim()) {
-    // Central list custom-field option names
+  // Normalise: uppercase, collapse whitespace, and fold em/en dashes to a plain
+  // hyphen so "LEVELED — PENDING REVIEW" matches regardless of the dash glyph.
+  const key = name
+    .toUpperCase()
+    .replace(/[‒–—―−]/g, '-') // figure/en/em/bar/minus dashes → "-"
+    .replace(/\s+/g, ' ')
+    .trim();
+  switch (key) {
+    // ── Central list custom-field option names ──────────────────────────────
     case 'TO SEND':            return 'ntb';
     case 'RFP SENT':           return 'snt';
     case 'FOLLOWED UP':        return 'fu1';
     case 'PROPOSALS RECEIVED': return 'rec';
     case 'TO CLARIFY':         return 'rec';
-    case 'LEVELED':            return 'rec';
-    case 'REVIEWED':           return 'rec';
+    case 'REVIEWED':           return 'lvp';
     case 'REJECTED':           return 'hld';
     case 'AWARDED':            return 'fnl';
-    // Per-project list native task statuses
+    // ── Per-project list native task statuses ───────────────────────────────
     case 'NOT STARTED':        return 'ntb';
+    case 'WAITING FOR PLANS':  return 'wfp';
     case 'BID RECIEVED':       return 'rec'; // ClickUp's persistent typo
     case 'BID RECEIVED':       return 'rec';
+    case 'LEVELING':           return 'lvl';
+    case 'LEVELED':            return 'lvl';
+    case 'LEVELED - PENDING REVIEW': return 'lvp';
+    case 'PENDING REVIEW':     return 'lvp';
     case 'NO BID / DECLINED':  return 'hld';
+    case 'NO BID/DECLINED':    return 'hld';
     case 'NO BID':             return 'hld';
+    case 'DECLINED':           return 'hld';
     default:                   return 'ntb';
   }
 }

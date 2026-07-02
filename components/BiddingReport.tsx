@@ -7,11 +7,14 @@ import type { BiddingPayload, BidStatus, BidTrade } from '@/lib/bidding-types';
 // ─── Hardcoded status palette (safe for print / no CSS vars) ──────────────────
 
 const STATUS: Record<BidStatus, { bg: string; fg: string; ring: string; label: string }> = {
-  ntb: { bg: '#E8E6E1', fg: '#3F3D38', ring: '#9C9A92', label: 'Not bidding' },
-  snt: { bg: '#7DD3F2', fg: '#053A5F', ring: '#1B7CB0', label: 'Sent' },
+  ntb: { bg: '#E8E6E1', fg: '#3F3D38', ring: '#9C9A92', label: 'To Send' },
+  snt: { bg: '#7DD3F2', fg: '#053A5F', ring: '#1B7CB0', label: 'RFP Sent' },
+  wfp: { bg: '#B7E3D8', fg: '#063A2F', ring: '#2E8C78', label: 'Waiting for Plans' },
   rec: { bg: '#FFE74A', fg: '#3D2D00', ring: '#9C7A00', label: 'Received' },
-  hld: { bg: '#F47B7B', fg: '#3E0707', ring: '#A82828', label: 'Hold' },
-  fnl: { bg: '#7DD68F', fg: '#0D3E18', ring: '#1F7A38', label: 'Finalized' },
+  lvl: { bg: '#FBD48D', fg: '#4A2C00', ring: '#B87400', label: 'Leveling' },
+  lvp: { bg: '#F6B266', fg: '#4A2400', ring: '#A85E14', label: 'Leveled · Pending' },
+  hld: { bg: '#F47B7B', fg: '#3E0707', ring: '#A82828', label: 'No Bid' },
+  fnl: { bg: '#7DD68F', fg: '#0D3E18', ring: '#1F7A38', label: 'Awarded' },
   fu1: { bg: '#C8A7E6', fg: '#33124F', ring: '#6B3A95', label: 'FU · W1' },
   fu2: { bg: '#F8CEAC', fg: '#4A2308', ring: '#A85F18', label: 'FU · W2' },
   fu3: { bg: '#F5C8DD', fg: '#5A1338', ring: '#A8336E', label: 'FU · W3' },

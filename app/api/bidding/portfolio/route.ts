@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { unstable_cache } from 'next/cache';
-import { hasClickUpToken, getFoldersInSpace, getListsInFolder, getTasksInList } from '@/lib/clickup';
+import { hasClickUpToken, getFoldersInSpace, getListsInFolder, getTasksInList, getMasterProjectNames } from '@/lib/clickup';
 import { transformBiddingTasks, transformBiddingTasksByName } from '@/lib/bidding-transforms';
 import type { BiddingPortfolioPayload, BiddingProject } from '@/lib/bidding-types';
 import type { ClickUpList } from '@/lib/clickup';
@@ -57,6 +57,19 @@ async function buildPortfolioPayload(): Promise<BiddingPortfolioPayload> {
     return { projects: [], syncedAt: Date.now(), source: 'live' };
   }
 
+  // Cross-reference folders against the Master Projects Board. A folder with no
+  // matching board record is "unlinked" — we still surface it, but flag it so
+  // the dashboard can warn and keep it out of the aggregate counts. Board lookup
+  // is best-effort: if it fails we treat every folder as linked (no false alarms).
+  let masterNames: Set<string> | null = null;
+  try {
+    masterNames = await getMasterProjectNames();
+  } catch (err) {
+    console.warn('[bidding/portfolio] Master Projects Board lookup failed; skipping unlinked check:', err);
+  }
+  const isUnlinked = (folderName: string): boolean =>
+    masterNames !== null && masterNames.size > 0 && !masterNames.has(folderName.trim().toLowerCase());
+
   // Fetch each project's bidding data in parallel; failed projects get an empty stub.
   const results = await Promise.allSettled(
     targetFolders.map(async (folder): Promise<BiddingProject> => {
@@ -85,23 +98,27 @@ async function buildPortfolioPayload(): Promise<BiddingPortfolioPayload> {
   );
 
   const projects: BiddingProject[] = results.map((result, i) => {
+    const folderName = targetFolders[i].name;
+    const unlinked = isUnlinked(folderName);
     if (result.status === 'fulfilled') {
-      return result.value;
+      return unlinked ? { ...result.value, unlinked: true } : result.value;
     }
     console.error(
-      `[bidding/portfolio] Failed to fetch project "${targetFolders[i].name}":`,
+      `[bidding/portfolio] Failed to fetch project "${folderName}":`,
       result.reason,
     );
-    return { ...EMPTY_PROJECT, name: targetFolders[i].name };
+    return { ...EMPTY_PROJECT, name: folderName, unlinked };
   });
 
-  return { projects, syncedAt: Date.now(), source: 'live' };
+  const unlinkedProjects = projects.filter((p) => p.unlinked).map((p) => p.name);
+
+  return { projects, syncedAt: Date.now(), source: 'live', unlinkedProjects };
 }
 
 // Cache keyed on a fixed key (no per-project variation) with 60 s TTL.
 const getCachedPortfolioPayload = unstable_cache(
   buildPortfolioPayload,
-  ['lib-bidding-portfolio:v5'],
+  ['lib-bidding-portfolio:v6'],
   { revalidate: CACHE_TTL_SECONDS, tags: [BIDDING_CACHE_TAG] },
 );
 

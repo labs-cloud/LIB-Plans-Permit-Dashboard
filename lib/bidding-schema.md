@@ -47,18 +47,31 @@ Folder: 1931-1935 Bedford Ave  (folder id: 90177597601)
 
 ## Status Values (`task.status.status` on subtask rows)
 
-ClickUp returns these in lowercase. They map to the dashboard 8-color palette:
+ClickUp returns these in lowercase. `mapBiddingStatusName` normalises case,
+whitespace, and dash glyphs (em/en dashes → `-`) before matching, then maps to
+the dashboard status palette. Each tier has a distinct color/label — statuses
+are **no longer collapsed** into the wrong pill:
 
-| ClickUp status string  | Dashboard `BidStatus` | Color bucket          |
-|------------------------|-----------------------|-----------------------|
-| `not started`          | `ntb`                 | grey — not yet bid    |
-| `rfp sent`             | `snt`                 | blue — sent           |
-| `followed up`          | `fu1`                 | yellow — follow-up W1 |
-| `bid recieved`         | `rec`                 | orange — received (ClickUp's persistent typo) |
-| `bid received`         | `rec`                 | orange — received     |
-| `awarded`              | `fnl`                 | green — finalized     |
-| `no bid / declined`    | `hld`                 | red — hold/declined   |
-| `no bid`               | `hld`                 | red — hold/declined   |
+| ClickUp status string        | Dashboard `BidStatus` | Color bucket                     |
+|------------------------------|-----------------------|----------------------------------|
+| `not started`                | `ntb`                 | grey — To Send                   |
+| `rfp sent`                   | `snt`                 | blue — RFP Sent                  |
+| `waiting for plans`          | `wfp`                 | teal — Waiting for Plans         |
+| `followed up`                | `fu1`                 | purple — Followed Up             |
+| `bid recieved`               | `rec`                 | yellow — Received (ClickUp typo) |
+| `bid received`               | `rec`                 | yellow — Received                |
+| `leveling`                   | `lvl`                 | amber — Leveling                 |
+| `leveled`                    | `lvl`                 | amber — Leveling                 |
+| `leveled — pending review`   | `lvp`                 | deep amber — Leveled · Pending   |
+| `awarded`                    | `fnl`                 | green — Awarded                  |
+| `no bid / declined`          | `hld`                 | red — No Bid / Declined          |
+| `no bid`                     | `hld`                 | red — No Bid / Declined          |
+
+The **trade-level** status shown in the portfolio matrix is the *most advanced*
+status among the trade's bids (see `STATUS_RANK` in `BiddingDashboard.tsx`):
+`ntb < hld < wfp < snt < followed-up < rec < lvl < lvp < fnl`. So a trade with a
+single AWARDED sub renders green "Awarded"; a trade whose bids are all in
+leveling renders amber "Leveling", etc. — never a blanket "To Send".
 
 ## Schema B — Flat ("Bid" tasks, e.g. 3930 Carpenter)
 
