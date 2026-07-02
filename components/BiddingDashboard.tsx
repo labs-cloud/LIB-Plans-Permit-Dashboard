@@ -45,6 +45,8 @@ function useBiddingPortfolio() {
 
 type StatusMeta = {
   label: string;
+  /** Compact label for tight surfaces like the portfolio matrix cell. */
+  short: string;
   icon: string;
   bg: string;
   fg: string;
@@ -53,14 +55,34 @@ type StatusMeta = {
 };
 
 const STATUS_META: Record<BidStatus, StatusMeta> = {
-  ntb: { label: 'To Send',       icon: 'ti-ban',        bg: 'var(--bid-ntb-bg)', fg: 'var(--bid-ntb-fg)', ring: 'var(--bid-ntb-ring)', strong: 'var(--bid-ntb-strong)' },
-  snt: { label: 'RFP Sent',      icon: 'ti-send',       bg: 'var(--bid-snt-bg)', fg: 'var(--bid-snt-fg)', ring: 'var(--bid-snt-ring)', strong: 'var(--bid-snt-strong)' },
-  rec: { label: 'Bid Received',  icon: 'ti-checks',     bg: 'var(--bid-rec-bg)', fg: 'var(--bid-rec-fg)', ring: 'var(--bid-rec-ring)', strong: 'var(--bid-rec-strong)' },
-  hld: { label: 'Rejected',      icon: 'ti-hand-stop',  bg: 'var(--bid-hld-bg)', fg: 'var(--bid-hld-fg)', ring: 'var(--bid-hld-ring)', strong: 'var(--bid-hld-strong)' },
-  fnl: { label: 'Awarded',       icon: 'ti-trophy',     bg: 'var(--bid-fnl-bg)', fg: 'var(--bid-fnl-fg)', ring: 'var(--bid-fnl-ring)', strong: 'var(--bid-fnl-strong)' },
-  fu1: { label: 'Followed Up · W1 (14d ago)', icon: 'ti-message-2', bg: 'var(--bid-fu1-bg)', fg: 'var(--bid-fu1-fg)', ring: 'var(--bid-fu1-ring)', strong: 'var(--bid-fu1-strong)' },
-  fu2: { label: 'Followed Up · W2 (7d ago)',  icon: 'ti-message-2', bg: 'var(--bid-fu2-bg)', fg: 'var(--bid-fu2-fg)', ring: 'var(--bid-fu2-ring)', strong: 'var(--bid-fu2-strong)' },
-  fu3: { label: 'Followed Up · W3 (0d ago)',  icon: 'ti-message-2', bg: 'var(--bid-fu3-bg)', fg: 'var(--bid-fu3-fg)', ring: 'var(--bid-fu3-ring)', strong: 'var(--bid-fu3-strong)' },
+  ntb: { label: 'To Send',       short: 'To Send',     icon: 'ti-ban',        bg: 'var(--bid-ntb-bg)', fg: 'var(--bid-ntb-fg)', ring: 'var(--bid-ntb-ring)', strong: 'var(--bid-ntb-strong)' },
+  snt: { label: 'RFP Sent',      short: 'RFP Sent',    icon: 'ti-send',       bg: 'var(--bid-snt-bg)', fg: 'var(--bid-snt-fg)', ring: 'var(--bid-snt-ring)', strong: 'var(--bid-snt-strong)' },
+  wfp: { label: 'Waiting for Plans', short: 'Waiting', icon: 'ti-clock-pause', bg: 'var(--bid-wfp-bg)', fg: 'var(--bid-wfp-fg)', ring: 'var(--bid-wfp-ring)', strong: 'var(--bid-wfp-strong)' },
+  rec: { label: 'Bid Received',  short: 'Received',    icon: 'ti-checks',     bg: 'var(--bid-rec-bg)', fg: 'var(--bid-rec-fg)', ring: 'var(--bid-rec-ring)', strong: 'var(--bid-rec-strong)' },
+  lvl: { label: 'Leveling',      short: 'Leveling',    icon: 'ti-scale',      bg: 'var(--bid-lvl-bg)', fg: 'var(--bid-lvl-fg)', ring: 'var(--bid-lvl-ring)', strong: 'var(--bid-lvl-strong)' },
+  lvp: { label: 'Leveled · Pending Review', short: 'Leveled', icon: 'ti-list-check', bg: 'var(--bid-lvp-bg)', fg: 'var(--bid-lvp-fg)', ring: 'var(--bid-lvp-ring)', strong: 'var(--bid-lvp-strong)' },
+  hld: { label: 'No Bid / Declined', short: 'No Bid',  icon: 'ti-hand-stop', bg: 'var(--bid-hld-bg)', fg: 'var(--bid-hld-fg)', ring: 'var(--bid-hld-ring)', strong: 'var(--bid-hld-strong)' },
+  fnl: { label: 'Awarded',       short: 'Awarded',     icon: 'ti-trophy',     bg: 'var(--bid-fnl-bg)', fg: 'var(--bid-fnl-fg)', ring: 'var(--bid-fnl-ring)', strong: 'var(--bid-fnl-strong)' },
+  fu1: { label: 'Followed Up · W1 (14d ago)', short: 'Followed Up', icon: 'ti-message-2', bg: 'var(--bid-fu1-bg)', fg: 'var(--bid-fu1-fg)', ring: 'var(--bid-fu1-ring)', strong: 'var(--bid-fu1-strong)' },
+  fu2: { label: 'Followed Up · W2 (7d ago)',  short: 'Followed Up', icon: 'ti-message-2', bg: 'var(--bid-fu2-bg)', fg: 'var(--bid-fu2-fg)', ring: 'var(--bid-fu2-ring)', strong: 'var(--bid-fu2-strong)' },
+  fu3: { label: 'Followed Up · W3 (0d ago)',  short: 'Followed Up', icon: 'ti-message-2', bg: 'var(--bid-fu3-bg)', fg: 'var(--bid-fu3-fg)', ring: 'var(--bid-fu3-ring)', strong: 'var(--bid-fu3-strong)' },
+};
+
+// Lifecycle rank (low → high). Used to pick the *most advanced* status among a
+// trade's bids for the matrix cell. NO BID / DECLINED sits just above "not
+// started" so it only surfaces when nothing more advanced exists for the trade.
+const STATUS_RANK: Record<BidStatus, number> = {
+  ntb: 0,
+  hld: 1,
+  wfp: 2,
+  snt: 3,
+  fu1: 4,
+  fu2: 4,
+  fu3: 4,
+  rec: 5,
+  lvl: 6,
+  lvp: 7,
+  fnl: 8,
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -74,16 +96,25 @@ function fmtLong$(n: number): string {
   return `$${n.toLocaleString()}`;
 }
 
-/** Priority-based trade-level status derivation */
+/**
+ * Trade-level status = the *most advanced* status among the trade's bids, per
+ * STATUS_RANK. This replaces the old binary collapse where every non-received
+ * status fell back to "To Send". Follow-up sub-tiers (fu1/fu2/fu3) share a rank
+ * and collapse to `fu1` so the cell renders a single "Followed Up" pill.
+ */
 function tradeStatus(trade: BidTrade): BidStatus | null {
-  const s = trade.subs.map((sub) => sub.status);
-  if (s.includes('fnl')) return 'fnl';
-  if (s.includes('hld')) return 'hld';
-  if (s.length > 0 && s.every((x) => x === 'ntb')) return 'ntb';
-  if (s.some((x) => x === 'fu1' || x === 'fu2' || x === 'fu3')) return 'fu1';
-  if (s.includes('rec')) return 'rec';
-  if (s.includes('snt')) return 'snt';
-  return null;
+  if (!trade.subs.length) return null;
+  let best: BidStatus | null = null;
+  let bestRank = -Infinity;
+  for (const sub of trade.subs) {
+    const rank = STATUS_RANK[sub.status];
+    if (rank > bestRank) {
+      bestRank = rank;
+      best = sub.status;
+    }
+  }
+  if (best === 'fu2' || best === 'fu3') return 'fu1';
+  return best;
 }
 
 // ─── Status pill ──────────────────────────────────────────────────────────────
@@ -961,15 +992,17 @@ function OverviewView({ onGoDetailed }: { onGoDetailed: () => void }) {
 
 // ─── Detailed view ────────────────────────────────────────────────────────────
 
-type FilterKey = 'all' | BidStatus | 'fu' | 'out';
+type FilterKey = 'all' | BidStatus | 'fu' | 'out' | 'lev';
 
 const FILTER_CHIPS: { key: FilterKey; label: string }[] = [
   { key: 'all', label: 'All' },
   { key: 'snt', label: 'RFP Sent' },
-  { key: 'rec', label: 'Bid Received' },
-  { key: 'hld', label: 'Rejected' },
-  { key: 'fnl', label: 'Awarded' },
+  { key: 'wfp', label: 'Waiting for Plans' },
   { key: 'fu', label: 'Followed Up' },
+  { key: 'rec', label: 'Bid Received' },
+  { key: 'lev', label: 'Leveling' },
+  { key: 'fnl', label: 'Awarded' },
+  { key: 'hld', label: 'No Bid' },
 ];
 
 function DetailedView({ onBack, search = '' }: { onBack: () => void; search?: string }) {
@@ -984,7 +1017,21 @@ function DetailedView({ onBack, search = '' }: { onBack: () => void; search?: st
     // Count individual subs (not trades) so the KPI cards reflect sub-level status.
     const allSubs = trades.flatMap((t) => t.subs);
     const fnlCount = allSubs.filter((s) => s.status === 'fnl').length;
-    const outCount = allSubs.filter((s) => s.status === 'snt' || s.status === 'rec').length;
+    // "In flight" = every actively-in-process bid: sent, waiting for plans,
+    // followed up, received, and leveling (everything except To Send / Awarded /
+    // No Bid). Previously this only counted snt+rec, hiding leveling & waiting.
+    const outCount = allSubs.filter(
+      (s) =>
+        s.status === 'snt' ||
+        s.status === 'wfp' ||
+        s.status === 'fu1' ||
+        s.status === 'fu2' ||
+        s.status === 'fu3' ||
+        s.status === 'rec' ||
+        s.status === 'lvl' ||
+        s.status === 'lvp',
+    ).length;
+    const levCount = allSubs.filter((s) => s.status === 'lvl' || s.status === 'lvp').length;
     const hldCount = allSubs.filter((s) => s.status === 'hld').length;
     const ntbCount = allSubs.filter((s) => s.status === 'ntb').length;
     const total = trades.reduce((a, t) => a + (t.low ?? 0), 0);
@@ -997,6 +1044,7 @@ function DetailedView({ onBack, search = '' }: { onBack: () => void; search?: st
       totalTrades: trades.length,
       fnlCount,
       outCount,
+      levCount,
       hldCount,
       ntbCount,
       runningTotal: total,
@@ -1012,9 +1060,23 @@ function DetailedView({ onBack, search = '' }: { onBack: () => void; search?: st
           (s) => s.status === 'fu1' || s.status === 'fu2' || s.status === 'fu3',
         ),
       );
+    else if (filter === 'lev')
+      result = result.filter((t) =>
+        t.subs.some((s) => s.status === 'lvl' || s.status === 'lvp'),
+      );
     else if (filter === 'out')
       result = result.filter((t) =>
-        t.subs.some((s) => s.status === 'snt' || s.status === 'rec'),
+        t.subs.some(
+          (s) =>
+            s.status === 'snt' ||
+            s.status === 'wfp' ||
+            s.status === 'fu1' ||
+            s.status === 'fu2' ||
+            s.status === 'fu3' ||
+            s.status === 'rec' ||
+            s.status === 'lvl' ||
+            s.status === 'lvp',
+        ),
       );
     else if (filter !== 'all')
       result = result.filter((t) => t.subs.some((s) => s.status === filter));
@@ -1032,16 +1094,23 @@ function DetailedView({ onBack, search = '' }: { onBack: () => void; search?: st
   const chipCounts = useMemo<Record<FilterKey, number>>(() => {
     // Count individual subs (not trades) so the filter pills reflect sub-level status.
     const allSubs = trades.flatMap((t) => t.subs);
+    const inFlight = (s: BidStatus) =>
+      s === 'snt' || s === 'wfp' || s === 'fu1' || s === 'fu2' || s === 'fu3' ||
+      s === 'rec' || s === 'lvl' || s === 'lvp';
     return {
       all: allSubs.length,
       snt: allSubs.filter((s) => s.status === 'snt').length,
+      wfp: allSubs.filter((s) => s.status === 'wfp').length,
       rec: allSubs.filter((s) => s.status === 'rec').length,
+      lvl: allSubs.filter((s) => s.status === 'lvl').length,
+      lvp: allSubs.filter((s) => s.status === 'lvp').length,
       hld: allSubs.filter((s) => s.status === 'hld').length,
       fnl: allSubs.filter((s) => s.status === 'fnl').length,
       // fu1/fu2/fu3 are all surfaced under the single "Followed Up" pill.
       fu: allSubs.filter((s) => s.status.startsWith('fu')).length,
+      lev: allSubs.filter((s) => s.status === 'lvl' || s.status === 'lvp').length,
       ntb: allSubs.filter((s) => s.status === 'ntb').length,
-      out: allSubs.filter((s) => s.status === 'snt' || s.status === 'rec').length,
+      out: allSubs.filter((s) => inFlight(s.status)).length,
       fu1: 0,
       fu2: 0,
       fu3: 0,
@@ -1057,8 +1126,11 @@ function DetailedView({ onBack, search = '' }: { onBack: () => void; search?: st
   const PRINT_STATUS: Record<BidStatus, { bg: string; fg: string; ring: string; label: string }> = {
     ntb: { bg: '#E8E6E1', fg: '#3F3D38', ring: '#9C9A92', label: 'To Send' },
     snt: { bg: '#7DD3F2', fg: '#053A5F', ring: '#1B7CB0', label: 'RFP Sent' },
+    wfp: { bg: '#B7E3D8', fg: '#063A2F', ring: '#2E8C78', label: 'Waiting for Plans' },
     rec: { bg: '#FFE74A', fg: '#3D2D00', ring: '#9C7A00', label: 'Bid Received' },
-    hld: { bg: '#F47B7B', fg: '#3E0707', ring: '#A82828', label: 'Rejected' },
+    lvl: { bg: '#FBD48D', fg: '#4A2C00', ring: '#B87400', label: 'Leveling' },
+    lvp: { bg: '#F6B266', fg: '#4A2400', ring: '#A85E14', label: 'Leveled · Pending Review' },
+    hld: { bg: '#F47B7B', fg: '#3E0707', ring: '#A82828', label: 'No Bid / Declined' },
     fnl: { bg: '#7DD68F', fg: '#0D3E18', ring: '#1F7A38', label: 'Awarded' },
     fu1: { bg: '#C8A7E6', fg: '#33124F', ring: '#6B3A95', label: 'Followed Up · W1' },
     fu2: { bg: '#F8CEAC', fg: '#4A2308', ring: '#A85F18', label: 'Followed Up · W2' },
@@ -1427,8 +1499,8 @@ function DetailedView({ onBack, search = '' }: { onBack: () => void; search?: st
           onClick={() => setFilter(filter === 'fnl' ? 'all' : 'fnl')}
         />
         <KpiCard
-          label="Out for bid"
-          caption="snt + rec"
+          label="In flight"
+          caption="sent → leveling"
           value={kpis.outCount}
           icon="ti-send"
           tone="info"
@@ -1436,22 +1508,22 @@ function DetailedView({ onBack, search = '' }: { onBack: () => void; search?: st
           onClick={() => setFilter(filter === 'out' ? 'all' : 'out')}
         />
         <KpiCard
-          label="On hold"
-          caption="needs review"
+          label="In leveling"
+          caption="leveling + review"
+          value={kpis.levCount}
+          icon="ti-scale"
+          tone="amber"
+          active={filter === 'lev'}
+          onClick={() => setFilter(filter === 'lev' ? 'all' : 'lev')}
+        />
+        <KpiCard
+          label="No bid"
+          caption="declined"
           value={kpis.hldCount}
           icon="ti-hand-stop"
           tone="danger"
           active={filter === 'hld'}
           onClick={() => setFilter(filter === 'hld' ? 'all' : 'hld')}
-        />
-        <KpiCard
-          label="Not bidding"
-          caption="declined"
-          value={kpis.ntbCount}
-          icon="ti-ban"
-          tone="amber"
-          active={filter === 'ntb'}
-          onClick={() => setFilter(filter === 'ntb' ? 'all' : 'ntb')}
         />
         <KpiCard
           label="Lowest running"
@@ -2045,7 +2117,7 @@ function MatrixView({
                                 whiteSpace: 'nowrap',
                               }}
                             >
-                              {m.label.split(' ')[0]}
+                              {m.short}
                               {trade.low !== null && (
                                 <div style={{ fontSize: 8, fontWeight: 400, color: m.fg, opacity: 0.8 }}>
                                   {fmt$(trade.low)}
@@ -2131,7 +2203,17 @@ function PipelineView({ search = '' }: { search?: string }) {
       label: 'Received',
       items: trades.filter(
         (t) =>
-          t.subs.some((s) => s.status === 'rec') && !t.subs.some((s) => s.status === 'fnl'),
+          t.subs.some((s) => s.status === 'rec') &&
+          !t.subs.some((s) => s.status === 'fnl' || s.status === 'lvl' || s.status === 'lvp'),
+      ),
+    },
+    {
+      key: 'lvl',
+      label: 'Leveling',
+      items: trades.filter(
+        (t) =>
+          t.subs.some((s) => s.status === 'lvl' || s.status === 'lvp') &&
+          !t.subs.some((s) => s.status === 'fnl'),
       ),
     },
     {
@@ -2143,7 +2225,7 @@ function PipelineView({ search = '' }: { search?: string }) {
     },
     {
       key: 'hld',
-      label: 'Hold',
+      label: 'No Bid',
       items: trades.filter((t) => t.subs.some((s) => s.status === 'hld')),
     },
     {
@@ -2157,7 +2239,7 @@ function PipelineView({ search = '' }: { search?: string }) {
     <div
       style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(5, 1fr)',
+        gridTemplateColumns: 'repeat(6, 1fr)',
         gap: 10,
         marginBottom: '1.25rem',
       }}
@@ -2743,7 +2825,20 @@ function PortfolioMatrixView({
   onNavigateToProject: (id: string) => void;
   search: string;
 }) {
-  const projects = portfolioData.projects;
+  // Unlinked projects (no Master Projects Board record) are held out of the
+  // matrix and its counts so they can't silently distort the portfolio; they're
+  // surfaced separately in an admin warning banner below.
+  const unlinkedNames = useMemo(
+    () =>
+      portfolioData.unlinkedProjects?.length
+        ? portfolioData.unlinkedProjects
+        : portfolioData.projects.filter((p) => p.unlinked).map((p) => p.name),
+    [portfolioData],
+  );
+  const projects = useMemo(
+    () => portfolioData.projects.filter((p) => !p.unlinked),
+    [portfolioData],
+  );
 
   const projectTradeMap = useMemo(() => {
     const map = new Map<string, Map<string, BidTrade>>();
@@ -2765,7 +2860,9 @@ function PortfolioMatrixView({
   }, [projectTradeMap, search]);
 
   return (
-    <SectionCard title="Portfolio bidding matrix — all projects" icon="ti-table">
+    <>
+      {unlinkedNames.length > 0 && <UnlinkedProjectsWarning names={unlinkedNames} />}
+      <SectionCard title="Portfolio bidding matrix — all projects" icon="ti-table">
       <div style={{ overflowX: 'auto' }} className="matrix-scroll">
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
           <colgroup>
@@ -2879,7 +2976,43 @@ function PortfolioMatrixView({
           </tbody>
         </table>
       </div>
-    </SectionCard>
+      </SectionCard>
+    </>
+  );
+}
+
+// ─── Unlinked-projects admin warning ───────────────────────────────────────────
+// Shown when an Active-Projects folder has no Master Projects Board record. The
+// folder is excluded from the matrix/counts above; this banner makes the gap
+// visible so an admin can register the project (or link the folder) in ClickUp.
+function UnlinkedProjectsWarning({ names }: { names: string[] }) {
+  return (
+    <div
+      role="alert"
+      style={{
+        display: 'flex',
+        alignItems: 'flex-start',
+        gap: 10,
+        padding: '10px 14px',
+        marginBottom: 12,
+        background: 'var(--warn-bg, rgba(250,199,117,0.16))',
+        border: '1px solid var(--warn-strong)',
+        borderRadius: 'var(--border-radius-md)',
+        fontSize: 12.5,
+        color: 'var(--warn-fg, var(--color-text-primary))',
+      }}
+    >
+      <i className="ti ti-alert-triangle" style={{ fontSize: 16, color: 'var(--warn-strong)', flexShrink: 0, marginTop: 1 }} />
+      <div>
+        <div style={{ fontWeight: 600, marginBottom: 2 }}>
+          {names.length === 1 ? '1 project is' : `${names.length} projects are`} not linked to the Master Projects Board
+        </div>
+        <div style={{ color: 'var(--color-text-secondary)' }}>
+          Excluded from the matrix and portfolio counts until registered in ClickUp:{' '}
+          <span style={{ fontWeight: 500, color: 'var(--color-text-primary)' }}>{names.join(', ')}</span>
+        </div>
+      </div>
+    </div>
   );
 }
 
