@@ -1,12 +1,12 @@
 'use client';
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import useSWR from 'swr';
 import { LogoHeader } from './LogoHeader';
 import { ProjectPicker } from './ProjectPicker';
-import type { BidStatus, BidSub, BidTrade, BiddingPayload, BiddingPortfolioPayload } from '@/lib/bidding-types';
-import { taskUrl } from '@/lib/urls';
+import type { BidStatus, BidSub, BidTrade, BiddingPayload, BiddingPortfolioPayload, BiddingProject } from '@/lib/bidding-types';
+import { taskUrl, folderUrl } from '@/lib/urls';
 import { SITE_URL } from '@/lib/constants';
 import { EmbedSyncBar } from './EmbedSyncBar';
 
@@ -117,10 +117,51 @@ function tradeStatus(trade: BidTrade): BidStatus | null {
   return best;
 }
 
+/**
+ * Live ClickUp color that drove a trade's cell status — the color of the
+ * highest-ranked sub, mirroring `tradeStatus`. Returns null when ClickUp
+ * reported no color (the pill then falls back to the app palette).
+ */
+function tradeStatusColor(trade: BidTrade): string | null {
+  if (!trade.subs.length) return null;
+  let best: BidSub | null = null;
+  let bestRank = -Infinity;
+  for (const sub of trade.subs) {
+    const rank = STATUS_RANK[sub.status];
+    if (rank > bestRank) {
+      bestRank = rank;
+      best = sub;
+    }
+  }
+  return best?.color ?? null;
+}
+
+/** ClickUp deep-link for a trade cell: the trade task if we have it, else the first sub's task. */
+function tradeClickUpUrl(trade: BidTrade): string | null {
+  if (trade.taskId) return taskUrl(trade.taskId);
+  return trade.subs.find((s) => s.url)?.url ?? null;
+}
+
+/** Convert a ClickUp hex color (#rgb / #rrggbb) to an rgba() string; pass other formats through. */
+function hexToRgba(hex: string, alpha: number): string {
+  let h = hex.trim().replace(/^#/, '');
+  if (h.length === 3) h = h.split('').map((c) => c + c).join('');
+  if (h.length !== 6 || /[^0-9a-f]/i.test(h)) return hex;
+  const r = parseInt(h.slice(0, 2), 16);
+  const g = parseInt(h.slice(2, 4), 16);
+  const b = parseInt(h.slice(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
 // ─── Status pill ──────────────────────────────────────────────────────────────
 
-function StatusPill({ status, small }: { status: BidStatus; small?: boolean }) {
+// When `color` (a live ClickUp status color) is supplied the pill's tint, border
+// and dot are derived from it so the dashboard matches ClickUp exactly; the label
+// text stays on the app's readable foreground. Without it the pill uses the app
+// palette, so every existing caller is unaffected.
+function StatusPill({ status, small, color }: { status: BidStatus; small?: boolean; color?: string | null }) {
   const m = STATUS_META[status];
+  const hasLive = !!color;
   return (
     <span
       style={{
@@ -132,8 +173,8 @@ function StatusPill({ status, small }: { status: BidStatus; small?: boolean }) {
         fontSize: 11,
         fontWeight: 600,
         letterSpacing: '0.02em',
-        border: `1px solid ${m.ring}`,
-        background: m.bg,
+        border: `1px solid ${hasLive ? hexToRgba(color!, 0.55) : m.ring}`,
+        background: hasLive ? hexToRgba(color!, 0.16) : m.bg,
         color: m.fg,
         whiteSpace: 'nowrap',
       }}
@@ -144,7 +185,7 @@ function StatusPill({ status, small }: { status: BidStatus; small?: boolean }) {
           width: 6,
           height: 6,
           borderRadius: '50%',
-          background: m.strong,
+          background: hasLive ? color! : m.strong,
           flexShrink: 0,
         }}
       />
@@ -2816,6 +2857,8 @@ function SubsView({ search = '' }: { search?: string }) {
 
 // ─── Portfolio matrix view ─────────────────────────────────────────────────────
 
+type ProjectFilter = 'all' | 'active' | 'blank';
+
 function PortfolioMatrixView({
   portfolioData,
   onNavigateToProject,
@@ -2835,9 +2878,31 @@ function PortfolioMatrixView({
         : portfolioData.projects.filter((p) => p.unlinked).map((p) => p.name),
     [portfolioData],
   );
-  const projects = useMemo(
+  const linkedProjects = useMemo(
     () => portfolioData.projects.filter((p) => !p.unlinked),
     [portfolioData],
+  );
+
+  // A project is "blank" when no trade has any bidding activity (every cell is a
+  // dash). Drives the blank / has-bids column filter.
+  const isBlankProject = useCallback(
+    (proj: BiddingProject) => !proj.trades.some((t) => tradeStatus(t) !== null),
+    [],
+  );
+
+  const [projectFilter, setProjectFilter] = useState<ProjectFilter>('all');
+  const [tradeFilter, setTradeFilter] = useState<Set<string>>(new Set());
+
+  // Columns: apply the blank / has-bids filter.
+  const projects = useMemo(() => {
+    if (projectFilter === 'all') return linkedProjects;
+    if (projectFilter === 'blank') return linkedProjects.filter(isBlankProject);
+    return linkedProjects.filter((p) => !isBlankProject(p));
+  }, [linkedProjects, projectFilter, isBlankProject]);
+
+  const blankCount = useMemo(
+    () => linkedProjects.filter(isBlankProject).length,
+    [linkedProjects, isBlankProject],
   );
 
   const projectTradeMap = useMemo(() => {
@@ -2850,19 +2915,108 @@ function PortfolioMatrixView({
     return map;
   }, [projects]);
 
-  const allTradeNames = useMemo(() => {
+  // Every trade name across all linked projects — the pool for the trade filter.
+  const everyTradeName = useMemo(() => {
+    const names = new Set<string>();
+    for (const proj of linkedProjects) for (const t of proj.trades) names.add(t.trade);
+    return [...names].sort();
+  }, [linkedProjects]);
+
+  // Rows: text search AND the explicit trade multi-select (empty = all).
+  const tradeNames = useMemo(() => {
     const names = new Set<string>();
     for (const [, tm] of projectTradeMap) for (const n of tm.keys()) names.add(n);
-    const sorted = [...names].sort();
-    if (!search.trim()) return sorted;
-    const q = search.toLowerCase();
-    return sorted.filter((n) => n.toLowerCase().includes(q));
-  }, [projectTradeMap, search]);
+    let sorted = [...names].sort();
+    if (tradeFilter.size) sorted = sorted.filter((n) => tradeFilter.has(n));
+    const q = search.trim().toLowerCase();
+    if (q) sorted = sorted.filter((n) => n.toLowerCase().includes(q));
+    return sorted;
+  }, [projectTradeMap, tradeFilter, search]);
+
+  // Hover tooltip — imperatively positioned so mouse-move doesn't re-render the grid.
+  const tipRef = useRef<HTMLDivElement | null>(null);
+  const showTip = (e: React.MouseEvent<HTMLElement>, html: string) => {
+    const tip = tipRef.current;
+    if (!tip) return;
+    tip.innerHTML = html;
+    tip.style.opacity = '1';
+    tip.style.left = `${e.clientX + 14}px`;
+    tip.style.top = `${e.clientY + 14}px`;
+  };
+  const moveTip = (e: React.MouseEvent<HTMLElement>) => {
+    const tip = tipRef.current;
+    if (!tip) return;
+    tip.style.left = `${e.clientX + 14}px`;
+    tip.style.top = `${e.clientY + 14}px`;
+  };
+  const hideTip = () => {
+    if (tipRef.current) tipRef.current.style.opacity = '0';
+  };
+
+  const filtersActive = projectFilter !== 'all' || tradeFilter.size > 0;
 
   return (
     <>
       {unlinkedNames.length > 0 && <UnlinkedProjectsWarning names={unlinkedNames} />}
       <SectionCard title="Portfolio bidding matrix — all projects" icon="ti-table">
+      {/* Filter toolbar */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          flexWrap: 'wrap',
+          marginBottom: 12,
+        }}
+      >
+        <ProjectColumnFilter
+          value={projectFilter}
+          onChange={setProjectFilter}
+          total={linkedProjects.length}
+          blank={blankCount}
+        />
+        <TradeFilter
+          all={everyTradeName}
+          selected={tradeFilter}
+          onChange={setTradeFilter}
+        />
+        {filtersActive && (
+          <button
+            type="button"
+            onClick={() => {
+              setProjectFilter('all');
+              setTradeFilter(new Set());
+            }}
+            style={{
+              height: 30,
+              padding: '0 10px',
+              border: '0.5px solid var(--color-border-secondary)',
+              borderRadius: 'var(--border-radius-md)',
+              background: 'var(--color-background-primary)',
+              color: 'var(--color-text-secondary)',
+              fontSize: 12,
+              fontFamily: 'inherit',
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 5,
+            }}
+          >
+            <i className="ti ti-x" style={{ fontSize: 13 }} /> Clear filters
+          </button>
+        )}
+        <span
+          style={{
+            marginLeft: 'auto',
+            fontSize: 11,
+            color: 'var(--color-text-tertiary)',
+          }}
+        >
+          {tradeNames.length} {tradeNames.length === 1 ? 'trade' : 'trades'} ·{' '}
+          {projects.length} {projects.length === 1 ? 'project' : 'projects'}
+        </span>
+      </div>
+
       <div style={{ overflowX: 'auto' }} className="matrix-scroll">
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
           <colgroup>
@@ -2894,8 +3048,6 @@ function PortfolioMatrixView({
               {projects.map((proj) => (
                 <th
                   key={proj.name}
-                  title={`View ${proj.name}`}
-                  onClick={() => onNavigateToProject(proj.name)}
                   style={{
                     textAlign: 'center',
                     padding: '7px 8px',
@@ -2905,20 +3057,64 @@ function PortfolioMatrixView({
                     background: 'var(--color-background-secondary)',
                     border: '0.5px solid var(--color-border-tertiary)',
                     whiteSpace: 'nowrap',
-                    cursor: 'pointer',
                     letterSpacing: '0.02em',
                     maxWidth: 130,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
                   }}
                 >
-                  {proj.name}
+                  <div
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 4,
+                      maxWidth: '100%',
+                    }}
+                  >
+                    <button
+                      type="button"
+                      title={`View ${proj.name}`}
+                      onClick={() => onNavigateToProject(proj.name)}
+                      style={{
+                        border: 'none',
+                        background: 'transparent',
+                        color: 'inherit',
+                        font: 'inherit',
+                        fontWeight: 600,
+                        letterSpacing: 'inherit',
+                        cursor: 'pointer',
+                        padding: 0,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        minWidth: 0,
+                      }}
+                    >
+                      {proj.name}
+                    </button>
+                    {proj.folderId && (
+                      <a
+                        href={folderUrl(proj.folderId)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title={`Open ${proj.name} in ClickUp`}
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          color: 'var(--color-text-tertiary)',
+                          flexShrink: 0,
+                          lineHeight: 0,
+                        }}
+                      >
+                        <i className="ti ti-external-link" style={{ fontSize: 12 }} />
+                      </a>
+                    )}
+                  </div>
                 </th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {allTradeNames.length === 0 ? (
+            {tradeNames.length === 0 ? (
               <tr>
                 <td
                   colSpan={projects.length + 1}
@@ -2929,11 +3125,13 @@ function PortfolioMatrixView({
                     fontSize: 12,
                   }}
                 >
-                  {search ? 'No trades match your search.' : 'No bidding data yet.'}
+                  {search || filtersActive
+                    ? 'No trades match the current filters.'
+                    : 'No bidding data yet.'}
                 </td>
               </tr>
             ) : (
-              allTradeNames.map((tradeName, ti) => (
+              tradeNames.map((tradeName, ti) => (
                 <tr key={ti}>
                   <td
                     style={{
@@ -2951,19 +3149,35 @@ function PortfolioMatrixView({
                   {projects.map((proj) => {
                     const trade = projectTradeMap.get(proj.name)?.get(tradeName);
                     const ts = trade ? tradeStatus(trade) : null;
-                    const m = ts ? STATUS_META[ts] : null;
+                    const liveColor = trade ? tradeStatusColor(trade) : null;
+                    const url = trade ? tradeClickUpUrl(trade) : null;
+                    const linkable = !!(ts && url);
                     return (
                       <td
                         key={proj.name}
+                        className={linkable ? 'matrix-task-cell' : undefined}
+                        onClick={linkable ? () => window.open(url!, '_blank', 'noopener') : undefined}
+                        onMouseEnter={
+                          trade && ts
+                            ? (e) => showTip(e, tradeTipHtml(trade, proj.name))
+                            : undefined
+                        }
+                        onMouseMove={trade && ts ? moveTip : undefined}
+                        onMouseLeave={trade && ts ? hideTip : undefined}
                         style={{
                           padding: '6px 8px',
                           border: '0.5px solid var(--color-border-tertiary)',
                           textAlign: 'center',
-                          background: m ? m.bg : undefined,
+                          background: ts
+                            ? liveColor
+                              ? hexToRgba(liveColor, 0.14)
+                              : STATUS_META[ts].bg
+                            : undefined,
+                          cursor: linkable ? 'pointer' : undefined,
                         }}
                       >
                         {ts ? (
-                          <StatusPill status={ts} small />
+                          <StatusPill status={ts} small color={liveColor} />
                         ) : (
                           <span style={{ color: 'var(--color-text-tertiary)', fontSize: 11 }}>—</span>
                         )}
@@ -2976,8 +3190,308 @@ function PortfolioMatrixView({
           </tbody>
         </table>
       </div>
+
+      {/* Floating hover tooltip — sub-level breakdown for the hovered cell */}
+      <div
+        ref={tipRef}
+        style={{
+          position: 'fixed',
+          pointerEvents: 'none',
+          zIndex: 1000,
+          opacity: 0,
+          transition: 'opacity .12s',
+          maxWidth: 300,
+          background: 'var(--color-background-primary)',
+          color: 'var(--color-text-primary)',
+          border: '0.5px solid var(--color-border-secondary)',
+          borderRadius: 'var(--border-radius-md)',
+          boxShadow: '0 8px 28px rgba(0,0,0,0.22)',
+          padding: '10px 12px',
+          fontSize: 11.5,
+          lineHeight: 1.45,
+        }}
+      />
       </SectionCard>
     </>
+  );
+}
+
+// Builds the hover-card HTML for a trade cell: each sub with its ClickUp status
+// color, name and amount. Rendered via innerHTML, so every field is escaped.
+function tradeTipHtml(trade: BidTrade, projectName: string): string {
+  const head = `
+    <div style="font-weight:600;margin-bottom:1px;">${escapeAttr(trade.trade)}</div>
+    <div style="color:var(--color-text-tertiary);margin-bottom:7px;">${escapeAttr(projectName)}</div>`;
+  if (!trade.subs.length) {
+    return head + `<div style="color:var(--color-text-tertiary);font-style:italic;">No subs entered yet</div>`;
+  }
+  const rows = trade.subs
+    .map((sub) => {
+      const m = STATUS_META[sub.status];
+      const dot = sub.color || m.strong;
+      const amt =
+        sub.amount !== null ? '$' + Math.round(sub.amount).toLocaleString('en-US') : '—';
+      return `
+        <div style="display:flex;align-items:center;gap:7px;padding:2px 0;">
+          <span style="width:8px;height:8px;border-radius:50%;background:${escapeAttr(dot)};flex-shrink:0;"></span>
+          <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeAttr(sub.name)}</span>
+          <span style="color:var(--color-text-secondary);font-variant-numeric:tabular-nums;">${escapeAttr(amt)}</span>
+        </div>
+        <div style="color:var(--color-text-tertiary);font-size:10.5px;margin:-1px 0 4px 15px;">${escapeAttr(m.label)}</div>`;
+    })
+    .join('');
+  return head + rows;
+}
+
+function escapeAttr(s: string): string {
+  return s.replace(/[&<>"']/g, (c) =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string),
+  );
+}
+
+// ─── Portfolio matrix filters ──────────────────────────────────────────────────
+
+function ProjectColumnFilter({
+  value,
+  onChange,
+  total,
+  blank,
+}: {
+  value: ProjectFilter;
+  onChange: (v: ProjectFilter) => void;
+  total: number;
+  blank: number;
+}) {
+  const OPTIONS: { v: ProjectFilter; label: string; count: number }[] = [
+    { v: 'all', label: 'All projects', count: total },
+    { v: 'active', label: 'With bids', count: total - blank },
+    { v: 'blank', label: 'Blank', count: blank },
+  ];
+  return (
+    <div
+      style={{
+        display: 'inline-flex',
+        padding: 2,
+        gap: 2,
+        background: 'var(--color-background-secondary)',
+        borderRadius: 'var(--border-radius-md)',
+      }}
+    >
+      {OPTIONS.map((o) => {
+        const active = o.v === value;
+        return (
+          <button
+            key={o.v}
+            type="button"
+            onClick={() => onChange(o.v)}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 5,
+              padding: '4px 10px',
+              borderRadius: 6,
+              border: 'none',
+              background: active ? 'var(--color-background-primary)' : 'transparent',
+              color: active ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
+              fontWeight: active ? 600 : 400,
+              fontSize: 12,
+              fontFamily: 'inherit',
+              cursor: 'pointer',
+              boxShadow: active ? '0 1px 1px rgba(0,0,0,0.04)' : undefined,
+            }}
+          >
+            {o.label}
+            <span
+              style={{
+                fontSize: 10,
+                padding: '0 4px',
+                borderRadius: 3,
+                background: 'var(--color-background-secondary)',
+                color: 'var(--color-text-tertiary)',
+                fontVariantNumeric: 'tabular-nums',
+              }}
+            >
+              {o.count}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function TradeFilter({
+  all,
+  selected,
+  onChange,
+}: {
+  all: string[];
+  selected: Set<string>;
+  onChange: (next: Set<string>) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState('');
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('mousedown', onDoc);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDoc);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  const toggle = (name: string) => {
+    const next = new Set(selected);
+    if (next.has(name)) next.delete(name);
+    else next.add(name);
+    onChange(next);
+  };
+
+  const visible = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    return needle ? all.filter((n) => n.toLowerCase().includes(needle)) : all;
+  }, [all, q]);
+
+  const label = selected.size ? `Trades · ${selected.size}` : 'All trades';
+
+  return (
+    <div ref={ref} style={{ position: 'relative' }}>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        title="Filter trades"
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 6,
+          height: 30,
+          padding: '0 10px',
+          background:
+            selected.size > 0 ? 'var(--color-background-secondary)' : 'var(--color-background-primary)',
+          border: '0.5px solid var(--color-border-secondary)',
+          borderRadius: 'var(--border-radius-md)',
+          fontSize: 12,
+          color: 'var(--color-text-secondary)',
+          fontFamily: 'inherit',
+          cursor: 'pointer',
+        }}
+      >
+        <i className="ti ti-filter" style={{ fontSize: 13 }} />
+        {label}
+        <i className={`ti ti-chevron-${open ? 'up' : 'down'}`} style={{ fontSize: 12, opacity: 0.6 }} />
+      </button>
+      {open && (
+        <div
+          role="menu"
+          style={{
+            position: 'absolute',
+            left: 0,
+            top: 'calc(100% + 6px)',
+            zIndex: 60,
+            width: 260,
+            padding: 6,
+            background: 'var(--color-background-primary)',
+            border: '0.5px solid var(--color-border-secondary)',
+            borderRadius: 'var(--border-radius-md)',
+            boxShadow: '0 12px 28px rgba(0,0,0,0.18)',
+          }}
+        >
+          <input
+            type="search"
+            autoFocus
+            placeholder="Filter trades…"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            style={{
+              width: '100%',
+              height: 30,
+              padding: '0 8px',
+              marginBottom: 6,
+              border: '0.5px solid var(--color-border-secondary)',
+              borderRadius: 'var(--border-radius-md)',
+              background: 'var(--color-background-primary)',
+              color: 'var(--color-text-primary)',
+              fontSize: 12.5,
+              fontFamily: 'inherit',
+              outline: 'none',
+            }}
+          />
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              padding: '2px 6px 6px',
+              borderBottom: '0.5px solid var(--color-border-tertiary)',
+              marginBottom: 4,
+            }}
+          >
+            <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
+              {selected.size} selected
+            </span>
+            {selected.size > 0 && (
+              <button
+                type="button"
+                onClick={() => onChange(new Set())}
+                style={{
+                  fontSize: 11,
+                  color: 'var(--color-text-info)',
+                  border: 'none',
+                  background: 'transparent',
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                  padding: 0,
+                }}
+              >
+                Clear
+              </button>
+            )}
+          </div>
+          <div style={{ maxHeight: 260, overflowY: 'auto' }}>
+            {visible.length === 0 ? (
+              <div style={{ padding: '10px 8px', fontSize: 12, color: 'var(--color-text-tertiary)' }}>
+                No trades match.
+              </div>
+            ) : (
+              visible.map((name) => {
+                const checked = selected.has(name);
+                return (
+                  <label
+                    key={name}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      padding: '6px 8px',
+                      borderRadius: 6,
+                      cursor: 'pointer',
+                      fontSize: 12.5,
+                      background: checked ? 'var(--color-background-secondary)' : 'transparent',
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => toggle(name)}
+                      style={{ cursor: 'pointer' }}
+                    />
+                    <span style={{ flex: 1, minWidth: 0 }}>{name}</span>
+                  </label>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 

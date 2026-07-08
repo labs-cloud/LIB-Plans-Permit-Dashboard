@@ -24,6 +24,10 @@ export interface BidSub {
   status: BidStatus;
   flag?: string;
   url?: string;
+  // Raw status color straight from ClickUp (hex, e.g. "#f9d900"). Lets the
+  // dashboard render matrix cells/pills in the exact colors ClickUp shows so the
+  // two never disagree. Undefined when ClickUp reports no color for the status.
+  color?: string | null;
 }
 
 export interface BidTrade {
@@ -48,6 +52,9 @@ export interface BiddingProject {
   coordInitials: string;
   coordName: string;
   trades: BidTrade[];
+  // ClickUp folder id for this project, when known. Used to deep-link the
+  // matrix project header straight to the project's folder in ClickUp.
+  folderId?: string;
   // True when this Active-Projects folder has no matching record in the Master
   // Projects Board. Such projects are surfaced with an admin warning and left
   // out of portfolio aggregates rather than silently distorting the counts.

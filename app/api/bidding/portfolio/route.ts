@@ -99,15 +99,16 @@ async function buildPortfolioPayload(): Promise<BiddingPortfolioPayload> {
 
   const projects: BiddingProject[] = results.map((result, i) => {
     const folderName = targetFolders[i].name;
+    const folderId = targetFolders[i].id;
     const unlinked = isUnlinked(folderName);
     if (result.status === 'fulfilled') {
-      return unlinked ? { ...result.value, unlinked: true } : result.value;
+      return { ...result.value, folderId, ...(unlinked ? { unlinked: true } : {}) };
     }
     console.error(
       `[bidding/portfolio] Failed to fetch project "${folderName}":`,
       result.reason,
     );
-    return { ...EMPTY_PROJECT, name: folderName, unlinked };
+    return { ...EMPTY_PROJECT, name: folderName, folderId, unlinked };
   });
 
   const unlinkedProjects = projects.filter((p) => p.unlinked).map((p) => p.name);
@@ -118,7 +119,7 @@ async function buildPortfolioPayload(): Promise<BiddingPortfolioPayload> {
 // Cache keyed on a fixed key (no per-project variation) with 60 s TTL.
 const getCachedPortfolioPayload = unstable_cache(
   buildPortfolioPayload,
-  ['lib-bidding-portfolio:v6'],
+  ['lib-bidding-portfolio:v7'],
   { revalidate: CACHE_TTL_SECONDS, tags: [BIDDING_CACHE_TAG] },
 );
 

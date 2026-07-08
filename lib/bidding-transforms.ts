@@ -62,11 +62,11 @@ function getCurrency(task: ClickUpTask, id: string): number | null {
   return Number.isFinite(n) && n >= 0 ? n : null;
 }
 
-function getBiddingStatus(task: ClickUpTask): BidStatus {
+function getBiddingStatus(task: ClickUpTask): { status: BidStatus; color: string | null } {
   const f = getFieldById(task, F.BIDDING_STATUS);
-  if (!f || f.value == null) return 'ntb';
+  if (!f || f.value == null) return { status: 'ntb', color: null };
 
-  const options = (f.type_config?.options ?? []) as Array<{ id: string; name: string; orderindex: number }>;
+  const options = (f.type_config?.options ?? []) as Array<{ id: string; name: string; orderindex: number; color?: string | null }>;
   let opt: typeof options[0] | undefined;
 
   const numVal = Number(f.value);
@@ -77,7 +77,7 @@ function getBiddingStatus(task: ClickUpTask): BidStatus {
     opt = options.find(o => o.id === f.value);
   }
 
-  return mapBiddingStatusName(opt?.name ?? '');
+  return { status: mapBiddingStatusName(opt?.name ?? ''), color: opt?.color ?? null };
 }
 
 // ── Name-based currency helper (shared by both transforms) ────────────────
@@ -133,7 +133,7 @@ export function transformBiddingTasks(
 ): BiddingProject {
   const trades: BidTrade[] = tasks.map(task => {
     const tradeName = task.name;
-    const tradeStatus = getBiddingStatus(task);
+    const { status: tradeStatus, color: tradeColor } = getBiddingStatus(task);
 
     const subs: BidSub[] = [];
     const slots: [string, string][] = [
@@ -146,7 +146,7 @@ export function transformBiddingTasks(
     for (const [nameId, amtId] of slots) {
       const name = getString(task, nameId);
       if (!name) continue;
-      subs.push({ name, amount: getCurrency(task, amtId), status: tradeStatus, url: `https://app.clickup.com/t/${task.id}` });
+      subs.push({ name, amount: getCurrency(task, amtId), status: tradeStatus, color: tradeColor, url: `https://app.clickup.com/t/${task.id}` });
     }
 
     let low: number | null = null;
@@ -241,6 +241,7 @@ export function transformBiddingTasksByName(
       name: task.name.trim(),
       amount: getCurrencyByName(task, 'Bid/Contracted Amount'),
       status: mapBiddingStatusName(task.status?.status ?? ''),
+      color: task.status?.color ?? null,
       url: `https://app.clickup.com/t/${task.id}`,
     }));
 
