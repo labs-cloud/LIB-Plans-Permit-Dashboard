@@ -61,6 +61,7 @@ const STATUS_META: Record<BidStatus, StatusMeta> = {
   rec: { label: 'Bid Received',  short: 'Received',    icon: 'ti-checks',     bg: 'var(--bid-rec-bg)', fg: 'var(--bid-rec-fg)', ring: 'var(--bid-rec-ring)', strong: 'var(--bid-rec-strong)' },
   lvl: { label: 'Leveling',      short: 'Leveling',    icon: 'ti-scale',      bg: 'var(--bid-lvl-bg)', fg: 'var(--bid-lvl-fg)', ring: 'var(--bid-lvl-ring)', strong: 'var(--bid-lvl-strong)' },
   lvp: { label: 'Leveled · Pending Review', short: 'Leveled', icon: 'ti-list-check', bg: 'var(--bid-lvp-bg)', fg: 'var(--bid-lvp-fg)', ring: 'var(--bid-lvp-ring)', strong: 'var(--bid-lvp-strong)' },
+  reb: { label: 'Needs Rebid',   short: 'Rebid',      icon: 'ti-refresh',    bg: 'var(--bid-reb-bg)', fg: 'var(--bid-reb-fg)', ring: 'var(--bid-reb-ring)', strong: 'var(--bid-reb-strong)' },
   hld: { label: 'No Bid / Declined', short: 'No Bid',  icon: 'ti-hand-stop', bg: 'var(--bid-hld-bg)', fg: 'var(--bid-hld-fg)', ring: 'var(--bid-hld-ring)', strong: 'var(--bid-hld-strong)' },
   fnl: { label: 'Awarded',       short: 'Awarded',     icon: 'ti-trophy',     bg: 'var(--bid-fnl-bg)', fg: 'var(--bid-fnl-fg)', ring: 'var(--bid-fnl-ring)', strong: 'var(--bid-fnl-strong)' },
   fu1: { label: 'Followed Up · W1 (14d ago)', short: 'Followed Up', icon: 'ti-message-2', bg: 'var(--bid-fu1-bg)', fg: 'var(--bid-fu1-fg)', ring: 'var(--bid-fu1-ring)', strong: 'var(--bid-fu1-strong)' },
@@ -74,6 +75,9 @@ const STATUS_META: Record<BidStatus, StatusMeta> = {
 const STATUS_RANK: Record<BidStatus, number> = {
   ntb: 0,
   hld: 1,
+  // "needs rebid" is an attention state, not an advanced one — rank it low so a
+  // trade's cell still surfaces its most-advanced *valid* bid when one exists.
+  reb: 1,
   wfp: 2,
   snt: 3,
   fu1: 4,
@@ -340,7 +344,7 @@ function Drawer({ payload, onClose }: { payload: DrawerPayload; onClose: () => v
 
   const lowestAmount = payload.trade.low;
   const lowestSub = payload.trade.subs.find(
-    (s) => s.amount === lowestAmount && lowestAmount !== null,
+    (s) => s.amount === lowestAmount && lowestAmount !== null && s.status !== 'reb',
   );
 
   return (
@@ -610,7 +614,7 @@ function Drawer({ payload, onClose }: { payload: DrawerPayload; onClose: () => v
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {payload.trade.subs.map((sub, i) => {
-                    const isLow = sub.amount !== null && sub.amount === lowestAmount;
+                    const isLow = sub.amount !== null && sub.amount === lowestAmount && sub.status !== 'reb';
                     return (
                       <div
                         key={i}
@@ -926,7 +930,7 @@ function OverviewView({ onGoDetailed }: { onGoDetailed: () => void }) {
                         }
                         const trade = projectTradeMap.get(proj.name)?.get(tradeName);
                         const ts = trade ? tradeStatus(trade) : null;
-                        const lowSub = trade?.subs.find(s => s.amount === trade.low && trade.low !== null);
+                        const lowSub = trade?.subs.find(s => s.amount === trade.low && trade.low !== null && s.status !== 'reb');
                         const cellTaskId = ts ? trade?.taskId : undefined;
                         return (
                           <td
@@ -1042,6 +1046,7 @@ const FILTER_CHIPS: { key: FilterKey; label: string }[] = [
   { key: 'fu', label: 'Followed Up' },
   { key: 'rec', label: 'Bid Received' },
   { key: 'lev', label: 'Leveling' },
+  { key: 'reb', label: 'Needs Rebid' },
   { key: 'fnl', label: 'Awarded' },
   { key: 'hld', label: 'No Bid' },
 ];
@@ -1151,6 +1156,7 @@ function DetailedView({ onBack, search = '' }: { onBack: () => void; search?: st
       fu: allSubs.filter((s) => s.status.startsWith('fu')).length,
       lev: allSubs.filter((s) => s.status === 'lvl' || s.status === 'lvp').length,
       ntb: allSubs.filter((s) => s.status === 'ntb').length,
+      reb: allSubs.filter((s) => s.status === 'reb').length,
       out: allSubs.filter((s) => inFlight(s.status)).length,
       fu1: 0,
       fu2: 0,
@@ -1171,6 +1177,7 @@ function DetailedView({ onBack, search = '' }: { onBack: () => void; search?: st
     rec: { bg: '#FFE74A', fg: '#3D2D00', ring: '#9C7A00', label: 'Bid Received' },
     lvl: { bg: '#FBD48D', fg: '#4A2C00', ring: '#B87400', label: 'Leveling' },
     lvp: { bg: '#F6B266', fg: '#4A2400', ring: '#A85E14', label: 'Leveled · Pending Review' },
+    reb: { bg: '#C7C2F9', fg: '#241C6E', ring: '#5F55EE', label: 'Needs Rebid' },
     hld: { bg: '#F47B7B', fg: '#3E0707', ring: '#A82828', label: 'No Bid / Declined' },
     fnl: { bg: '#7DD68F', fg: '#0D3E18', ring: '#1F7A38', label: 'Awarded' },
     fu1: { bg: '#C8A7E6', fg: '#33124F', ring: '#6B3A95', label: 'Followed Up · W1' },
@@ -1186,7 +1193,7 @@ function DetailedView({ onBack, search = '' }: { onBack: () => void; search?: st
       const cells = subs5.map(sub => {
         if (!sub) return `<td style="padding:6px 8px;border-bottom:0.5px solid #f0f0ec;text-align:center;color:#ccc;font-size:10px;background:${rowBg};">—</td>`;
         const s = PRINT_STATUS[sub.status as BidStatus] ?? PRINT_STATUS.ntb;
-        const isLow = sub.amount !== null && sub.amount === trade.low;
+        const isLow = sub.amount !== null && sub.amount === trade.low && sub.status !== 'reb';
         const amt = sub.amount !== null ? '$' + Math.round(sub.amount).toLocaleString('en-US') : '—';
         return `<td style="padding:5px 6px;border-bottom:0.5px solid #f0f0ec;vertical-align:top;background:${rowBg};">
           <div style="background:${s.bg};color:${s.fg};border:1px solid ${s.ring};border-radius:4px 4px 0 0;border-bottom:none;padding:3px 6px;font-size:9.5px;text-align:center;font-weight:${isLow ? 700 : 500};line-height:1.3;">${sub.name}</div>
@@ -1776,7 +1783,7 @@ function DetailedView({ onBack, search = '' }: { onBack: () => void; search?: st
                           </td>
                         );
                       }
-                      const isLow = sub.amount !== null && sub.amount === trade.low;
+                      const isLow = sub.amount !== null && sub.amount === trade.low && sub.status !== 'reb';
                       return (
                         <td
                           key={si}

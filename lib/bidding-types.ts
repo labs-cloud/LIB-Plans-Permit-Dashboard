@@ -15,6 +15,7 @@ export type BidStatus =
   | 'rec' // BID RECEIVED
   | 'lvl' // LEVELING
   | 'lvp' // LEVELED — PENDING REVIEW
+  | 'reb' // NEEDS REBID — bid rejected/void, must be re-solicited. Never counts as a lowest bid.
   | 'fnl' // AWARDED
   | 'hld'; // NO BID / DECLINED
 

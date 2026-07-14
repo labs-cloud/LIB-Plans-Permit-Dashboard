@@ -13,6 +13,7 @@ const STATUS: Record<BidStatus, { bg: string; fg: string; ring: string; label: s
   rec: { bg: '#FFE74A', fg: '#3D2D00', ring: '#9C7A00', label: 'Received' },
   lvl: { bg: '#FBD48D', fg: '#4A2C00', ring: '#B87400', label: 'Leveling' },
   lvp: { bg: '#F6B266', fg: '#4A2400', ring: '#A85E14', label: 'Leveled · Pending' },
+  reb: { bg: '#C7C2F9', fg: '#241C6E', ring: '#5F55EE', label: 'Needs Rebid' },
   hld: { bg: '#F47B7B', fg: '#3E0707', ring: '#A82828', label: 'No Bid' },
   fnl: { bg: '#7DD68F', fg: '#0D3E18', ring: '#1F7A38', label: 'Awarded' },
   fu1: { bg: '#C8A7E6', fg: '#33124F', ring: '#6B3A95', label: 'FU · W1' },
@@ -374,7 +375,7 @@ export function BiddingReport({ projectId }: { projectId: string }) {
                           );
                         }
                         const st = STATUS[sub.status as BidStatus];
-                        const isLow = sub.amount !== null && sub.amount === trade.low;
+                        const isLow = sub.amount !== null && sub.amount === trade.low && sub.status !== 'reb';
                         return (
                           <td
                             key={si}

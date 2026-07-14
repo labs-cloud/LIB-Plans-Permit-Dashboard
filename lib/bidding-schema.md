@@ -63,13 +63,17 @@ are **no longer collapsed** into the wrong pill:
 | `leveling`                   | `lvl`                 | amber — Leveling                 |
 | `leveled`                    | `lvl`                 | amber — Leveling                 |
 | `leveled — pending review`   | `lvp`                 | deep amber — Leveled · Pending   |
+| `needs rebid`                | `reb`                 | indigo — Needs Rebid             |
 | `awarded`                    | `fnl`                 | green — Awarded                  |
 | `no bid / declined`          | `hld`                 | red — No Bid / Declined          |
 | `no bid`                     | `hld`                 | red — No Bid / Declined          |
 
 The **trade-level** status shown in the portfolio matrix is the *most advanced*
 status among the trade's bids (see `STATUS_RANK` in `BiddingDashboard.tsx`):
-`ntb < hld < wfp < snt < followed-up < rec < lvl < lvp < fnl`. So a trade with a
+`ntb < hld = reb < wfp < snt < followed-up < rec < lvl < lvp < fnl`. `needs rebid`
+is ranked low (an attention state, not an advanced one) and its bid amount is
+**excluded from every lowest-bid calculation** — a rejected bid can never be a
+trade's lowest. So a trade with a
 single AWARDED sub renders green "Awarded"; a trade whose bids are all in
 leveling renders amber "Leveling", etc. — never a blanket "To Send".
 

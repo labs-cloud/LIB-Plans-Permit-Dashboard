@@ -35,9 +35,20 @@ function isAwarded(task: ClickUpTask): boolean {
   return (task.status?.status ?? '').toUpperCase().trim() === 'AWARDED';
 }
 
+// A "needs rebid" bid has been rejected/voided and must be re-solicited, so it
+// must never be selected as a trade's lowest (or awarded) bid — the next
+// non-flagged bid should win instead. Kept as an explicit guard so the rule
+// survives any future change to the qualifying-status whitelist below.
+function isNeedsRebid(task: ClickUpTask): boolean {
+  const s = (task.status?.status ?? '').toLowerCase().trim();
+  return s === 'needs rebid' || s === 'rebid';
+}
+
 // A bid qualifies for the lowest-bid calculation only when the sub has
-// actually submitted a number (not just received an RFP).
+// actually submitted a number (not just received an RFP) and has not been
+// flagged "needs rebid".
 function isQualifyingBid(task: ClickUpTask): boolean {
+  if (isNeedsRebid(task)) return false;
   const s = (task.status?.status ?? '').toLowerCase().trim();
   return (
     s === 'proposals received' ||
