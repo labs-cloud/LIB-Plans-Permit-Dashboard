@@ -153,3 +153,43 @@ export function computeAwardedBids(tasks: ClickUpTask[]): Map<string, AwardedBid
 
   return result;
 }
+
+// Returns every "needs rebid" bid amount per trade. Used to stop a stale
+// "Updated Budget" override — one that merely mirrors a bid since flagged for
+// rebid — from resurfacing as the New Budget. A rejected bid must not drive the
+// budget through any column.
+export function computeNeedsRebidBids(tasks: ClickUpTask[]): Map<string, number[]> {
+  const result = new Map<string, number[]>();
+  const add = (tradeName: string, amt: number) => {
+    const arr = result.get(tradeName);
+    if (arr) arr.push(amt);
+    else result.set(tradeName, [amt]);
+  };
+
+  if (detectHierarchy(tasks)) {
+    const parentNames = new Map<string, string>();
+    for (const t of tasks) {
+      if (!t.parent) parentNames.set(t.id, t.name.trim());
+    }
+    for (const t of tasks) {
+      if (!t.parent || !isNeedsRebid(t)) continue;
+      const tradeName = parentNames.get(t.parent);
+      if (!tradeName) continue;
+      const amt = getAmt(t);
+      if (amt !== null) add(tradeName, amt);
+    }
+  } else {
+    const optionMap = buildTradeOptionMap(tasks);
+    for (const t of tasks) {
+      if (!isNeedsRebid(t)) continue;
+      const tradeF = t.custom_fields?.find(cf => cf.id === TRADE_FIELD_ID);
+      if (!tradeF || tradeF.value == null) continue;
+      const tradeName = optionMap.get(Number(tradeF.value));
+      if (!tradeName) continue;
+      const amt = getAmt(t);
+      if (amt !== null) add(tradeName, amt);
+    }
+  }
+
+  return result;
+}

@@ -134,10 +134,11 @@ export function transformBudgetTasks(
   coordName: string,
   biddingLows?: Map<string, number>,
   awardedBids?: Map<string, AwardedBidEntry>,
+  needsRebidBids?: Map<string, number[]>,
 ): BudgetProject {
   const entries: RawEntry[] = tasks.map(task => {
     const est: MoneyVal = getCurrency(task, F.BUDGET_ALLOC);
-    const updatedBudget: MoneyVal = getCurrency(task, F.UPDATED_BUDGET);
+    const rawUpdatedBudget: MoneyVal = getCurrency(task, F.UPDATED_BUDGET);
     const biddingLow: number | null = biddingLows?.get(task.name.trim()) ?? null;
     const awardedEntry = awardedBids?.get(task.name.trim());
     const awardedBid: number | null = awardedEntry?.amount ?? null;
@@ -146,6 +147,15 @@ export function transformBudgetTasks(
     // fin comes ONLY from bid activity in the 02. Bidding list — never from
     // trade-task fields which may contain stale or manually-entered data.
     const fin: MoneyVal = awardedBid ?? biddingLow ?? null;
+
+    // Ignore an "Updated Budget" override that merely mirrors a bid which has
+    // since been flagged "needs rebid": a rejected bid must not reflect as the
+    // New Budget any more than it does as the lowest bid.
+    const rebidAmounts = needsRebidBids?.get(task.name.trim());
+    const overrideMirrorsRebid =
+      typeof rawUpdatedBudget === 'number' &&
+      (rebidAmounts?.some(a => Math.abs(a - rawUpdatedBudget) < 0.5) ?? false);
+    const updatedBudget: MoneyVal = overrideMirrorsRebid ? null : rawUpdatedBudget;
 
     // newv: manual budget override (Updated Budget) → finalized bid → estimate carry-forward.
     const newv = deriveNewv(est, updatedBudget ?? fin);
