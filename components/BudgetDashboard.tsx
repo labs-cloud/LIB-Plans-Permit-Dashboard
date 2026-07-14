@@ -182,31 +182,20 @@ function VarBar({ r }: { r: BudgetTrade }) {
     if (r.est === 'NA' || r.newv === 'NA') label = '—';
     else if (r.est === 'INC' || r.fin === 'INC') label = 'rolled-up';
     return (
-      <div style={{ position: 'relative', height: 18, display: 'flex', alignItems: 'center' }}>
-        <div style={{ position: 'absolute', left: '50%', top: 0, bottom: 0, width: 1, background: 'var(--color-border-secondary)' }} />
-        <div style={{ position: 'relative', zIndex: 2, fontSize: 10.5, width: '100%', textAlign: 'center', color: 'var(--color-text-tertiary)' }}>{label}</div>
+      <div style={{ height: 18, display: 'flex', alignItems: 'center' }}>
+        <div style={{ fontSize: 10.5, width: '100%', textAlign: 'center', color: 'var(--color-text-tertiary)' }}>{label}</div>
       </div>
     );
   }
   const delta = r.fin - r.est;
-  const denom = Math.max(Math.abs(r.est), Math.abs(r.fin), 1);
-  const pct = Math.min(50, Math.abs(delta) / denom * 50);
   const dl = delta === 0 ? '$0' : (delta < 0 ? '−' : '+') + fmt$(Math.abs(delta));
   const dp = r.est > 0 ? ' · ' + (delta / r.est * 100).toFixed(0) + '%' : '';
   return (
-    <div style={{ position: 'relative', height: 18, display: 'flex', alignItems: 'center' }}>
-      {delta < 0 && (
-        <div style={{ position: 'absolute', top: 3, bottom: 3, right: '50%', width: `${pct}%`, borderRadius: 3, background: 'var(--var-under)' }} />
-      )}
-      {delta > 0 && (
-        <div style={{ position: 'absolute', top: 3, bottom: 3, left: '50%', width: `${pct}%`, borderRadius: 3, background: 'var(--var-over)' }} />
-      )}
-      <div style={{ position: 'absolute', left: '50%', top: 0, bottom: 0, width: 1, background: 'var(--color-border-secondary)' }} />
+    <div style={{ height: 18, display: 'flex', alignItems: 'center' }}>
       <div style={{
-        position: 'relative', zIndex: 2, fontSize: 10.5, fontVariantNumeric: 'tabular-nums',
+        fontSize: 10.5, fontVariantNumeric: 'tabular-nums',
         fontWeight: 500, width: '100%', textAlign: 'center', lineHeight: 1,
         color: delta === 0 ? 'var(--color-text-tertiary)' : 'var(--color-text-primary)',
-        textShadow: '0 0 4px var(--color-background-primary), 0 0 4px var(--color-background-primary)',
       }}>{dl}{dp}</div>
     </div>
   );
