@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { hasClickUpToken, getFoldersInSpace, getListsInFolder, getTasksInList } from '@/lib/clickup';
 import { transformBudgetTasks } from '@/lib/budget-transforms';
-import { findBiddingList, computeBiddingLows, computeAwardedBids } from '@/lib/bidding-lows';
+import { findBiddingList, computeBiddingLows, computeAwardedBids, computeNeedsRebidBids } from '@/lib/bidding-lows';
 import type { ClickUpList } from '@/lib/clickup';
 import { CLICKUP } from '@/lib/constants';
 
@@ -71,7 +71,8 @@ export async function GET(req: Request) {
 
     const biddingLows = computeBiddingLows(biddingTasks);
     const awardedBids = computeAwardedBids(biddingTasks);
-    const project = transformBudgetTasks(tasks, targetFolder.name, '', targetFolder.id, '', '', biddingLows, awardedBids);
+    const needsRebidBids = computeNeedsRebidBids(biddingTasks);
+    const project = transformBudgetTasks(tasks, targetFolder.name, '', targetFolder.id, '', '', biddingLows, awardedBids, needsRebidBids);
 
     const mismatches: AuditMismatch[] = project.trades
       .filter(t => t.finMismatch && t.taskId && typeof t.fin === 'number' && t.awardedBid !== undefined)
