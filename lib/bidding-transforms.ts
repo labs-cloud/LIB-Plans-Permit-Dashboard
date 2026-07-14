@@ -35,6 +35,8 @@ function mapBiddingStatusName(name: string): BidStatus {
     case 'LEVELED':            return 'lvl';
     case 'LEVELED - PENDING REVIEW': return 'lvp';
     case 'PENDING REVIEW':     return 'lvp';
+    case 'NEEDS REBID':        return 'reb';
+    case 'REBID':              return 'reb';
     case 'NO BID / DECLINED':  return 'hld';
     case 'NO BID/DECLINED':    return 'hld';
     case 'NO BID':             return 'hld';
@@ -151,10 +153,17 @@ export function transformBiddingTasks(
 
     let low: number | null = null;
     if (subs.length > 0) {
-      const amounts = subs.map(s => s.amount).filter((a): a is number => a !== null);
+      // A "needs rebid" bid is void — never let it set the trade's lowest bid.
+      const amounts = subs
+        .filter(s => s.status !== 'reb')
+        .map(s => s.amount)
+        .filter((a): a is number => a !== null);
       if (amounts.length > 0) low = Math.min(...amounts);
     }
-    if (low === null) {
+    // Only fall back to the stored best/lowest/contract fields when the trade
+    // isn't flagged "needs rebid" — otherwise a rejected bid would resurface as
+    // the low through the stale fallback fields.
+    if (low === null && tradeStatus !== 'reb') {
       low = getCurrency(task, F.BEST_BID)
         ?? getCurrency(task, F.LOWEST_BID)
         ?? getCurrency(task, F.CONTRACT);
@@ -245,7 +254,12 @@ export function transformBiddingTasksByName(
       url: `https://app.clickup.com/t/${task.id}`,
     }));
 
-    const amounts = subs.map(s => s.amount).filter((a): a is number => a !== null);
+    // A "needs rebid" bid is void — exclude it so the lowest bid is the lowest
+    // *valid* (non-flagged) sub, never the rejected one.
+    const amounts = subs
+      .filter(s => s.status !== 'reb')
+      .map(s => s.amount)
+      .filter((a): a is number => a !== null);
     const low = amounts.length > 0 ? Math.min(...amounts) : null;
 
     trades.push({ trade: tradeName, annot: null, subs, low, taskId: tradeNameToTaskId.get(tradeName) });
