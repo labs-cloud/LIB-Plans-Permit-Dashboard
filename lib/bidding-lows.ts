@@ -31,8 +31,20 @@ function recordLow(lows: Map<string, number>, tradeName: string, amt: number) {
   if (cur === undefined || amt < cur) lows.set(tradeName, amt);
 }
 
+// Normalise a raw ClickUp status for comparison: lowercase, fold em/en dashes
+// to a plain hyphen, collapse whitespace. Mirrors mapBiddingStatusName in
+// bidding-transforms.ts so both codepaths agree on status identity (e.g.
+// "LEVELED — PENDING REVIEW" with an em dash).
+function normStatus(task: ClickUpTask): string {
+  return (task.status?.status ?? '')
+    .toLowerCase()
+    .replace(/[‒–—―−]/g, '-')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function isAwarded(task: ClickUpTask): boolean {
-  return (task.status?.status ?? '').toUpperCase().trim() === 'AWARDED';
+  return normStatus(task) === 'awarded';
 }
 
 // A "needs rebid" bid has been rejected/voided and must be re-solicited, so it
@@ -40,7 +52,7 @@ function isAwarded(task: ClickUpTask): boolean {
 // non-flagged bid should win instead. Kept as an explicit guard so the rule
 // survives any future change to the qualifying-status whitelist below.
 function isNeedsRebid(task: ClickUpTask): boolean {
-  const s = (task.status?.status ?? '').toLowerCase().trim();
+  const s = normStatus(task);
   return s === 'needs rebid' || s === 'rebid';
 }
 
@@ -49,13 +61,16 @@ function isNeedsRebid(task: ClickUpTask): boolean {
 // flagged "needs rebid".
 function isQualifyingBid(task: ClickUpTask): boolean {
   if (isNeedsRebid(task)) return false;
-  const s = (task.status?.status ?? '').toLowerCase().trim();
+  const s = normStatus(task);
   return (
     s === 'proposals received' ||
     s === 'bid received' ||
     s === 'bid recieved' || // ClickUp's persistent typo
     s === 'to clarify' ||
-    s === 'leveled' ||
+    // Prefix match: covers "leveled" and variants like
+    // "leveled - pending review" (any dash glyph, via normStatus).
+    s.startsWith('leveled') ||
+    s === 'pending review' ||
     s === 'reviewed' ||
     s === 'awarded'
   );
