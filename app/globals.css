@@ -153,6 +153,22 @@ body {
   -webkit-overflow-scrolling: touch;
 }
 
+/* Portfolio matrix: the wrapper owns the scroll in both axes so the sticky
+   <thead> freezes against it instead of scrolling off with the page. */
+.matrix-scroll-frozen {
+  overflow: auto;
+  /* Grows with the viewport but never collapses to an unusable strip inside a
+     short ClickUp iframe. Only caps height — a short matrix stays short. */
+  max-height: max(320px, calc(100vh - 260px));
+  overscroll-behavior: contain;
+}
+
+@media (max-width: 860px) {
+  .matrix-scroll-frozen {
+    max-height: max(320px, calc(100vh - 180px));
+  }
+}
+
 @media (max-width: 860px) {
   .overview-grid,
   .overview-two-up,

@@ -2865,6 +2865,13 @@ function SubsView({ search = '' }: { search?: string }) {
 // ─── Portfolio matrix view ─────────────────────────────────────────────────────
 
 type ProjectFilter = 'all' | 'active' | 'blank';
+// Matrix ordering. 'data' (the default) pulls everything with bidding activity
+// to the front and pushes empty projects/trades to the end; 'name' is the plain
+// alphabetical order the matrix used to have.
+type MatrixSort = 'data' | 'name';
+
+const byNameAsc = (a: string, b: string) =>
+  a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
 
 function PortfolioMatrixView({
   portfolioData,
@@ -2890,22 +2897,38 @@ function PortfolioMatrixView({
     [portfolioData],
   );
 
+  // How many trades in a project carry any bidding activity. Zero means the
+  // column is all dashes — that project is "blank".
+  const projectBidCount = useCallback(
+    (proj: BiddingProject) =>
+      proj.trades.reduce((n, t) => n + (tradeStatus(t) !== null ? 1 : 0), 0),
+    [],
+  );
   // A project is "blank" when no trade has any bidding activity (every cell is a
   // dash). Drives the blank / has-bids column filter.
   const isBlankProject = useCallback(
-    (proj: BiddingProject) => !proj.trades.some((t) => tradeStatus(t) !== null),
-    [],
+    (proj: BiddingProject) => projectBidCount(proj) === 0,
+    [projectBidCount],
   );
 
   const [projectFilter, setProjectFilter] = useState<ProjectFilter>('all');
   const [tradeFilter, setTradeFilter] = useState<Set<string>>(new Set());
+  const [sort, setSort] = useState<MatrixSort>('data');
 
-  // Columns: apply the blank / has-bids filter.
+  // Columns: apply the blank / has-bids filter, then order. The default puts the
+  // busiest projects first and leaves the empty ones trailing at the end.
   const projects = useMemo(() => {
-    if (projectFilter === 'all') return linkedProjects;
-    if (projectFilter === 'blank') return linkedProjects.filter(isBlankProject);
-    return linkedProjects.filter((p) => !isBlankProject(p));
-  }, [linkedProjects, projectFilter, isBlankProject]);
+    const filtered =
+      projectFilter === 'all'
+        ? linkedProjects
+        : projectFilter === 'blank'
+        ? linkedProjects.filter(isBlankProject)
+        : linkedProjects.filter((p) => !isBlankProject(p));
+    if (sort === 'name') return [...filtered].sort((a, b) => byNameAsc(a.name, b.name));
+    return [...filtered].sort(
+      (a, b) => projectBidCount(b) - projectBidCount(a) || byNameAsc(a.name, b.name),
+    );
+  }, [linkedProjects, projectFilter, isBlankProject, projectBidCount, sort]);
 
   const blankCount = useMemo(
     () => linkedProjects.filter(isBlankProject).length,
@@ -2929,16 +2952,28 @@ function PortfolioMatrixView({
     return [...names].sort();
   }, [linkedProjects]);
 
-  // Rows: text search AND the explicit trade multi-select (empty = all).
+  // Rows: text search AND the explicit trade multi-select (empty = all), then the
+  // same data-first ordering as the columns — trades with bids across the visible
+  // projects lead, all-empty trades sink to the bottom.
   const tradeNames = useMemo(() => {
-    const names = new Set<string>();
-    for (const [, tm] of projectTradeMap) for (const n of tm.keys()) names.add(n);
-    let sorted = [...names].sort();
-    if (tradeFilter.size) sorted = sorted.filter((n) => tradeFilter.has(n));
+    const bidCounts = new Map<string, number>();
+    for (const [, tm] of projectTradeMap) {
+      for (const [name, trade] of tm) {
+        bidCounts.set(
+          name,
+          (bidCounts.get(name) ?? 0) + (tradeStatus(trade) !== null ? 1 : 0),
+        );
+      }
+    }
+    let names = [...bidCounts.keys()];
+    if (tradeFilter.size) names = names.filter((n) => tradeFilter.has(n));
     const q = search.trim().toLowerCase();
-    if (q) sorted = sorted.filter((n) => n.toLowerCase().includes(q));
-    return sorted;
-  }, [projectTradeMap, tradeFilter, search]);
+    if (q) names = names.filter((n) => n.toLowerCase().includes(q));
+    if (sort === 'name') return names.sort(byNameAsc);
+    return names.sort(
+      (a, b) => (bidCounts.get(b) ?? 0) - (bidCounts.get(a) ?? 0) || byNameAsc(a, b),
+    );
+  }, [projectTradeMap, tradeFilter, search, sort]);
 
   // Hover tooltip — imperatively positioned so mouse-move doesn't re-render the grid.
   const tipRef = useRef<HTMLDivElement | null>(null);
@@ -2960,7 +2995,8 @@ function PortfolioMatrixView({
     if (tipRef.current) tipRef.current.style.opacity = '0';
   };
 
-  const filtersActive = projectFilter !== 'all' || tradeFilter.size > 0;
+  const filtersActive =
+    projectFilter !== 'all' || tradeFilter.size > 0 || sort !== 'data';
 
   return (
     <>
@@ -2987,12 +3023,14 @@ function PortfolioMatrixView({
           selected={tradeFilter}
           onChange={setTradeFilter}
         />
+        <MatrixSortToggle value={sort} onChange={setSort} />
         {filtersActive && (
           <button
             type="button"
             onClick={() => {
               setProjectFilter('all');
               setTradeFilter(new Set());
+              setSort('data');
             }}
             style={{
               height: 30,
@@ -3024,7 +3062,9 @@ function PortfolioMatrixView({
         </span>
       </div>
 
-      <div style={{ overflowX: 'auto' }} className="matrix-scroll">
+      {/* The wrapper is the scrollport in both axes, so <thead> can stay frozen
+          against it while the rows scroll underneath. */}
+      <div className="matrix-scroll matrix-scroll-frozen">
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
           <colgroup>
             <col style={{ minWidth: 200 }} />
@@ -3046,8 +3086,13 @@ function PortfolioMatrixView({
                   background: 'var(--color-background-secondary)',
                   border: '0.5px solid var(--color-border-tertiary)',
                   position: 'sticky',
+                  top: 0,
                   left: 0,
-                  zIndex: 2,
+                  // Above both the sticky header row and the sticky trade column.
+                  zIndex: 4,
+                  // border-collapse drops sticky cell borders while scrolling;
+                  // inset shadows keep the grid lines painted.
+                  boxShadow: 'inset -1px -1px 0 var(--color-border-tertiary)',
                 }}
               >
                 Trade
@@ -3066,6 +3111,10 @@ function PortfolioMatrixView({
                     whiteSpace: 'nowrap',
                     letterSpacing: '0.02em',
                     maxWidth: 130,
+                    position: 'sticky',
+                    top: 0,
+                    zIndex: 3,
+                    boxShadow: 'inset 0 -1px 0 var(--color-border-tertiary)',
                   }}
                 >
                   <div
@@ -3148,7 +3197,8 @@ function PortfolioMatrixView({
                       background: 'var(--color-background-primary)',
                       position: 'sticky',
                       left: 0,
-                      zIndex: 1,
+                      zIndex: 2,
+                      boxShadow: 'inset -1px 0 0 var(--color-border-tertiary)',
                     }}
                   >
                     {tradeName}
@@ -3320,6 +3370,78 @@ function ProjectColumnFilter({
             >
               {o.count}
             </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// Ordering toggle for the portfolio matrix. Defaults to "With data first", which
+// fronts the projects/trades that actually have bids and trails the empty ones.
+function MatrixSortToggle({
+  value,
+  onChange,
+}: {
+  value: MatrixSort;
+  onChange: (v: MatrixSort) => void;
+}) {
+  const OPTIONS: { v: MatrixSort; label: string; title: string }[] = [
+    {
+      v: 'data',
+      label: 'With data first',
+      title: 'Most bidding activity first · empty projects and trades last',
+    },
+    {
+      v: 'name',
+      label: 'A → Z',
+      title: 'Alphabetical by project and trade name',
+    },
+  ];
+  return (
+    <div
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        padding: 2,
+        gap: 2,
+        background: 'var(--color-background-secondary)',
+        borderRadius: 'var(--border-radius-md)',
+      }}
+    >
+      <i
+        className="ti ti-arrows-sort"
+        style={{
+          fontSize: 14,
+          margin: '0 2px 0 6px',
+          color: 'var(--color-text-tertiary)',
+        }}
+      />
+      {OPTIONS.map((o) => {
+        const active = o.v === value;
+        return (
+          <button
+            key={o.v}
+            type="button"
+            title={o.title}
+            onClick={() => onChange(o.v)}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 5,
+              padding: '4px 10px',
+              borderRadius: 6,
+              border: 'none',
+              background: active ? 'var(--color-background-primary)' : 'transparent',
+              color: active ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
+              fontWeight: active ? 600 : 400,
+              fontSize: 12,
+              fontFamily: 'inherit',
+              cursor: 'pointer',
+              boxShadow: active ? '0 1px 1px rgba(0,0,0,0.04)' : undefined,
+            }}
+          >
+            {o.label}
           </button>
         );
       })}
