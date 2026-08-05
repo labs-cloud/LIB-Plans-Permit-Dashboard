@@ -6,7 +6,7 @@ import useSWR from 'swr';
 import { LogoHeader } from './LogoHeader';
 import { ProjectPicker } from './ProjectPicker';
 import type { BidStatus, BidSub, BidTrade, BiddingPayload, BiddingPortfolioPayload, BiddingProject } from '@/lib/bidding-types';
-import { taskUrl, folderUrl } from '@/lib/urls';
+import { taskUrl, folderUrl, apiUrl } from '@/lib/urls';
 import { SITE_URL } from '@/lib/constants';
 import { EmbedSyncBar } from './EmbedSyncBar';
 
@@ -34,7 +34,7 @@ async function portfolioFetcher(url: string): Promise<BiddingPortfolioPayload> {
 
 function useBiddingPortfolio() {
   const { data } = useSWR<BiddingPortfolioPayload>(
-    '/api/bidding/portfolio',
+    apiUrl('/api/bidding/portfolio'),
     portfolioFetcher,
     { refreshInterval: 300_000, revalidateOnFocus: false, dedupingInterval: 60_000 },
   );
@@ -3695,14 +3695,14 @@ export function BiddingDashboard({ projectId }: { projectId?: string } = {}) {
 
   // Portfolio data — only fetched in portfolio mode
   const { data: portfolioData, isLoading: portfolioLoading } = useSWR<BiddingPortfolioPayload>(
-    projectId ? null : '/api/bidding/portfolio',
+    projectId ? null : apiUrl('/api/bidding/portfolio'),
     portfolioFetcher,
     { refreshInterval: 300_000, revalidateOnFocus: false, dedupingInterval: 60_000 },
   );
 
   // Per-project data — only fetched in project mode
   const { data: projectData, isLoading: projectLoading } = useSWR<BiddingPayload>(
-    projectId ? `/api/bidding/project/${encodeURIComponent(projectId)}` : null,
+    projectId ? apiUrl(`/api/bidding/project/${encodeURIComponent(projectId)}`) : null,
     fetcher,
     { refreshInterval: 300_000, revalidateOnFocus: false, dedupingInterval: 60_000 },
   );

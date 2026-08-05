@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useSWRConfig } from 'swr';
+import { apiUrl } from '@/lib/urls';
 
 interface Props {
   syncedAt: number | null;
@@ -30,10 +31,10 @@ export function EmbedSyncBar({ syncedAt }: Props) {
     if (syncing) return;
     setSyncing(true);
     try {
-      const res = await fetch('/api/refresh', { method: 'POST' });
+      const res = await fetch(apiUrl('/api/refresh'), { method: 'POST' });
       if (!res.ok) throw new Error(`refresh failed: ${res.status}`);
       await Promise.all([
-        mutate('/api/projects'),
+        mutate(apiUrl('/api/projects')),
         mutate((key) => typeof key === 'string' && key.startsWith('/api/bidding')),
         mutate((key) => typeof key === 'string' && key.startsWith('/api/budget')),
       ]);

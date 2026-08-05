@@ -7,6 +7,7 @@ import { LogoHeader } from '@/components/LogoHeader';
 import { ProjectPicker } from '@/components/ProjectPicker';
 import { CLICKUP, SITE_URL } from '@/lib/constants';
 import { EmbedSyncBar } from '@/components/EmbedSyncBar';
+import { apiUrl } from '@/lib/urls';
 import type {
   BudgetTrade,
   BudgetPayload,
@@ -14,6 +15,30 @@ import type {
   BudgetProject,
   MoneyVal,
 } from '@/lib/budget-types';
+
+// ──────────────────────────────────────────────────────────────
+// Share scope
+//
+// True when the viewer holds a single-project share link rather than the team
+// token. The access gate is what actually enforces this — the portfolio routes
+// 401 for them — but a link they cannot use should not be dangled in front of
+// them either, so the picker and the Portfolio crumb drop out.
+const ScopedCtx = createContext(false);
+
+function PortfolioCrumb({ onClick }: { onClick: () => void }) {
+  const scoped = useContext(ScopedCtx);
+  if (scoped) {
+    return <span style={{ color: 'var(--color-text-tertiary)' }}>Lead It Builders</span>;
+  }
+  return (
+    <button
+      onClick={onClick}
+      style={{ background: 'none', border: 'none', color: 'var(--color-text-info)', cursor: 'pointer', padding: 0, fontSize: 12, fontFamily: 'inherit' }}
+    >
+      Portfolio
+    </button>
+  );
+}
 
 // ──────────────────────────────────────────────────────────────
 // Data context (per-project mode)
@@ -237,7 +262,7 @@ function ReconcileButton({ label, taskId, value, onSuccess }: {
   async function handleClick() {
     setState('loading');
     try {
-      const res = await fetch('/api/budget/reconcile', {
+      const res = await fetch(apiUrl('/api/budget/reconcile'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ taskId, value }),
@@ -823,7 +848,7 @@ function DetailedView({
     <div>
       {/* Breadcrumb */}
       <div className="budget-crumb" style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginBottom: 12, display: 'flex', gap: 6, alignItems: 'center' }}>
-        <button onClick={onGoOverview} style={{ background: 'none', border: 'none', color: 'var(--color-text-info)', cursor: 'pointer', padding: 0, fontSize: 12, fontFamily: 'inherit' }}>Portfolio</button>
+        <PortfolioCrumb onClick={onGoOverview} />
         <i className="ti ti-chevron-right" style={{ fontSize: 14, opacity: 0.6 }} />
         <span>{project.name} · Budget</span>
         <span style={{ flex: 1 }} />
@@ -1286,7 +1311,7 @@ function VarianceView({ onBack, search, tradeTypeFilter = 'all' }: { onBack: () 
     <div>
       {/* Breadcrumb */}
       <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginBottom: 12, display: 'flex', gap: 6, alignItems: 'center' }}>
-        <button onClick={onBack} style={{ background: 'none', border: 'none', color: 'var(--color-text-info)', cursor: 'pointer', padding: 0, fontSize: 12, fontFamily: 'inherit' }}>Portfolio</button>
+        <PortfolioCrumb onClick={onBack} />
         <i className="ti ti-chevron-right" style={{ fontSize: 14, opacity: 0.6 }} />
         <span>{project.name} · Variance</span>
       </div>
@@ -1480,7 +1505,7 @@ function TreemapView({ onBack, search, tradeTypeFilter = 'all' }: { onBack: () =
     <div>
       {/* Breadcrumb */}
       <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginBottom: 12, display: 'flex', gap: 6, alignItems: 'center' }}>
-        <button onClick={onBack} style={{ background: 'none', border: 'none', color: 'var(--color-text-info)', cursor: 'pointer', padding: 0, fontSize: 12, fontFamily: 'inherit' }}>Portfolio</button>
+        <PortfolioCrumb onClick={onBack} />
         <i className="ti ti-chevron-right" style={{ fontSize: 14, opacity: 0.6 }} />
         <span>{project.name} · Treemap</span>
       </div>
@@ -1733,7 +1758,7 @@ function CategoriesView({ onBack, search, tradeTypeFilter = 'all' }: { onBack: (
     <div>
       {/* Breadcrumb */}
       <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginBottom: 12, display: 'flex', gap: 6, alignItems: 'center' }}>
-        <button onClick={onBack} style={{ background: 'none', border: 'none', color: 'var(--color-text-info)', cursor: 'pointer', padding: 0, fontSize: 12, fontFamily: 'inherit' }}>Portfolio</button>
+        <PortfolioCrumb onClick={onBack} />
         <i className="ti ti-chevron-right" style={{ fontSize: 14, opacity: 0.6 }} />
         <span>{project.name} · Categories</span>
       </div>
@@ -1874,7 +1899,10 @@ const PROJECT_TABS: { id: ProjectTab; label: string; icon: string }[] = [
   { id: 'categories', label: 'Categories', icon: 'ti-list-tree' },
 ];
 
-export function BudgetDashboard({ projectId }: { projectId?: string } = {}) {
+export function BudgetDashboard({
+  projectId,
+  scoped = false,
+}: { projectId?: string; scoped?: boolean } = {}) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const tab = (searchParams?.get('tab') ?? 'table') as ProjectTab;
@@ -1903,14 +1931,14 @@ export function BudgetDashboard({ projectId }: { projectId?: string } = {}) {
 
   // Portfolio data — only fetched in portfolio mode
   const { data: portfolioData, isLoading: portfolioLoading } = useSWR<BudgetPortfolioPayload>(
-    projectId ? null : '/api/budget/portfolio',
+    projectId ? null : apiUrl('/api/budget/portfolio'),
     portfolioFetcher,
     { refreshInterval: 300_000, revalidateOnFocus: false, dedupingInterval: 60_000 },
   );
 
   // Per-project data — only fetched in project mode
   const { data: projectData, isLoading: projectLoading } = useSWR<BudgetPayload>(
-    projectId ? `/api/budget/project/${encodeURIComponent(projectId)}` : null,
+    projectId ? apiUrl(`/api/budget/project/${encodeURIComponent(projectId)}`) : null,
     fetcher,
     { refreshInterval: 300_000, revalidateOnFocus: false, dedupingInterval: 60_000 },
   );
@@ -1998,6 +2026,7 @@ export function BudgetDashboard({ projectId }: { projectId?: string } = {}) {
   }
 
   return (
+    <ScopedCtx.Provider value={scoped}>
     <div className="dashboard-shell">
       {!isEmbed && (
         <LogoHeader
@@ -2105,17 +2134,20 @@ export function BudgetDashboard({ projectId }: { projectId?: string } = {}) {
           </div>
         )}
 
-        {/* Project picker */}
-        <ProjectPicker
-          projectId={projectId}
-          projectNames={allProjectNames}
-          onPortfolio={navigateToPortfolio}
-          onProject={navigateToProject}
-          isEmbed={isEmbed}
-        />
+        {/* Project picker — never shown to a single-project share viewer. */}
+        {!scoped && (
+          <ProjectPicker
+            projectId={projectId}
+            projectNames={allProjectNames}
+            onPortfolio={navigateToPortfolio}
+            onProject={navigateToProject}
+            isEmbed={isEmbed}
+          />
+        )}
 
-        {/* Copy embed link — per-project, non-embed mode only */}
-        {!isEmbed && projectId && (
+        {/* Copy embed link — per-project, non-embed mode only. Hidden for share
+            viewers: it builds an un-tokenized team URL that would 401 for them. */}
+        {!isEmbed && projectId && !scoped && (
           <button
             type="button"
             onClick={() => {
@@ -2207,6 +2239,7 @@ export function BudgetDashboard({ projectId }: { projectId?: string } = {}) {
 
       <Drawer open={drawerTrade !== null} trade={drawerTrade} onClose={closeDrawer} />
     </div>
+    </ScopedCtx.Provider>
   );
 }
 

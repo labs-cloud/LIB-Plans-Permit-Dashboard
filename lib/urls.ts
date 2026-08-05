@@ -1,4 +1,20 @@
 import { CLICKUP } from './constants';
+import { ACCESS_PARAM } from './access';
+
+/**
+ * Carry the caller's access token from the page URL onto an API request.
+ *
+ * The gate also drops a cookie, but the ClickUp embed is a third-party iframe and
+ * browsers increasingly refuse cookies there — so the token in the address bar is
+ * the reliable carrier. Every client-side call to /api must go through this or it
+ * will 401 inside the widget.
+ */
+export function apiUrl(path: string): string {
+  if (typeof window === 'undefined') return path;
+  const token = new URLSearchParams(window.location.search).get(ACCESS_PARAM);
+  if (!token) return path;
+  return `${path}${path.includes('?') ? '&' : '?'}${ACCESS_PARAM}=${encodeURIComponent(token)}`;
+}
 
 export function taskUrl(taskId: string): string {
   return `${CLICKUP.BASE_URL}/t/${taskId}`;
