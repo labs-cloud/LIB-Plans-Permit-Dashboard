@@ -48,12 +48,18 @@ function deriveNewv(est: MoneyVal, fin: MoneyVal): MoneyVal {
   return est;
 }
 
+// Currency fields carry cents, so compare money with a tolerance rather than ===.
+function sameMoney(a: number, b: number): boolean {
+  return Math.abs(a - b) < 0.5;
+}
+
 interface RawEntry {
   taskId: string;
   tradeName: string;
   est: MoneyVal;
   fin: MoneyVal;
   newv: MoneyVal;
+  updatedBudget: MoneyVal;
   costType: 'hard' | 'soft';
   status: string;
   tradeType: 'biddable' | 'set' | 'pending';
@@ -86,6 +92,7 @@ function dedup(entries: RawEntry[]): BudgetTrade[] {
         est: e.est,
         fin: e.fin,
         newv: e.newv,
+        updatedBudget: typeof e.updatedBudget === 'number' ? e.updatedBudget : undefined,
         costType: e.costType,
         status: e.status,
         tradeType: e.tradeType,
@@ -111,6 +118,7 @@ function dedup(entries: RawEntry[]): BudgetTrade[] {
       est: winner.est,
       fin: winner.fin,
       newv: winner.newv,
+      updatedBudget: typeof winner.updatedBudget === 'number' ? winner.updatedBudget : undefined,
       costType: winner.costType,
       status: winner.status,
       tradeType: winner.tradeType,
@@ -154,12 +162,33 @@ export function transformBudgetTasks(
     const rebidAmounts = needsRebidBids?.get(task.name.trim());
     const overrideMirrorsRebid =
       typeof rawUpdatedBudget === 'number' &&
-      (rebidAmounts?.some(a => Math.abs(a - rawUpdatedBudget) < 0.5) ?? false);
-    const updatedBudget: MoneyVal = overrideMirrorsRebid ? null : rawUpdatedBudget;
+      (rebidAmounts?.some(a => sameMoney(a, rawUpdatedBudget)) ?? false);
+
+    // Ignore an "Updated Budget" that just restates the estimate. Copying the
+    // estimated figure into the override field is not a decision to hold the
+    // budget there — but because the override outranks bids, such a copy would
+    // silently suppress the trade's finalized/lowest bid and pin New Budget to
+    // the estimate. Only an override that says something *different* from the
+    // estimate is treated as a real manual call.
+    const overrideMirrorsEstimate =
+      typeof rawUpdatedBudget === 'number' &&
+      typeof est === 'number' &&
+      sameMoney(est, rawUpdatedBudget);
+
+    const updatedBudget: MoneyVal =
+      overrideMirrorsRebid || overrideMirrorsEstimate ? null : rawUpdatedBudget;
 
     // newv: manual budget override (Updated Budget) → finalized bid → estimate carry-forward.
     const newv = deriveNewv(est, updatedBudget ?? fin);
-    const finMismatch = false;
+
+    // A live override that disagrees with the trade's bid is the one case a human
+    // must adjudicate, so surface it for the Reconcile panel instead of letting the
+    // override win silently. Overrides dropped above are not mismatches — the
+    // dashboard already resolves those to the bid.
+    const finMismatch =
+      typeof updatedBudget === 'number' &&
+      typeof fin === 'number' &&
+      !sameMoney(updatedBudget, fin);
     const costType = getCostType(task);
     const status = task.status?.status ?? '';
     const tradeType = getTradeType(task) ?? 'pending';
@@ -170,6 +199,7 @@ export function transformBudgetTasks(
       est,
       fin,
       newv,
+      updatedBudget,
       costType,
       status,
       tradeType,

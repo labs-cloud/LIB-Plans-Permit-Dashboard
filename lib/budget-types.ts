@@ -21,7 +21,14 @@ export interface BudgetTrade {
   awardedBid?: number;
   /** Name of the awarded sub. */
   awardedSubName?: string;
-  /** True when the Updated Budget override exists but doesn't match the awarded sub's bid. */
+  /**
+   * The ClickUp "Updated Budget" override actually in force for this trade — the
+   * value that outranks the bid when deriving New Budget. Undefined when the field
+   * is empty or when its value was disregarded for merely restating the estimate
+   * or a needs-rebid amount.
+   */
+  updatedBudget?: number;
+  /** True when a live Updated Budget override disagrees with the trade's finalized/lowest bid. */
   finMismatch?: boolean;
 }
 

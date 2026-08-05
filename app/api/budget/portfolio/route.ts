@@ -97,7 +97,7 @@ async function buildPortfolioPayload(): Promise<BudgetPortfolioPayload> {
 
 const getCachedPortfolioPayload = unstable_cache(
   buildPortfolioPayload,
-  ['lib-budget-portfolio:v11'],
+  ['lib-budget-portfolio:v12'],
   { revalidate: CACHE_TTL_SECONDS, tags: [BUDGET_CACHE_TAG] },
 );
 
