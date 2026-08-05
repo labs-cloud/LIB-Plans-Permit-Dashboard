@@ -19,8 +19,10 @@ function findBudgetList(lists: ClickUpList[]): ClickUpList | undefined {
 export interface AuditMismatch {
   trade: string;
   taskId: string;
-  finalized: number;
-  awardedBid: number;
+  /** The Updated Budget override in force — what New Budget currently shows. */
+  override: number;
+  /** The trade's finalized/lowest bid, which the override is suppressing. */
+  bid: number;
   awardedSubName: string;
   diffAmount: number;
   diffPct: number;
@@ -75,17 +77,17 @@ export async function GET(req: Request) {
     const project = transformBudgetTasks(tasks, targetFolder.name, '', targetFolder.id, '', '', biddingLows, awardedBids, needsRebidBids);
 
     const mismatches: AuditMismatch[] = project.trades
-      .filter(t => t.finMismatch && t.taskId && typeof t.fin === 'number' && t.awardedBid !== undefined)
+      .filter(t => t.finMismatch && t.taskId && typeof t.fin === 'number' && t.updatedBudget !== undefined)
       .map(t => {
-        const finalized = t.fin as number;
-        const awardedBid = t.awardedBid as number;
-        const diff = finalized - awardedBid;
-        const diffPct = awardedBid > 0 ? (diff / awardedBid) * 100 : 0;
+        const bid = t.fin as number;
+        const override = t.updatedBudget as number;
+        const diff = override - bid;
+        const diffPct = bid > 0 ? (diff / bid) * 100 : 0;
         return {
           trade: t.trade,
           taskId: t.taskId as string,
-          finalized,
-          awardedBid,
+          override,
+          bid,
           awardedSubName: t.awardedSubName ?? '',
           diffAmount: diff,
           diffPct,
