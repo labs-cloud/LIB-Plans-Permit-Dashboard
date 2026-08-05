@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { unstable_cache } from 'next/cache';
+import { headers } from 'next/headers';
+import { SCOPE_HEADER, TEAM_SCOPE } from '@/lib/access';
 import { hasClickUpToken, getFoldersInSpace, getListsInFolder, getTasksInList } from '@/lib/clickup';
 import { transformBudgetTasks } from '@/lib/budget-transforms';
 import { findBiddingList, computeBiddingLows, computeAwardedBids, computeNeedsRebidBids } from '@/lib/bidding-lows';
@@ -96,8 +98,20 @@ export async function GET(
     const { id } = await params;
     const projectId = decodeURIComponent(id);
     const payload = await getCachedPayload(projectId);
-    return NextResponse.json(payload, {
-      headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300' },
+
+    // A share-scoped caller must not learn the rest of the portfolio. The cached
+    // payload carries every project name to drive the team's project picker, so
+    // strip it here — after the cache, so the team's copy is unaffected.
+    const scope = (await headers()).get(SCOPE_HEADER);
+    const scoped = scope !== null && scope !== TEAM_SCOPE;
+    const body = scoped ? { ...payload, portfolioProjects: [] } : payload;
+
+    return NextResponse.json(body, {
+      headers: {
+        'Cache-Control': scoped
+          ? 'private, no-store'
+          : 'public, s-maxage=60, stale-while-revalidate=300',
+      },
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';

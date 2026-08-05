@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useSWRConfig } from 'swr';
+import { apiUrl } from '@/lib/urls';
 
 export function SyncButton() {
   const { mutate } = useSWRConfig();
@@ -13,11 +14,11 @@ export function SyncButton() {
     setSyncing(true);
     setError(false);
     try {
-      const res = await fetch('/api/refresh', { method: 'POST' });
+      const res = await fetch(apiUrl('/api/refresh'), { method: 'POST' });
       if (!res.ok) throw new Error(`refresh failed: ${res.status}`);
       // Revalidate all dashboard API caches simultaneously
       await Promise.all([
-        mutate('/api/projects'),
+        mutate(apiUrl('/api/projects')),
         mutate((key) => typeof key === 'string' && key.startsWith('/api/bidding')),
         mutate((key) => typeof key === 'string' && key.startsWith('/api/budget')),
       ]);

@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import useSWR from 'swr';
 import type { BiddingPayload, BidStatus, BidTrade } from '@/lib/bidding-types';
+import { apiUrl } from '@/lib/urls';
 
 // ─── Hardcoded status palette (safe for print / no CSS vars) ──────────────────
 
@@ -32,7 +33,7 @@ export function BiddingReport({ projectId }: { projectId: string }) {
   const [copied, setCopied] = useState(false);
 
   const { data, isLoading, mutate } = useSWR<BiddingPayload>(
-    `/api/bidding/project/${encodeURIComponent(projectId)}`,
+    apiUrl(`/api/bidding/project/${encodeURIComponent(projectId)}`),
     fetcher,
     { refreshInterval: 300_000, revalidateOnFocus: true },
   );

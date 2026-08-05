@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { ScreenshotEditor } from './ScreenshotEditor';
+import { apiUrl } from '@/lib/urls';
 
 type Mode = 'menu' | 'issue' | 'feature';
 type Status = 'idle' | 'sending' | 'sent' | 'error';
@@ -171,7 +172,7 @@ export function SupportBubble() {
     for (const f of files) fd.append('screenshots', f);
 
     try {
-      const res = await fetch('/api/support', { method: 'POST', body: fd });
+      const res = await fetch(apiUrl('/api/support'), { method: 'POST', body: fd });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         throw new Error(body?.error || `Send failed (${res.status})`);

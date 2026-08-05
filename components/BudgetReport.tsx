@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import useSWR from 'swr';
 import type { BudgetPayload, BudgetTrade, MoneyVal } from '@/lib/budget-types';
+import { apiUrl } from '@/lib/urls';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -41,7 +42,7 @@ export function BudgetReport({ projectId }: { projectId: string }) {
   const [copied, setCopied] = useState(false);
 
   const { data, isLoading, mutate } = useSWR<BudgetPayload>(
-    `/api/budget/project/${encodeURIComponent(projectId)}`,
+    apiUrl(`/api/budget/project/${encodeURIComponent(projectId)}`),
     fetcher,
     { refreshInterval: 300_000, revalidateOnFocus: true },
   );
@@ -162,7 +163,7 @@ export function BudgetReport({ projectId }: { projectId: string }) {
           {/* Live indicator + actions */}
           <div className="no-print" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <button
-              onClick={async () => { await fetch('/api/refresh', { method: 'POST' }); mutate(); }}
+              onClick={async () => { await fetch(apiUrl('/api/refresh'), { method: 'POST' }); mutate(); }}
               title="Refresh from ClickUp"
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: 4,

@@ -17,6 +17,7 @@ import { DetailedView } from './DetailedView';
 import { MatrixView } from './MatrixView';
 import type { SortKey } from './SortChips';
 import type { ChipStyle, DetailedLayout } from './ViewSettings';
+import { apiUrl } from '@/lib/urls';
 
 // ── Types ─────────────────────────────────────────────────────────
 type ViewMode = 'overview' | 'detailed' | 'matrix';
@@ -173,7 +174,7 @@ export function Dashboard({ initial, initialError, projectId }: Props) {
   }, [searchInput, search, setParam]);
 
   // ── Data ────────────────────────────────────────────────────────
-  const { data, error } = useSWR<DashboardPayload>('/api/projects', fetcher, {
+  const { data, error } = useSWR<DashboardPayload>(apiUrl('/api/projects'), fetcher, {
     fallbackData: initial ?? undefined,
     refreshInterval: 300_000,
     revalidateOnFocus: false,
