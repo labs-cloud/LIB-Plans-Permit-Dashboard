@@ -14,6 +14,10 @@ export const dynamic = 'force-dynamic';
  * token can never be used to mint another one.
  *
  *   GET /api/share-link?projectId=257%20E%20201%20St&k=<team token>
+ *
+ * `view=report` returns the printable outlook report instead of the interactive
+ * budget page. Both live under /budget/<projectId>, which is exactly what the
+ * share token opens.
  */
 export async function GET(req: Request) {
   const scope = (await headers()).get(SCOPE_HEADER);
@@ -29,13 +33,15 @@ export async function GET(req: Request) {
     );
   }
 
-  const projectId = new URL(req.url).searchParams.get('projectId');
+  const params = new URL(req.url).searchParams;
+  const projectId = params.get('projectId');
   if (!projectId) {
     return NextResponse.json({ error: 'projectId is required' }, { status: 400 });
   }
+  const view = params.get('view') === 'report' ? '/report' : '';
 
   const token = await projectShareToken(secret, projectId);
-  const url = `${SITE_URL}/budget/${encodeURIComponent(projectId)}?k=${token}`;
+  const url = `${SITE_URL}/budget/${encodeURIComponent(projectId)}${view}?k=${token}`;
 
   return NextResponse.json(
     {

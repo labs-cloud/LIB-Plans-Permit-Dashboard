@@ -17,7 +17,7 @@ import { DetailedView } from './DetailedView';
 import { MatrixView } from './MatrixView';
 import type { SortKey } from './SortChips';
 import type { ChipStyle, DetailedLayout } from './ViewSettings';
-import { apiUrl } from '@/lib/urls';
+import { apiUrl, withAccessToken } from '@/lib/urls';
 
 // ── Types ─────────────────────────────────────────────────────────
 type ViewMode = 'overview' | 'detailed' | 'matrix';
@@ -221,8 +221,11 @@ export function Dashboard({ initial, initialError, projectId }: Props) {
   const activeTotalCount = projectId ? 1 : payload.projects.length;
 
   // ── Navigation ───────────────────────────────────────────────────
-  const navigateToProject  = useCallback((name: string) => router.push(`/plans/${encodeURIComponent(name)}`), [router]);
-  const navigateToPortfolio = useCallback(() => router.push('/'), [router]);
+  // Both carry the access token forward: the gate's cookie is a third-party
+  // cookie inside the ClickUp iframe and is often refused, leaving the URL as
+  // the only thing that keeps the next page open.
+  const navigateToProject  = useCallback((name: string) => router.push(withAccessToken(`/plans/${encodeURIComponent(name)}`)), [router]);
+  const navigateToPortfolio = useCallback(() => router.push(withAccessToken('/')), [router]);
 
   // ── View-toggle pin helpers ──────────────────────────────────────
   const isDefaultView = view === defaultView;

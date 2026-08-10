@@ -40,6 +40,41 @@ Without a token the dashboard renders empty-state with a banner; with one set
 it crawls the Active Projects space, walks each project folder for the
 `03. Plans` / `04. Permits` / `00. Project Overview` lists, and aggregates.
 
+The access gate (below) adds two more, both required in production:
+
+```
+DASHBOARD_ACCESS_TOKEN=<long random string>   # the team key
+DASHBOARD_SHARE_SECRET=<long random string>   # signs owner share links
+```
+
+## Access & sharing
+
+Every page and API route is gated by `middleware.ts`. Access rides in the URL as
+`?k=<token>`, because the ClickUp embed is a third-party iframe where cookies are
+often refused. There are two kinds of token, and the difference matters:
+
+| | What it opens | Where it comes from |
+|---|---|---|
+| **Team key** (`DASHBOARD_ACCESS_TOKEN`) | Everything — all projects, all four dashboards | The ClickUp widget URLs and the **Copy embed link** buttons |
+| **Owner link** (`p_…`, HMAC of `DASHBOARD_SHARE_SECRET`) | One project's budget page and outlook report, read-only | The **Share** button on a project's budget, or `/api/share-link` |
+
+**Sending a budget to an owner: use Share.** It mints an owner link for that one
+project. Pasting the URL out of your own address bar instead would hand over the
+team key, and a link with no `k` at all is what produces the gate's
+"Access required" page on the far end — the thing an owner sees when the link
+they were sent has no token in it.
+
+Owner links are derived, not stored, so they can't be revoked one at a time —
+rotating `DASHBOARD_SHARE_SECRET` invalidates all of them at once. Bidding,
+plans and permits have no owner link by design: they show every sub's numbers
+across the portfolio, so they stay team-only.
+
+Mint one by hand with:
+
+```
+GET /api/share-link?projectId=<project name>&view=report&k=<team key>
+```
+
 ## Architecture in one paragraph
 
 `app/page.tsx` server-renders the first paint by calling `getDashboardPayload`

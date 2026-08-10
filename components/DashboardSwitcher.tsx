@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
+import { withAccessToken } from '@/lib/urls';
 
 interface Option {
   id: 'budget' | 'bidding' | 'plans' | 'permits';
@@ -58,12 +59,14 @@ export function DashboardSwitcher() {
 
   // If we're on a per-project page, carry the project over to budget/bidding/plans.
   // Plans per-project lives at /plans/[segment]; its portfolio is still at /.
+  // The access token rides along too — in the ClickUp iframe the gate's cookie is
+  // third-party and often refused, so a link without it lands on "Access required".
   const projectSegment = extractProjectSegment(pathname);
   function hrefFor(opt: Option): string {
     if (projectSegment && (opt.id === 'budget' || opt.id === 'bidding' || opt.id === 'plans')) {
-      return `/${opt.id}/${projectSegment}`;
+      return withAccessToken(`/${opt.id}/${projectSegment}`);
     }
-    return opt.href;
+    return withAccessToken(opt.href);
   };
 
   const [open, setOpen] = useState(false);

@@ -7,7 +7,8 @@ import { LogoHeader } from '@/components/LogoHeader';
 import { ProjectPicker } from '@/components/ProjectPicker';
 import { CLICKUP, SITE_URL } from '@/lib/constants';
 import { EmbedSyncBar } from '@/components/EmbedSyncBar';
-import { apiUrl } from '@/lib/urls';
+import { apiUrl, mintOwnerLink, withAccessToken } from '@/lib/urls';
+import { copyText } from '@/lib/clipboard';
 import type {
   BudgetTrade,
   BudgetPayload,
@@ -666,7 +667,8 @@ function DetailedView({
   const bs = computeStats(filteredTrades);
   const d = bs.newv - bs.est;
   const dp = bs.est > 0 ? (d / bs.est * 100) : 0;
-  const [shareCopied, setShareCopied] = useState(false);
+  const scoped = useContext(ScopedCtx);
+  const [shareState, setShareState] = useState<'idle' | 'busy' | 'copied' | 'error'>('idle');
 
   // "where budget moved"
   const movers = filteredTrades
@@ -821,27 +823,23 @@ function DetailedView({
     setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
   }
 
-  function handleShareLink() {
-    const url = `${SITE_URL}/budget/${encodeURIComponent(project.name)}/report`;
-    const onSuccess = () => {
-      setShareCopied(true);
-      setTimeout(() => setShareCopied(false), 2500);
-    };
-    const execFallback = () => {
-      const ta = document.createElement('textarea');
-      ta.value = url;
-      ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;pointer-events:none;';
-      document.body.appendChild(ta);
-      ta.focus();
-      ta.select();
-      try { document.execCommand('copy'); onSuccess(); } catch (_) { /* silent */ }
-      document.body.removeChild(ta);
-    };
-    if (navigator.clipboard?.writeText) {
-      navigator.clipboard.writeText(url).then(onSuccess).catch(execFallback);
-    } else {
-      execFallback();
+  // Share hands this report to an owner, so the link has to stand on its own:
+  // since the dashboard was gated, a bare /budget/<project>/report URL shows the
+  // recipient "Access required". The URL in our own address bar does work — but
+  // it carries the team token, which opens every project and every dashboard, so
+  // pasting that is worse than a broken link. Mint a read-only share link for
+  // this one project instead. A share viewer already holds such a link and
+  // cannot mint another, so theirs is simply carried forward.
+  async function handleShareLink() {
+    setShareState('busy');
+    try {
+      const reportPath = `${SITE_URL}/budget/${encodeURIComponent(project.name)}/report`;
+      const url = scoped ? withAccessToken(reportPath) : await mintOwnerLink(project.name, 'report');
+      setShareState((await copyText(url)) ? 'copied' : 'error');
+    } catch {
+      setShareState('error');
     }
+    setTimeout(() => setShareState('idle'), 2800);
   }
 
   return (
@@ -865,11 +863,15 @@ function DetailedView({
           <button
             type="button"
             onClick={handleShareLink}
-            title="Copy live report link to clipboard"
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 10px', background: shareCopied ? 'var(--bid-fnl-bg)' : 'var(--color-background-secondary)', color: shareCopied ? 'var(--bid-fnl-fg)' : 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer', fontFamily: 'inherit', border: 'none', transition: 'background 0.2s, color 0.2s' }}
+            disabled={shareState === 'busy'}
+            title="Copy an owner-safe link to this live report — read-only, this project only"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 10px', background: shareState === 'copied' ? 'var(--bid-fnl-bg)' : 'var(--color-background-secondary)', color: shareState === 'copied' ? 'var(--bid-fnl-fg)' : shareState === 'error' ? '#A82828' : 'var(--color-text-secondary)', fontSize: 11, cursor: shareState === 'busy' ? 'default' : 'pointer', fontFamily: 'inherit', border: 'none', transition: 'background 0.2s, color 0.2s' }}
           >
-            <i className={`ti ${shareCopied ? 'ti-check' : 'ti-link'}`} style={{ fontSize: 13 }} />
-            {shareCopied ? 'Copied!' : 'Share'}
+            <i
+              className={`ti ${shareState === 'copied' ? 'ti-check' : shareState === 'error' ? 'ti-alert-triangle' : shareState === 'busy' ? 'ti-loader' : 'ti-link'}`}
+              style={{ fontSize: 13, animation: shareState === 'busy' ? 'lib-spin 1s linear infinite' : undefined }}
+            />
+            {shareState === 'copied' ? 'Link copied!' : shareState === 'error' ? 'Failed' : shareState === 'busy' ? 'Linking…' : 'Share'}
           </button>
         </div>
         <a
@@ -1914,11 +1916,14 @@ export function BudgetDashboard({
   const [embedCopied, setEmbedCopied] = useState(false);
   const closeDrawer = useCallback(() => setDrawerTrade(null), []);
 
+  // In-app navigation has to carry the access token forward: inside the ClickUp
+  // iframe the gate's cookie is a third-party cookie and is often refused, which
+  // leaves the token in the URL as the only thing keeping the next page open.
   const navigateToProject = useCallback(
-    (id: string) => router.push(`/budget/${encodeURIComponent(id)}`),
+    (id: string) => router.push(withAccessToken(`/budget/${encodeURIComponent(id)}`)),
     [router],
   );
-  const navigateToPortfolio = useCallback(() => router.push('/budget'), [router]);
+  const navigateToPortfolio = useCallback(() => router.push(withAccessToken('/budget')), [router]);
   const setTab = useCallback(
     (newTab: ProjectTab) => {
       if (!projectId) return;
@@ -2146,13 +2151,17 @@ export function BudgetDashboard({
         )}
 
         {/* Copy embed link — per-project, non-embed mode only. Hidden for share
-            viewers: it builds an un-tokenized team URL that would 401 for them. */}
+            viewers, who have no ClickUp to embed it in. The link carries the
+            team token, so it belongs in a ClickUp widget and nowhere else; use
+            Share on the project view for anything sent outside the team. */}
         {!isEmbed && projectId && !scoped && (
           <button
             type="button"
+            title="Copy this project's ClickUp embed URL — carries the team key, internal use only"
             onClick={() => {
-              const url = `${SITE_URL}/budget/${encodeURIComponent(projectId)}?embed=1`;
-              navigator.clipboard.writeText(url).then(() => {
+              const url = withAccessToken(`${SITE_URL}/budget/${encodeURIComponent(projectId)}?embed=1`);
+              copyText(url).then((ok) => {
+                if (!ok) return;
                 setEmbedCopied(true);
                 setTimeout(() => setEmbedCopied(false), 2000);
               });

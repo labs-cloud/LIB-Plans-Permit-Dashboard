@@ -1,9 +1,11 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import useSWR from 'swr';
 import type { BudgetPayload, BudgetTrade, MoneyVal } from '@/lib/budget-types';
-import { apiUrl } from '@/lib/urls';
+import { accessToken, apiUrl, mintOwnerLink, withoutAccessToken } from '@/lib/urls';
+import { isShareToken } from '@/lib/access';
+import { copyText } from '@/lib/clipboard';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -39,7 +41,29 @@ function computeStats(trades: BudgetTrade[]) {
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
 export function BudgetReport({ projectId }: { projectId: string }) {
-  const [copied, setCopied] = useState(false);
+  const [copyState, setCopyState] = useState<'idle' | 'busy' | 'copied' | 'error'>('idle');
+
+  // The link this report hands out — to the clipboard and to the printed page.
+  //
+  // A teammate is here with the team token in the URL; that token opens every
+  // project, so it must never leave with a link or a PDF. Ask for a share token
+  // scoped to this one project instead. A share viewer is already holding such a
+  // link, so theirs is used as-is. If minting fails, the token is dropped rather
+  // than passed on — a link the recipient has to ask about beats one that hands
+  // them the whole book.
+  const [ownerUrl, setOwnerUrl] = useState<string | null>(null);
+  useEffect(() => {
+    let live = true;
+    const token = accessToken();
+    if (token && isShareToken(token)) {
+      setOwnerUrl(window.location.href);
+      return;
+    }
+    mintOwnerLink(projectId, 'report')
+      .then((url) => { if (live) setOwnerUrl(url); })
+      .catch(() => { if (live) setOwnerUrl(withoutAccessToken(window.location.href)); });
+    return () => { live = false; };
+  }, [projectId]);
 
   const { data, isLoading, mutate } = useSWR<BudgetPayload>(
     apiUrl(`/api/budget/project/${encodeURIComponent(projectId)}`),
@@ -63,24 +87,11 @@ export function BudgetReport({ projectId }: { projectId: string }) {
   const delta = kpis.newv - kpis.est;
   const deltaPct = kpis.est > 0 ? (delta / kpis.est) * 100 : 0;
 
-  function handleCopyLink() {
-    const url = window.location.href;
-    const onSuccess = () => { setCopied(true); setTimeout(() => setCopied(false), 2500); };
-    const execFallback = () => {
-      const ta = document.createElement('textarea');
-      ta.value = url;
-      ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;pointer-events:none;';
-      document.body.appendChild(ta);
-      ta.focus();
-      ta.select();
-      try { document.execCommand('copy'); onSuccess(); } catch (_) { /* silent */ }
-      document.body.removeChild(ta);
-    };
-    if (navigator.clipboard?.writeText) {
-      navigator.clipboard.writeText(url).then(onSuccess).catch(execFallback);
-    } else {
-      execFallback();
-    }
+  async function handleCopyLink() {
+    if (!ownerUrl) return;
+    setCopyState('busy');
+    setCopyState((await copyText(ownerUrl)) ? 'copied' : 'error');
+    setTimeout(() => setCopyState('idle'), 2800);
   }
 
   if (isLoading || !data) {
@@ -178,21 +189,24 @@ export function BudgetReport({ projectId }: { projectId: string }) {
             </button>
             <button
               onClick={handleCopyLink}
+              disabled={!ownerUrl || copyState === 'busy'}
+              title="Copy an owner-safe link to this live report — read-only, this project only"
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: 5,
                 padding: '5px 12px', border: '0.5px solid #d4d4d0', borderRadius: 6,
-                background: copied ? '#f0fdf4' : '#fff',
-                color: copied ? '#166534' : '#555',
-                fontSize: 12, cursor: 'pointer', fontFamily: 'inherit',
+                background: copyState === 'copied' ? '#f0fdf4' : '#fff',
+                color: copyState === 'copied' ? '#166534' : copyState === 'error' ? '#A82828' : '#555',
+                fontSize: 12, cursor: ownerUrl && copyState !== 'busy' ? 'pointer' : 'default',
+                fontFamily: 'inherit',
                 transition: 'background 0.2s, color 0.2s',
               }}
             >
-              {copied ? (
+              {copyState === 'copied' ? (
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
               ) : (
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" /></svg>
               )}
-              {copied ? 'Copied!' : 'Copy link'}
+              {copyState === 'copied' ? 'Link copied!' : copyState === 'error' ? 'Copy failed' : 'Copy link'}
             </button>
             <button
               onClick={() => window.print()}
@@ -370,10 +384,10 @@ export function BudgetReport({ projectId }: { projectId: string }) {
           </svg>
           <span style={{ color: '#555' }}>Live report:</span>
           <a
-            href={typeof window !== 'undefined' ? window.location.href : ''}
+            href={ownerUrl ?? ''}
             style={{ color: '#F47832', fontWeight: 600, wordBreak: 'break-all' }}
           >
-            {typeof window !== 'undefined' ? window.location.href : ''}
+            {ownerUrl ?? ''}
           </a>
           <span style={{ marginLeft: 'auto', color: '#bbb' }}>Open this URL to refresh · data updates every 5 min</span>
         </div>
