@@ -128,8 +128,10 @@ export async function middleware(req: NextRequest) {
 
 export const config = {
   matcher: [
-    // Everything except Next's static output and the icon routes, which carry no
-    // project data and are needed to render the denial page itself.
-    '/((?!_next/static|_next/image|favicon.ico|icon.svg|apple-icon).*)',
+    // Everything except Next's static output, the icon routes and the brand
+    // images. Those carry no project data, are needed to render the denial page
+    // itself, and are fetched by printed reports and by the ClickUp iframe —
+    // where a third-party cookie is often refused, so a gated logo just breaks.
+    '/((?!_next/static|_next/image|favicon.ico|icon.svg|apple-icon|lib_brand/).*)',
   ],
 };

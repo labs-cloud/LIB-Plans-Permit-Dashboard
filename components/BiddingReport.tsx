@@ -1,9 +1,10 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import useSWR from 'swr';
 import type { BiddingPayload, BidStatus, BidTrade } from '@/lib/bidding-types';
-import { apiUrl } from '@/lib/urls';
+import { apiUrl, withoutAccessToken } from '@/lib/urls';
+import { copyText } from '@/lib/clipboard';
 
 // ─── Hardcoded status palette (safe for print / no CSS vars) ──────────────────
 
@@ -31,6 +32,12 @@ const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
 export function BiddingReport({ projectId }: { projectId: string }) {
   const [copied, setCopied] = useState(false);
+
+  // The URL printed into the PDF, with the access token stripped — a teammate
+  // opening it has a token of their own, and a printout that carries the team
+  // key hands full access to whoever the file gets forwarded to.
+  const [printedUrl, setPrintedUrl] = useState('');
+  useEffect(() => setPrintedUrl(withoutAccessToken(window.location.href)), []);
 
   const { data, isLoading, mutate } = useSWR<BiddingPayload>(
     apiUrl(`/api/bidding/project/${encodeURIComponent(projectId)}`),
@@ -64,24 +71,15 @@ export function BiddingReport({ projectId }: { projectId: string }) {
     day: 'numeric',
   });
 
+  // Copies the current URL, access token and all: bidding is team-only, so this
+  // link is for a teammate who needs the same view. The printed footer below
+  // drops the token instead — a PDF outlives the conversation it was sent in.
   function handleCopyLink() {
-    const url = window.location.href;
-    const onSuccess = () => { setCopied(true); setTimeout(() => setCopied(false), 2500); };
-    const execFallback = () => {
-      const ta = document.createElement('textarea');
-      ta.value = url;
-      ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;pointer-events:none;';
-      document.body.appendChild(ta);
-      ta.focus();
-      ta.select();
-      try { document.execCommand('copy'); onSuccess(); } catch (_) { /* silent */ }
-      document.body.removeChild(ta);
-    };
-    if (navigator.clipboard?.writeText) {
-      navigator.clipboard.writeText(url).then(onSuccess).catch(execFallback);
-    } else {
-      execFallback();
-    }
+    copyText(window.location.href).then((ok) => {
+      if (!ok) return;
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    });
   }
 
   if (isLoading || !data) {
@@ -545,10 +543,10 @@ export function BiddingReport({ projectId }: { projectId: string }) {
           </svg>
           <span style={{ color: '#555' }}>Live report:</span>
           <a
-            href={typeof window !== 'undefined' ? window.location.href : ''}
+            href={printedUrl}
             style={{ color: '#F47832', fontWeight: 600, wordBreak: 'break-all' }}
           >
-            {typeof window !== 'undefined' ? window.location.href : ''}
+            {printedUrl}
           </a>
           <span style={{ marginLeft: 'auto', color: '#bbb' }}>Open this URL to refresh · data updates every 5 min</span>
         </div>

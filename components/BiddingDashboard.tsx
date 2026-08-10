@@ -6,7 +6,8 @@ import useSWR from 'swr';
 import { LogoHeader } from './LogoHeader';
 import { ProjectPicker } from './ProjectPicker';
 import type { BidStatus, BidSub, BidTrade, BiddingPayload, BiddingPortfolioPayload, BiddingProject } from '@/lib/bidding-types';
-import { taskUrl, folderUrl, apiUrl } from '@/lib/urls';
+import { taskUrl, folderUrl, apiUrl, withAccessToken } from '@/lib/urls';
+import { copyText } from '@/lib/clipboard';
 import { SITE_URL } from '@/lib/constants';
 import { EmbedSyncBar } from './EmbedSyncBar';
 
@@ -1294,47 +1295,26 @@ function DetailedView({ onBack, search = '' }: { onBack: () => void; search?: st
     w.document.close();
   }
 
+  // Both links carry the caller's token — without it the recipient just gets the
+  // gate's "Access required" page. Bidding has no scoped share link of its own:
+  // it shows every sub's number on every trade, so it stays team-only, and these
+  // links are for teammates and ClickUp widgets, not for owners.
   function handleCopyEmbedLink() {
-    const url = `${SITE_URL}/bidding/${encodeURIComponent(project.name)}?embed=1`;
-    const onSuccess = () => { setEmbedCopied(true); setTimeout(() => setEmbedCopied(false), 2500); };
-    const execFallback = () => {
-      const ta = document.createElement('textarea');
-      ta.value = url;
-      ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;pointer-events:none;';
-      document.body.appendChild(ta);
-      ta.focus();
-      ta.select();
-      try { document.execCommand('copy'); onSuccess(); } catch (_) { /* silent */ }
-      document.body.removeChild(ta);
-    };
-    if (navigator.clipboard?.writeText) {
-      navigator.clipboard.writeText(url).then(onSuccess).catch(execFallback);
-    } else {
-      execFallback();
-    }
+    const url = withAccessToken(`${SITE_URL}/bidding/${encodeURIComponent(project.name)}?embed=1`);
+    copyText(url).then((ok) => {
+      if (!ok) return;
+      setEmbedCopied(true);
+      setTimeout(() => setEmbedCopied(false), 2500);
+    });
   }
 
   function handleShareLink() {
-    const url = `${SITE_URL}/bidding/${encodeURIComponent(project.name)}/report`;
-    const onSuccess = () => {
+    const url = withAccessToken(`${SITE_URL}/bidding/${encodeURIComponent(project.name)}/report`);
+    copyText(url).then((ok) => {
+      if (!ok) return;
       setShareCopied(true);
       setTimeout(() => setShareCopied(false), 2500);
-    };
-    const execFallback = () => {
-      const ta = document.createElement('textarea');
-      ta.value = url;
-      ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;pointer-events:none;';
-      document.body.appendChild(ta);
-      ta.focus();
-      ta.select();
-      try { document.execCommand('copy'); onSuccess(); } catch (_) { /* silent */ }
-      document.body.removeChild(ta);
-    };
-    if (navigator.clipboard?.writeText) {
-      navigator.clipboard.writeText(url).then(onSuccess).catch(execFallback);
-    } else {
-      execFallback();
-    }
+    });
   }
 
   return (
@@ -1397,7 +1377,7 @@ function DetailedView({ onBack, search = '' }: { onBack: () => void; search?: st
           <button
             type="button"
             onClick={handleShareLink}
-            title="Copy live report link to clipboard"
+            title="Copy live report link — carries the team key, for teammates only"
             style={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -3678,11 +3658,14 @@ export function BiddingDashboard({ projectId }: { projectId?: string } = {}) {
   const [search, setSearch] = useState('');
   const [embedCopied, setEmbedCopied] = useState(false);
 
+  // Navigation carries the access token forward — inside the ClickUp iframe the
+  // gate's cookie is third-party and often refused, so the URL is what keeps the
+  // next page open.
   const navigateToProject = useCallback(
-    (id: string) => router.push(`/bidding/${encodeURIComponent(id)}`),
+    (id: string) => router.push(withAccessToken(`/bidding/${encodeURIComponent(id)}`)),
     [router],
   );
-  const navigateToPortfolio = useCallback(() => router.push('/bidding'), [router]);
+  const navigateToPortfolio = useCallback(() => router.push(withAccessToken('/bidding')), [router]);
   const setTab = useCallback(
     (newTab: ProjectTab) => {
       if (!projectId) return;
@@ -3846,13 +3829,17 @@ export function BiddingDashboard({ projectId }: { projectId?: string } = {}) {
           isEmbed={isEmbed}
         />
 
-        {/* Copy embed link — per-project, non-embed mode only */}
+        {/* Copy embed link — per-project, non-embed mode only. Bidding is
+            team-only (share tokens never resolve for /bidding), so this link
+            carries the team key and must stay inside ClickUp. */}
         {!isEmbed && projectId && (
           <button
             type="button"
+            title="Copy this project's ClickUp embed URL — carries the team key, internal use only"
             onClick={() => {
-              const url = `${SITE_URL}/bidding/${encodeURIComponent(projectId)}?embed=1`;
-              navigator.clipboard.writeText(url).then(() => {
+              const url = withAccessToken(`${SITE_URL}/bidding/${encodeURIComponent(projectId)}?embed=1`);
+              copyText(url).then((ok) => {
+                if (!ok) return;
                 setEmbedCopied(true);
                 setTimeout(() => setEmbedCopied(false), 2000);
               });
