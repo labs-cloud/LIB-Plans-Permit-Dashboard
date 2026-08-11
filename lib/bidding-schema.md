@@ -63,6 +63,7 @@ are **no longer collapsed** into the wrong pill:
 | `leveling`                   | `lvl`                 | amber — Leveling                 |
 | `leveled`                    | `lvl`                 | amber — Leveling                 |
 | `leveled — pending review`   | `lvp`                 | deep amber — Leveled · Pending   |
+| `reviewed`                   | `rvw`                 | pink — Reviewed (ClickUp #e93d82)|
 | `needs rebid`                | `reb`                 | indigo — Needs Rebid             |
 | `awarded`                    | `fnl`                 | green — Awarded                  |
 | `no bid / declined`          | `hld`                 | red — No Bid / Declined          |
@@ -70,7 +71,7 @@ are **no longer collapsed** into the wrong pill:
 
 The **trade-level** status shown in the portfolio matrix is the *most advanced*
 status among the trade's bids (see `STATUS_RANK` in `BiddingDashboard.tsx`):
-`ntb < hld = reb < wfp < snt < followed-up < rec < lvl < lvp < fnl`. `needs rebid`
+`ntb < hld = reb < wfp < snt < followed-up < rec < lvl < lvp < rvw < fnl`. `needs rebid`
 is ranked low (an attention state, not an advanced one) and its bid amount is
 **excluded from every lowest-bid calculation** — a rejected bid can never be a
 trade's lowest. So a trade with a
