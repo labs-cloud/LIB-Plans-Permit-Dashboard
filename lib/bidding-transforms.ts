@@ -23,7 +23,7 @@ function mapBiddingStatusName(name: string): BidStatus {
     case 'FOLLOWED UP':        return 'fu1';
     case 'PROPOSALS RECEIVED': return 'rec';
     case 'TO CLARIFY':         return 'rec';
-    case 'REVIEWED':           return 'lvp';
+    case 'REVIEWED':           return 'rvw';
     case 'REJECTED':           return 'hld';
     case 'AWARDED':            return 'fnl';
     // ── Per-project list native task statuses ───────────────────────────────
@@ -35,6 +35,10 @@ function mapBiddingStatusName(name: string): BidStatus {
     case 'LEVELED':            return 'lvl';
     case 'LEVELED - PENDING REVIEW': return 'lvp';
     case 'PENDING REVIEW':     return 'lvp';
+    // "Reviewed" is the step *after* pending review (orderindex 7 vs 6 in the
+    // per-project lists), so it gets its own tier — collapsing it into lvp made
+    // reviewing a bid a no-op on screen.
+    case 'BID REVIEWED':       return 'rvw';
     case 'NEEDS REBID':        return 'reb';
     case 'REBID':              return 'reb';
     case 'NO BID / DECLINED':  return 'hld';

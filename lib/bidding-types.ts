@@ -5,6 +5,8 @@
 //   • wfp — "Waiting for Plans" (previously mis-mapped to ntb / "To Send")
 //   • lvl — "Leveling"          (previously mis-mapped to ntb / "To Send")
 //   • lvp — "Leveled — Pending Review" (previously mis-mapped to ntb)
+//   • rvw — "Reviewed" (previously collapsed into lvp, so marking a bid reviewed
+//     changed nothing on screen — the pill still read "Leveled · Pending Review")
 export type BidStatus =
   | 'ntb' // NOT STARTED — To Send
   | 'snt' // RFP SENT
@@ -15,6 +17,7 @@ export type BidStatus =
   | 'rec' // BID RECEIVED
   | 'lvl' // LEVELING
   | 'lvp' // LEVELED — PENDING REVIEW
+  | 'rvw' // REVIEWED — leveling reviewed, awaiting the award decision
   | 'reb' // NEEDS REBID — bid rejected/void, must be re-solicited. Never counts as a lowest bid.
   | 'fnl' // AWARDED
   | 'hld'; // NO BID / DECLINED

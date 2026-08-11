@@ -15,6 +15,7 @@ const STATUS: Record<BidStatus, { bg: string; fg: string; ring: string; label: s
   rec: { bg: '#FFE74A', fg: '#3D2D00', ring: '#9C7A00', label: 'Received' },
   lvl: { bg: '#FBD48D', fg: '#4A2C00', ring: '#B87400', label: 'Leveling' },
   lvp: { bg: '#F6B266', fg: '#4A2400', ring: '#A85E14', label: 'Leveled · Pending' },
+  rvw: { bg: '#F7A8C4', fg: '#4E0722', ring: '#C21E5B', label: 'Reviewed' },
   reb: { bg: '#C7C2F9', fg: '#241C6E', ring: '#5F55EE', label: 'Needs Rebid' },
   hld: { bg: '#F47B7B', fg: '#3E0707', ring: '#A82828', label: 'No Bid' },
   fnl: { bg: '#7DD68F', fg: '#0D3E18', ring: '#1F7A38', label: 'Awarded' },

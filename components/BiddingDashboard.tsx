@@ -62,6 +62,7 @@ const STATUS_META: Record<BidStatus, StatusMeta> = {
   rec: { label: 'Bid Received',  short: 'Received',    icon: 'ti-checks',     bg: 'var(--bid-rec-bg)', fg: 'var(--bid-rec-fg)', ring: 'var(--bid-rec-ring)', strong: 'var(--bid-rec-strong)' },
   lvl: { label: 'Leveling',      short: 'Leveling',    icon: 'ti-scale',      bg: 'var(--bid-lvl-bg)', fg: 'var(--bid-lvl-fg)', ring: 'var(--bid-lvl-ring)', strong: 'var(--bid-lvl-strong)' },
   lvp: { label: 'Leveled · Pending Review', short: 'Leveled', icon: 'ti-list-check', bg: 'var(--bid-lvp-bg)', fg: 'var(--bid-lvp-fg)', ring: 'var(--bid-lvp-ring)', strong: 'var(--bid-lvp-strong)' },
+  rvw: { label: 'Reviewed',      short: 'Reviewed',    icon: 'ti-clipboard-check', bg: 'var(--bid-rvw-bg)', fg: 'var(--bid-rvw-fg)', ring: 'var(--bid-rvw-ring)', strong: 'var(--bid-rvw-strong)' },
   reb: { label: 'Needs Rebid',   short: 'Rebid',      icon: 'ti-refresh',    bg: 'var(--bid-reb-bg)', fg: 'var(--bid-reb-fg)', ring: 'var(--bid-reb-ring)', strong: 'var(--bid-reb-strong)' },
   hld: { label: 'No Bid / Declined', short: 'No Bid',  icon: 'ti-hand-stop', bg: 'var(--bid-hld-bg)', fg: 'var(--bid-hld-fg)', ring: 'var(--bid-hld-ring)', strong: 'var(--bid-hld-strong)' },
   fnl: { label: 'Awarded',       short: 'Awarded',     icon: 'ti-trophy',     bg: 'var(--bid-fnl-bg)', fg: 'var(--bid-fnl-fg)', ring: 'var(--bid-fnl-ring)', strong: 'var(--bid-fnl-strong)' },
@@ -87,7 +88,10 @@ const STATUS_RANK: Record<BidStatus, number> = {
   rec: 5,
   lvl: 6,
   lvp: 7,
-  fnl: 8,
+  // Reviewed sits between "leveled — pending review" and "awarded", mirroring
+  // the order of the statuses in the per-project bidding lists.
+  rvw: 8,
+  fnl: 9,
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -1047,6 +1051,7 @@ const FILTER_CHIPS: { key: FilterKey; label: string }[] = [
   { key: 'fu', label: 'Followed Up' },
   { key: 'rec', label: 'Bid Received' },
   { key: 'lev', label: 'Leveling' },
+  { key: 'rvw', label: 'Reviewed' },
   { key: 'reb', label: 'Needs Rebid' },
   { key: 'fnl', label: 'Awarded' },
   { key: 'hld', label: 'No Bid' },
@@ -1076,7 +1081,8 @@ function DetailedView({ onBack, search = '' }: { onBack: () => void; search?: st
         s.status === 'fu3' ||
         s.status === 'rec' ||
         s.status === 'lvl' ||
-        s.status === 'lvp',
+        s.status === 'lvp' ||
+        s.status === 'rvw',
     ).length;
     const levCount = allSubs.filter((s) => s.status === 'lvl' || s.status === 'lvp').length;
     const hldCount = allSubs.filter((s) => s.status === 'hld').length;
@@ -1122,7 +1128,8 @@ function DetailedView({ onBack, search = '' }: { onBack: () => void; search?: st
             s.status === 'fu3' ||
             s.status === 'rec' ||
             s.status === 'lvl' ||
-            s.status === 'lvp',
+            s.status === 'lvp' ||
+            s.status === 'rvw',
         ),
       );
     else if (filter !== 'all')
@@ -1143,7 +1150,7 @@ function DetailedView({ onBack, search = '' }: { onBack: () => void; search?: st
     const allSubs = trades.flatMap((t) => t.subs);
     const inFlight = (s: BidStatus) =>
       s === 'snt' || s === 'wfp' || s === 'fu1' || s === 'fu2' || s === 'fu3' ||
-      s === 'rec' || s === 'lvl' || s === 'lvp';
+      s === 'rec' || s === 'lvl' || s === 'lvp' || s === 'rvw';
     return {
       all: allSubs.length,
       snt: allSubs.filter((s) => s.status === 'snt').length,
@@ -1151,6 +1158,7 @@ function DetailedView({ onBack, search = '' }: { onBack: () => void; search?: st
       rec: allSubs.filter((s) => s.status === 'rec').length,
       lvl: allSubs.filter((s) => s.status === 'lvl').length,
       lvp: allSubs.filter((s) => s.status === 'lvp').length,
+      rvw: allSubs.filter((s) => s.status === 'rvw').length,
       hld: allSubs.filter((s) => s.status === 'hld').length,
       fnl: allSubs.filter((s) => s.status === 'fnl').length,
       // fu1/fu2/fu3 are all surfaced under the single "Followed Up" pill.
@@ -1178,6 +1186,7 @@ function DetailedView({ onBack, search = '' }: { onBack: () => void; search?: st
     rec: { bg: '#FFE74A', fg: '#3D2D00', ring: '#9C7A00', label: 'Bid Received' },
     lvl: { bg: '#FBD48D', fg: '#4A2C00', ring: '#B87400', label: 'Leveling' },
     lvp: { bg: '#F6B266', fg: '#4A2400', ring: '#A85E14', label: 'Leveled · Pending Review' },
+    rvw: { bg: '#F7A8C4', fg: '#4E0722', ring: '#C21E5B', label: 'Reviewed' },
     reb: { bg: '#C7C2F9', fg: '#241C6E', ring: '#5F55EE', label: 'Needs Rebid' },
     hld: { bg: '#F47B7B', fg: '#3E0707', ring: '#A82828', label: 'No Bid / Declined' },
     fnl: { bg: '#7DD68F', fg: '#0D3E18', ring: '#1F7A38', label: 'Awarded' },
@@ -2232,7 +2241,10 @@ function PipelineView({ search = '' }: { search?: string }) {
       items: trades.filter(
         (t) =>
           t.subs.some((s) => s.status === 'rec') &&
-          !t.subs.some((s) => s.status === 'fnl' || s.status === 'lvl' || s.status === 'lvp'),
+          !t.subs.some(
+            (s) =>
+              s.status === 'fnl' || s.status === 'lvl' || s.status === 'lvp' || s.status === 'rvw',
+          ),
       ),
     },
     {
@@ -2241,7 +2253,14 @@ function PipelineView({ search = '' }: { search?: string }) {
       items: trades.filter(
         (t) =>
           t.subs.some((s) => s.status === 'lvl' || s.status === 'lvp') &&
-          !t.subs.some((s) => s.status === 'fnl'),
+          !t.subs.some((s) => s.status === 'fnl' || s.status === 'rvw'),
+      ),
+    },
+    {
+      key: 'rvw',
+      label: 'Reviewed',
+      items: trades.filter(
+        (t) => t.subs.some((s) => s.status === 'rvw') && !t.subs.some((s) => s.status === 'fnl'),
       ),
     },
     {
@@ -2267,7 +2286,7 @@ function PipelineView({ search = '' }: { search?: string }) {
     <div
       style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(6, 1fr)',
+        gridTemplateColumns: `repeat(${columns.length}, 1fr)`,
         gap: 10,
         marginBottom: '1.25rem',
       }}

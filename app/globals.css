@@ -46,6 +46,9 @@
   --bid-rec-bg: #FFE74A; --bid-rec-fg: #3D2D00; --bid-rec-ring: #9C7A00; --bid-rec-strong: #9C7A00;
   --bid-lvl-bg: #FBD48D; --bid-lvl-fg: #4A2C00; --bid-lvl-ring: #B87400; --bid-lvl-strong: #B87400;
   --bid-lvp-bg: #F6B266; --bid-lvp-fg: #4A2400; --bid-lvp-ring: #A85E14; --bid-lvp-strong: #A85E14;
+  /* Reviewed — keyed off ClickUp's own #e93d82 so the pill matches the status
+     chip in the task list, and reads as distinct from the ambers before it. */
+  --bid-rvw-bg: #F7A8C4; --bid-rvw-fg: #4E0722; --bid-rvw-ring: #C21E5B; --bid-rvw-strong: #C21E5B;
   --bid-reb-bg: #C7C2F9; --bid-reb-fg: #241C6E; --bid-reb-ring: #5F55EE; --bid-reb-strong: #4B42C7;
   --bid-hld-bg: #F47B7B; --bid-hld-fg: #3E0707; --bid-hld-ring: #A82828; --bid-hld-strong: #A82828;
   --bid-fnl-bg: #7DD68F; --bid-fnl-fg: #0D3E18; --bid-fnl-ring: #1F7A38; --bid-fnl-strong: #1F7A38;
@@ -76,6 +79,7 @@ html[data-theme='dark'] {
   --bid-rec-bg: rgba(255,231,74,0.18);  --bid-rec-fg: #ffe98a; --bid-rec-ring: #d6b300; --bid-rec-strong: #d6b300;
   --bid-lvl-bg: rgba(251,212,141,0.20); --bid-lvl-fg: #f6cd86; --bid-lvl-ring: #cb9038; --bid-lvl-strong: #cb9038;
   --bid-lvp-bg: rgba(246,178,102,0.20); --bid-lvp-fg: #f3b878; --bid-lvp-ring: #c47a2c; --bid-lvp-strong: #c47a2c;
+  --bid-rvw-bg: rgba(233,61,130,0.22); --bid-rvw-fg: #f5a1bf; --bid-rvw-ring: #d94a7f; --bid-rvw-strong: #d94a7f;
   --bid-reb-bg: rgba(95,85,238,0.22); --bid-reb-fg: #c3bdf7; --bid-reb-ring: #7b72f0; --bid-reb-strong: #7b72f0;
   --bid-hld-bg: rgba(244,123,123,0.20); --bid-hld-fg: #ff9a9a; --bid-hld-ring: #c95050; --bid-hld-strong: #c95050;
   --bid-fnl-bg: rgba(125,214,143,0.20); --bid-fnl-fg: #9adfa9; --bid-fnl-ring: #4ea063; --bid-fnl-strong: #4ea063;
